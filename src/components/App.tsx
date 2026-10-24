@@ -1,196 +1,189 @@
 "use client";
 import { useEffect, useState } from "react";
+import BottomNav, { type Tab } from "./BottomNav";
 import Game from "./Game";
+import Gem, { type GemKind } from "./Gem";
+import Modal from "./Modal";
+import { RulesContent, type RulesGame } from "./Rules";
 import ZipGame from "./ZipGame";
-import { ZIP_PUZZLES } from "../lib/zip";
+import { FEEDBACK_CONFIGURED } from "../lib/feedback";
 import { PUZZLES, puzzleGrid } from "../lib/puzzles";
 import type { Grid } from "../lib/sudoku";
-import { FEEDBACK_CONFIGURED } from "../lib/feedback";
+import { validateNick } from "../lib/nick";
 import { KEYS, readStore, writeStore } from "../lib/storage";
+import { ZIP_PUZZLES } from "../lib/zip";
 
-type Screen = "entry" | "menu" | "rules" | "select" | "game" | "zselect" | "zgame" | "feedback";
+type View = "home" | "games" | "select" | "zselect" | "game" | "rules" | "profile" | "feedback";
 type Save = { id: string; grid: Grid };
+type Session = { game: RulesGame; idx: number; round: number };
 
-const SOON = [
-  { name: "Tango", text: "Alternância e equilíbrio de estados binários." },
-  { name: "Patches", text: "Composição por encaixe modular." },
-];
-
-function Hero() {
-  return (
-    <div className="hero">
-      <img src="/logo.jpg" alt="MindLoop — Desafie sua mente" width={320} height={320} />
-    </div>
-  );
-}
+const TAB_OF: Record<View, Tab> = { home: "home", games: "games", select: "games", zselect: "games", game: "games", rules: "rules", profile: "profile", feedback: "profile" };
+const NAME: Record<RulesGame, string> = { sudoku: "Mini Sudoku", zip: "Zip" };
 
 export default function App() {
   const [ready, setReady] = useState(false);
-  const [screen, setScreen] = useState<Screen>("entry");
-  const [after, setAfter] = useState<Screen>("menu"); // para onde voltar das regras
-  const [rulesFor, setRulesFor] = useState<"sudoku" | "zip">("sudoku");
-  const [zipSeen, setZipSeen] = useState(false);
-  const [zidx, setZidx] = useState(0);
-  const [zround, setZround] = useState(0);
+  const [view, setView] = useState<View>("home");
   const [nick, setNick] = useState("");
+  const [nickModal, setNickModal] = useState<null | View>(null); // para onde ir depois de salvar
   const [draft, setDraft] = useState("");
-  const [rulesSeen, setRulesSeen] = useState(false);
+  const [nickError, setNickError] = useState<string | null>(null);
+  const [seen, setSeen] = useState<Record<RulesGame, boolean>>({ sudoku: false, zip: false });
+  const [rulesModal, setRulesModal] = useState<RulesGame | null>(null);
+  const [rulesTab, setRulesTab] = useState<RulesGame>("sudoku");
   const [save, setSave] = useState<Save | null>(null);
-  const [idx, setIdx] = useState(0);
-  const [round, setRound] = useState(0);
+  const [session, setSession] = useState<Session | null>(null);
   const [rating, setRating] = useState<number | null>(null);
   const [comment, setComment] = useState("");
   const [demoMsg, setDemoMsg] = useState(false);
 
   useEffect(() => {
     const n = readStore(KEYS.nick) ?? "";
-    setNick(n); setDraft(n);
-    setRulesSeen(readStore(KEYS.rules) === "1");
-    setZipSeen(readStore("mindloop:rules-zip") === "1");
+    if (n && !validateNick(n)) setNick(n);
+    setSeen({ sudoku: readStore(KEYS.rules) === "1", zip: readStore("mindloop:rules-zip") === "1" });
     try { const s = readStore(KEYS.save); if (s) setSave(JSON.parse(s) as Save); } catch { /* ignora */ }
-    setScreen(readStore(KEYS.entered) === "1" ? "menu" : "entry");
     setReady(true);
   }, []);
 
   const persist = (s: Save | null) => { setSave(s); writeStore(KEYS.save, s ? JSON.stringify(s) : null); };
 
-  function enterApp(e?: React.FormEvent) {
-    e?.preventDefault();
-    const n = draft.trim().slice(0, 20);
-    setNick(n); writeStore(KEYS.nick, n || null); writeStore(KEYS.entered, "1");
-    setScreen("menu");
+  function openNick(next: View) { setDraft(nick); setNickError(null); setNickModal(next); }
+  function onPlay() { if (nick) setView("games"); else openNick("games"); }
+  function confirmNick(e: React.FormEvent) {
+    e.preventDefault();
+    const err = validateNick(draft);
+    if (err) return setNickError(err);
+    const v = draft.trim();
+    setNick(v); writeStore(KEYS.nick, v);
+    const next = nickModal ?? "games";
+    setNickModal(null); setView(next);
   }
-  function goRules(next: Screen, game: "sudoku" | "zip" = "sudoku") { setAfter(next); setRulesFor(game); setScreen("rules"); }
-  function playZip() { if (zipSeen) setScreen("zselect"); else goRules("zselect", "zip"); }
-  function startZip(i: number) { setZidx(i); setZround((r) => r + 1); setScreen("zgame"); }
-  function playMini() { if (rulesSeen) setScreen("select"); else goRules("select"); }
-  function start(i: number) { setIdx(i); setRound((r) => r + 1); setScreen("game"); }
-  function closeRules() {
-    if (rulesFor === "zip") { writeStore("mindloop:rules-zip", "1"); setZipSeen(true); } else { writeStore(KEYS.rules, "1"); setRulesSeen(true); }
-    setScreen(after);
+  function onTab(t: Tab) {
+    if (t === "games" && !nick) return openNick("games");
+    setView(t);
+  }
+  function startGame(game: RulesGame, idx: number) {
+    setSession((s) => ({ game, idx, round: (s?.round ?? 0) + 1 }));
+    setView("game");
+    if (!seen[game]) { openRules(game); }
+  }
+  function openRules(game: RulesGame) {
+    setRulesModal(game);
+    if (!seen[game]) {
+      setSeen((s) => ({ ...s, [game]: true }));
+      writeStore(game === "zip" ? "mindloop:rules-zip" : KEYS.rules, "1");
+    }
   }
 
-  const puzzle = PUZZLES[idx];
-  const initial: Grid = save && save.id === puzzle.id ? save.grid : puzzleGrid(puzzle);
+  const GAMES: { id: string; name: string; text: string; kind: GemKind; color: string; open?: () => void }[] = [
+    { id: "sudoku", name: "Mini Sudoku", text: "Complete a grade sem repetir números.", kind: "sudoku", color: "#F05BC8", open: () => setView("select") },
+    { id: "zip", name: "Zip", text: "Ligue os números em ordem, passando por todas as casas.", kind: "zip", color: "#12CFE0", open: () => setView("zselect") },
+    { id: "tango", name: "Tango", text: "Alternância e equilíbrio de estados binários.", kind: "tango", color: "#FFB020" },
+    { id: "patches", name: "Patches", text: "Composição por encaixe modular.", kind: "patches", color: "#762CEB" },
+  ];
+
+  const inGame = session && view === "game";
+  const activeSession = session;
 
   return (
     <>
-      <header className="top">
-        <span className="brand"><img src="/cube.png" alt="" width={36} height={40} /><span className="wordmark">MindLoop</span></span>
-        <span className="tagline">Lógica sem mistério</span>
-      </header>
-      <main className="stage">
+      {view !== "home" && (
+        <header className="top">
+          <span className="brand"><img src="/cube.png" alt="" width={36} height={34} /><span className="wordmark">MindLoop</span></span>
+          {nick && <span className="chip" aria-label={`Apelido: ${nick}`}>{nick}</span>}
+        </header>
+      )}
+
+      <main id="main" className={view === "home" ? "home-main" : "page"}>
         {!ready ? (
           <div className="wrap"><p role="status">Carregando…</p></div>
-        ) : screen === "entry" ? (
-          <><Hero /><form className="wrap" onSubmit={enterApp}>
-            <h1>Oi! Qual apelido você quer usar?</h1>
-            <p className="muted">É opcional. O apelido fica só neste aparelho — não é um cadastro e não pedimos nenhum outro dado.</p>
-            <div>
-              <label htmlFor="nick">Apelido</label>
-              <input id="nick" value={draft} maxLength={20} autoComplete="off" onChange={(e) => setDraft(e.target.value)} placeholder="Ex.: Lia" />
+        ) : view === "home" ? (
+          <section className="home" aria-label="Início">
+            <div className="fill" style={{ background: "rgb(15,9,56)" }} />
+            <div className="art">
+              <img src="/home-art.jpg" width={1080} height={1350} alt="MindLoop — Desafie sua mente. Um cubo mágico de quebra-cabeça sobre ilhas flutuantes, com os cristais dos jogos Mini Sudoku, Zip, Tango e Patches." fetchPriority="high" />
+              <button className="hotspot" onClick={onPlay} aria-label="Jogar"><span aria-hidden="true">Jogar</span></button>
             </div>
-            <div className="row">
-              <button className="btn cta" type="submit">{draft.trim() ? "Começar" : "Entrar sem apelido"}</button>
-              {nick && <button type="button" className="btn sec" onClick={() => setScreen("menu")}>Cancelar</button>}
-            </div>
-          </form></>
-        ) : screen === "menu" ? (
-          <><Hero /><div className="wrap">
-            <div>
-              <h1>{nick ? `Olá, ${nick}!` : "Olá!"}</h1>
-              <p className="muted">Pensar, testar, aprender e tentar de novo. Escolha um jogo.</p>
-            </div>
-            <div className="menu-grid">
-              <section className="card" aria-labelledby="g-mini">
-                <span className="badge">Disponível</span>
-                <h2 id="g-mini">Mini Sudoku</h2>
-                <p>Complete a grade sem repetir números em linha, coluna ou bloco.</p>
-                <button className="btn cta" onClick={playMini}>Jogar</button>
-              </section>
-              <section className="card" aria-labelledby="g-zip">
-                <span className="badge">Disponível</span>
-                <h2 id="g-zip">Zip</h2>
-                <p>Ligue os números em ordem com um caminho que passa por todas as casas.</p>
-                <button className="btn cta" onClick={playZip}>Jogar</button>
-              </section>
-              {SOON.map((g) => (
-                <section key={g.name} className="card soon" aria-labelledby={`g-${g.name}`}>
+            <div className="fill" style={{ background: "rgb(13,7,33)" }} />
+          </section>
+        ) : view === "games" ? (
+          <div className="screen">
+            <h1>Escolha um jogo</h1>
+            <p className="lead">{nick ? `Boa, ${nick}! ` : ""}Toque num jogo para começar.</p>
+            <div className="ggrid">
+              {GAMES.map((g) => g.open ? (
+                <button key={g.id} className="gcard" style={{ "--gc": g.color } as React.CSSProperties} onClick={g.open} aria-label={`Jogar ${g.name}`}>
+                  <Gem kind={g.kind} size={88} />
+                  <span className="badge">Disponível</span>
+                  <span className="gname">{g.name}</span>
+                  <span className="gtext">{g.text}</span>
+                  <span className="go">Jogar ›</span>
+                </button>
+              ) : (
+                <div key={g.id} className="gcard soon" style={{ "--gc": g.color } as React.CSSProperties} aria-disabled="true">
+                  <Gem kind={g.kind} size={88} />
                   <span className="badge soon">Em breve</span>
-                  <h2 id={`g-${g.name}`}>{g.name}</h2>
-                  <p className="muted">{g.text}</p>
-                </section>
+                  <span className="gname">{g.name}</span>
+                  <span className="gtext">{g.text}</span>
+                </div>
               ))}
             </div>
-            <div className="row">
-              <button className="btn sec" onClick={() => goRules("menu")}>Regras do Mini Sudoku</button>
-              <button className="btn sec" onClick={() => goRules("menu", "zip")}>Regras do Zip</button>
-              <button className="btn sec" onClick={() => { setRating(null); setComment(""); setDemoMsg(false); setScreen("feedback"); }}>Dar opinião</button>
-              <button className="btn sec" onClick={() => { setDraft(nick); setScreen("entry"); }}>Alterar apelido</button>
-            </div>
-          </div></>
-        ) : screen === "rules" ? (
-          rulesFor === "zip" ? (
-          <div className="wrap">
-            <h1>Como jogar o Zip</h1>
-            <p><b>Objetivo:</b> traçar um único caminho que liga os números em ordem (1, 2, 3…), passa por todas as casas uma só vez e termina no maior número.</p>
-            <ul style={{ margin: 0, paddingLeft: 20, display: "grid", gap: 4 }}>
-              <li>O caminho começa no 1. Arraste o dedo ou toque nas casas vizinhas (sem diagonais).</li>
-              <li>Você só pode entrar num número depois de passar pelo anterior.</li>
-              <li>Toque numa casa do caminho, ou use Desfazer, para voltar e tentar outra rota.</li>
-              <li>No teclado: setas estendem o caminho e Backspace volta um passo.</li>
-            </ul>
-            <div className="note info"><b aria-hidden="true">ℹ</b><span>Estas regras do Zip são uma versão provisória do MVP, ainda a confirmar com a equipe MindLoop.</span></div>
-            <button className="btn cta" onClick={closeRules}>{after === "zselect" ? "Entendi, vamos lá" : "Voltar"}</button>
           </div>
-          ) : (
+        ) : view === "select" ? (
           <div className="wrap">
-            <h1>Como jogar o Mini Sudoku</h1>
-            <p><b>Objetivo:</b> preencher a grade 4×4 com os números 1 a 4, sem repetir nenhum em cada linha, coluna ou bloco de 2×2.</p>
-            <ul style={{ margin: 0, paddingLeft: 20, display: "grid", gap: 4 }}>
-              <li>Toque numa casa vazia e escolha um número.</li>
-              <li>Casas roxas claras são pistas fixas.</li>
-              <li>Se um número repetir, a casa ganha um “!” e uma mensagem explica onde.</li>
-              <li>Pode desfazer, pedir uma dica ou reiniciar quando quiser.</li>
-            </ul>
-            <div className="note info"><b aria-hidden="true">ℹ</b><span>Estas regras 4×4 são uma versão provisória do MVP, ainda a confirmar com a equipe MindLoop.</span></div>
-            <button className="btn cta" onClick={closeRules}>{after === "select" ? "Entendi, vamos lá" : "Voltar"}</button>
-          </div>
-          )
-        ) : screen === "select" ? (
-          <div className="wrap">
-            <h1>Escolha um puzzle</h1>
+            <h1>Mini Sudoku</h1>
+            <p className="muted">Escolha um puzzle.</p>
             {PUZZLES.map((p, i) => (
               <section key={p.id} className="card">
                 <h2>{p.name}</h2>
                 <p className="muted">{p.level}{save?.id === p.id ? " · Em andamento" : ""}</p>
                 <div className="row">
-                  <button className="btn" onClick={() => start(i)}>{save?.id === p.id ? "Continuar" : "Jogar"}</button>
-                  {save?.id === p.id && <button className="btn sec" onClick={() => { persist(null); start(i); }}>Começar do zero</button>}
+                  <button className="btn" onClick={() => startGame("sudoku", i)}>{save?.id === p.id ? "Continuar" : "Jogar"}</button>
+                  {save?.id === p.id && <button className="btn sec" onClick={() => { persist(null); startGame("sudoku", i); }}>Começar do zero</button>}
                 </div>
               </section>
             ))}
-            <button className="btn sec" onClick={() => setScreen("menu")}>Voltar ao menu</button>
+            <button className="btn sec" onClick={() => setView("games")}>Voltar aos jogos</button>
           </div>
-        ) : screen === "game" ? (
-          <Game key={`${puzzle.id}-${round}`} puzzle={puzzle} initialGrid={initial}
-            onSave={(g) => persist(g ? { id: puzzle.id, grid: g } : null)}
-            onMenu={() => setScreen("menu")}
-            onNext={() => start((idx + 1) % PUZZLES.length)}
-            onRules={() => goRules("game")} />
-        ) : screen === "zselect" ? (
+        ) : view === "zselect" ? (
           <div className="wrap">
-            <h1>Escolha um puzzle do Zip</h1>
+            <h1>Zip</h1>
+            <p className="muted">Escolha um puzzle.</p>
             {ZIP_PUZZLES.map((p, i) => (
               <section key={p.id} className="card">
                 <h2>{p.name}</h2>
                 <p className="muted">{p.level} · grade {p.rows.length}×{p.rows.length}</p>
-                <div className="row"><button className="btn" onClick={() => startZip(i)}>Jogar</button></div>
+                <div className="row"><button className="btn" onClick={() => startGame("zip", i)}>Jogar</button></div>
               </section>
             ))}
-            <button className="btn sec" onClick={() => setScreen("menu")}>Voltar ao menu</button>
+            <button className="btn sec" onClick={() => setView("games")}>Voltar aos jogos</button>
           </div>
-        ) : screen === "zgame" ? null : (
+        ) : view === "rules" ? (
+          <div className="wrap">
+            <h1>Regras</h1>
+            <div className="seg" role="group" aria-label="Escolher jogo">
+              {(["sudoku", "zip"] as RulesGame[]).map((g) => (
+                <button key={g} className={rulesTab === g ? "on" : ""} aria-pressed={rulesTab === g} onClick={() => setRulesTab(g)}>
+                  <Gem kind={g} size={28} />{NAME[g]}
+                </button>
+              ))}
+            </div>
+            <h2>Como jogar o {NAME[rulesTab]}</h2>
+            <RulesContent game={rulesTab} />
+            <p className="muted">Tango e Patches ainda estão chegando — as regras aparecem aqui quando os jogos forem lançados.</p>
+          </div>
+        ) : view === "profile" ? (
+          <div className="wrap">
+            <h1>Perfil</h1>
+            {nick ? (
+              <div className="card"><span className="muted">Seu apelido</span><h2>{nick}</h2>
+                <button className="btn sec" onClick={() => openNick("profile")}>Alterar apelido</button></div>
+            ) : (
+              <div className="card"><p>Você ainda não escolheu um apelido.</p><button className="btn cta" onClick={() => openNick("profile")}>Escolher apelido</button></div>
+            )}
+            <p className="muted">O apelido fica salvo só neste aparelho. Não pedimos cadastro nem outros dados.</p>
+            <button className="btn sec" onClick={() => { setRating(null); setComment(""); setDemoMsg(false); setView("feedback"); }}>Dar opinião</button>
+          </div>
+        ) : view === "feedback" ? (
           <form className="wrap" onSubmit={(e) => { e.preventDefault(); setDemoMsg(true); }}>
             <h1>Sua opinião</h1>
             <div className="note warn" role="note"><b aria-hidden="true">!</b>
@@ -200,25 +193,58 @@ export default function App() {
                 <label key={n}><input type="radio" name="rating" value={n} checked={rating === n} onChange={() => setRating(n)} /><span aria-label={`Nota ${n}`}>{n}</span></label>
               ))}
             </fieldset>
-            <div>
-              <label htmlFor="cm">Comentário (opcional)</label>
-              <textarea id="cm" rows={4} value={comment} onChange={(e) => setComment(e.target.value)} />
-            </div>
+            <div><label htmlFor="cm">Comentário (opcional)</label><textarea id="cm" rows={4} value={comment} onChange={(e) => setComment(e.target.value)} /></div>
             {demoMsg && <div className="note info" role="status"><b aria-hidden="true">ℹ</b><span>Obrigado por testar! Nesta versão a avaliação não foi enviada nem armazenada.</span></div>}
             <div className="row">
               <button className="btn" type="submit">Testar envio (demonstração)</button>
-              <button type="button" className="btn sec" onClick={() => setScreen("menu")}>Voltar ao menu</button>
+              <button type="button" className="btn sec" onClick={() => setView("profile")}>Voltar ao perfil</button>
             </div>
           </form>
+        ) : null}
+
+        {/* Partidas ficam montadas enquanto a pessoa navega, para não perder o progresso. */}
+        {activeSession?.game === "sudoku" && (
+          <div hidden={!inGame}>
+            <Game key={`s-${activeSession.idx}-${activeSession.round}`} puzzle={PUZZLES[activeSession.idx]}
+              initialGrid={save && save.id === PUZZLES[activeSession.idx].id ? save.grid : puzzleGrid(PUZZLES[activeSession.idx])}
+              onSave={(g) => persist(g ? { id: PUZZLES[activeSession.idx].id, grid: g } : null)}
+              onMenu={() => setView("games")} onNext={() => startGame("sudoku", (activeSession.idx + 1) % PUZZLES.length)}
+              onRules={() => openRules("sudoku")} />
+          </div>
         )}
-        {(screen === "zgame" || (screen === "rules" && after === "zgame")) && (
-          <div hidden={screen !== "zgame"}>
-            <ZipGame key={`${ZIP_PUZZLES[zidx].id}-${zround}`} puzzle={ZIP_PUZZLES[zidx]}
-              onMenu={() => setScreen("menu")} onNext={() => startZip((zidx + 1) % ZIP_PUZZLES.length)}
-              onRules={() => goRules("zgame", "zip")} />
+        {activeSession?.game === "zip" && (
+          <div hidden={!inGame}>
+            <ZipGame key={`z-${activeSession.idx}-${activeSession.round}`} puzzle={ZIP_PUZZLES[activeSession.idx]}
+              onMenu={() => setView("games")} onNext={() => startGame("zip", (activeSession.idx + 1) % ZIP_PUZZLES.length)}
+              onRules={() => openRules("zip")} />
           </div>
         )}
       </main>
+
+      {rulesModal && (
+        <Modal title={`Como jogar o ${NAME[rulesModal]}`} onClose={() => setRulesModal(null)} closeLabel="Fechar regras">
+          <RulesContent game={rulesModal} />
+          <button className="btn cta" onClick={() => setRulesModal(null)} style={{ marginTop: 16 }}>Entendi, continuar jogando</button>
+        </Modal>
+      )}
+
+      {nickModal && (
+        <Modal title="Como podemos te chamar?" onClose={() => setNickModal(null)} closeLabel="Fechar">
+          <form className="stack" onSubmit={confirmNick} noValidate>
+            <p className="muted">Seu apelido identifica você nas partidas neste aparelho. Ele fica salvo só aqui — não é um cadastro.</p>
+            <div>
+              <label htmlFor="nick">Apelido</label>
+              <input id="nick" value={draft} maxLength={20} autoComplete="off" autoFocus placeholder="Ex.: Lia"
+                aria-invalid={!!nickError} aria-describedby={nickError ? "nick-err" : undefined}
+                onChange={(e) => { setDraft(e.target.value); setNickError(null); }} />
+              {nickError && <p id="nick-err" className="err" role="alert"><b aria-hidden="true">! </b>{nickError}</p>}
+            </div>
+            <button className="btn cta" type="submit">Continuar</button>
+          </form>
+        </Modal>
+      )}
+
+      <BottomNav active={TAB_OF[view]} onChange={onTab} />
     </>
   );
 }

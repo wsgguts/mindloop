@@ -1,4 +1,5 @@
 "use client";
+import Gem from "./Gem";
 import { useMemo, useRef, useState } from "react";
 import type { Puzzle } from "../lib/puzzles";
 import { puzzleGrid } from "../lib/puzzles";
@@ -111,10 +112,10 @@ export default function Game({ puzzle, initialGrid, onSave, onMenu, onNext, onRu
 
   return (
     <div className="wrap">
-      <div>
+      <div className="title"><Gem kind="sudoku" size={48} /><div>
         <h1>{puzzle.name}</h1>
         <p className="muted">Mini Sudoku · {puzzle.level}</p>
-      </div>
+      </div></div>
 
       <div>
         <div className="progress" role="progressbar" aria-label="Casas preenchidas" aria-valuemin={0} aria-valuemax={total} aria-valuenow={filled}>

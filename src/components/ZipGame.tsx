@@ -1,4 +1,5 @@
 "use client";
+import Gem from "./Gem";
 import { useMemo, useRef, useState } from "react";
 import {
   type Pos, type ZipPuzzle, canStep, indexInPath, isAdjacent, isZipSolved, nextTarget, parseZip, samePos, visitedNumbers,
@@ -80,7 +81,7 @@ export default function ZipGame({ puzzle, onMenu, onNext, onRules }: Props) {
 
   return (
     <div className="wrap">
-      <div><h1>{puzzle.name}</h1><p className="muted">Zip · {puzzle.level}</p></div>
+      <div className="title"><Gem kind="zip" size={48} /><div><h1>{puzzle.name}</h1><p className="muted">Zip · {puzzle.level}</p></div></div>
       <div>
         <div className="progress" role="progressbar" aria-label="Casas no caminho" aria-valuemin={0} aria-valuemax={total} aria-valuenow={path.length}>
           <i style={{ width: `${(path.length / total) * 100}%` }} />

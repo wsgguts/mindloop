@@ -14,10 +14,11 @@ npm run build && npm start
 ```
 
 ## O que existe
-- Tema fantasy: logo oficial (`public/logo.jpg`, `public/cube.png`) e banner `public/fantasy.jpg` só nas faixas da entrada e do menu; a área de jogo segue clara.
-- Entrada com apelido opcional (salvo só no navegador, em localStorage). Sem login nem dados pessoais.
+- Ícones dos jogos: recortados da arte original (`public/gem-*.png`; as etiquetas de texto foram retiradas só nos recortes). Cores e fundo seguem a paleta da arte.
+- **Home:** a arte original (`public/home-art.jpg`), sem filtros, com o botão Jogar sobre o "JOGAR AGORA" da arte. Barra de navegação inferior fixa: Início, Jogos, Regras e Perfil.
+- **Primeiro acesso:** ao tocar em Jogar, um painel pede o apelido (obrigatório, 2–20 caracteres, validado). Fica salvo só no aparelho; nos acessos seguintes o Jogar vai direto à seleção de jogos.
 - Menu: Mini Sudoku e Zip jogáveis; Tango e Patches marcados "Em breve" (sem ação).
-- Regras antes da primeira partida e ajuda durante o jogo.
+- Regras: aba própria (Regras) e painel "Regras" dentro de cada jogo, que abre sem perder o progresso. Aparece sozinho na primeira partida de cada jogo.
 - Partida: seleção de casa, dígitos 1–4 (toque e teclado), conflitos com mensagem textual e ícone "!",
   desfazer, dica (indica uma casa, não revela o número), pausar/retomar, reiniciar e encerrar (com confirmação),
   progresso salvo localmente, tela de conclusão.
@@ -28,7 +29,7 @@ npm run build && npm start
    Regras em `src/lib/sudoku.ts`; puzzles em `src/lib/puzzles.ts` (3 puzzles, solução única verificada por teste).
 2. **Zip** (implementado em `src/lib/zip.ts`): o manual só diz "caminhos e conexões sequenciais"; regras provisórias: ligar números em ordem com um caminho único que cobre todas as casas e termina no maior número (3 puzzles, solução única por teste). Progresso do Zip não é salvo. **Tango e Patches** não têm regras no manual e não foram implementados.
 3. **Destino das avaliações** não existe; não há integração.
-4. **Logo e arte**: usam os arquivos enviados (logo.jpeg e conceito fantasy), otimizados em `public/`.
+4. **Logo e arte**: derivadas dos arquivos enviados, otimizadas em `public/`.
 
 ## Estrutura
 ```
@@ -37,3 +38,5 @@ src/components/     App (fluxo/telas) e Game (partida)
 src/lib/            sudoku.ts (regras), puzzles.ts (dados), storage.ts, feedback.ts
 ```
 Fontes: Space Grotesk (títulos) e Inter (texto) via Google Fonts, com fallback de sistema.
+
+> Observação: o ranking citado no briefing de UX **não** foi implementado (o escopo do MVP exclui ranking e comparação). O apelido identifica a pessoa apenas neste aparelho.
