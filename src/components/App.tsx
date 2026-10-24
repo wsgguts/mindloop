@@ -98,12 +98,12 @@ export default function App() {
           <div className="wrap"><p role="status">Carregando…</p></div>
         ) : view === "home" ? (
           <section className="home" aria-label="Início">
-            <div className="fill" style={{ background: "rgb(15,9,56)" }} />
+            <div className="fill sky" aria-hidden="true" />
             <div className="art">
-              <img src="/home-art.jpg" width={1080} height={1350} alt="MindLoop — Desafie sua mente. Um cubo mágico de quebra-cabeça sobre ilhas flutuantes, com os cristais dos jogos Mini Sudoku, Zip, Tango e Patches." fetchPriority="high" />
+              <img src="/home-art.jpg" width={1080} height={1244} alt="MindLoop — Desafie sua mente. Um cubo mágico de quebra-cabeça sobre ilhas flutuantes, com os cristais dos jogos Mini Sudoku, Zip, Tango e Patches." fetchPriority="high" />
               <button className="hotspot" onClick={onPlay} aria-label="Jogar"><span aria-hidden="true">Jogar</span></button>
             </div>
-            <div className="fill" style={{ background: "rgb(13,7,33)" }} />
+            <div className="fill ground" aria-hidden="true" />
           </section>
         ) : view === "games" ? (
           <div className="screen">

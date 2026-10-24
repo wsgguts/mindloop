@@ -15,7 +15,7 @@ npm run build && npm start
 
 ## O que existe
 - Ícones dos jogos: recortados da arte original (`public/gem-*.png`; as etiquetas de texto foram retiradas só nos recortes). Cores e fundo seguem a paleta da arte.
-- **Home:** a arte original (`public/home-art.jpg`), sem filtros, com o botão Jogar sobre o "JOGAR AGORA" da arte. Barra de navegação inferior fixa: Início, Jogos, Regras e Perfil.
+- **Home:** a arte original (`public/home-art.jpg`, sem filtros; a barra de ícones desenhada na base da arte foi cortada, pois não é funcional), com o botão Jogar sobre o "JOGAR AGORA" da arte. Barra de navegação inferior fixa: Início, Jogos, Regras e Perfil.
 - **Primeiro acesso:** ao tocar em Jogar, um painel pede o apelido (obrigatório, 2–20 caracteres, validado). Fica salvo só no aparelho; nos acessos seguintes o Jogar vai direto à seleção de jogos.
 - Menu: Mini Sudoku e Zip jogáveis; Tango e Patches marcados "Em breve" (sem ação).
 - Regras: aba própria (Regras) e painel "Regras" dentro de cada jogo, que abre sem perder o progresso. Aparece sozinho na primeira partida de cada jogo.
