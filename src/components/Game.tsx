@@ -4,13 +4,13 @@ import { useMemo, useRef, useState } from "react";
 import type { Puzzle } from "../lib/puzzles";
 import { puzzleGrid } from "../lib/puzzles";
 import {
-  BOX, DIGITS, SIZE, type ConflictKind, type Grid,
+  boxDims, digitsFor, type ConflictKind, type Grid,
   cloneGrid, conflictsAt, filledCount, findHintCell, isFull, isSolved, setCell,
 } from "../lib/sudoku";
 
 type Tone = "info" | "ok" | "warn" | "hint";
 const ICON: Record<Tone, string> = { info: "ℹ", ok: "✓", warn: "!", hint: "?" };
-const WHERE: Record<ConflictKind, string> = { linha: "nesta linha", coluna: "nesta coluna", subgrade: "neste bloco 2×2" };
+const WHERE: Record<ConflictKind, string> = { linha: "nesta linha", coluna: "nesta coluna", subgrade: "neste bloco" };
 type Cell = { r: number; c: number };
 type Move = { r: number; c: number; prev: number };
 
@@ -25,6 +25,9 @@ interface Props {
 
 export default function Game({ puzzle, initialGrid, onSave, onMenu, onNext, onRules }: Props) {
   const givens = useMemo(() => puzzleGrid(puzzle), [puzzle]);
+  const N = givens.length;
+  const [bh, bw] = boxDims(N);
+  const digits = digitsFor(N);
   const [grid, setGrid] = useState<Grid>(() => cloneGrid(initialGrid));
   const [history, setHistory] = useState<Move[]>([]);
   const [sel, setSel] = useState<Cell | null>(null);
@@ -82,7 +85,7 @@ export default function Game({ puzzle, initialGrid, onSave, onMenu, onNext, onRu
     if (paused || won) return;
     const h = findHintCell(grid);
     if (!h) return;
-    for (let r = 0; r < SIZE; r++) for (let c = 0; c < SIZE; c++)
+    for (let r = 0; r < N; r++) for (let c = 0; c < N; c++)
       if (conflictsAt(grid, r, c).length) { setTip(null); return say("hint", "Há números repetidos marcados com “!”. Que tal resolver isso primeiro?"); }
     setTip({ r: h.r, c: h.c }); setSel({ r: h.r, c: h.c });
     say("hint", h.options === 0
@@ -98,17 +101,17 @@ export default function Game({ puzzle, initialGrid, onSave, onMenu, onNext, onRu
       e.preventDefault();
       const [dr, dc] = move[e.key];
       const from = sel ?? { r: 0, c: 0 };
-      const next = { r: Math.min(SIZE - 1, Math.max(0, from.r + dr)), c: Math.min(SIZE - 1, Math.max(0, from.c + dc)) };
+      const next = { r: Math.min(N - 1, Math.max(0, from.r + dr)), c: Math.min(N - 1, Math.max(0, from.c + dc)) };
       setSel(next);
       boardRef.current?.querySelector<HTMLButtonElement>(`[data-rc="${next.r}-${next.c}"]`)?.focus();
-    } else if (/^[1-4]$/.test(e.key)) enter(Number(e.key));
+    } else if (/^[1-9]$/.test(e.key) && Number(e.key) <= N) enter(Number(e.key));
     else if (["Backspace", "Delete", "0"].includes(e.key)) enter(0);
   }
 
-  const total = SIZE * SIZE;
+  const total = N * N;
   const filled = filledCount(grid);
   const related = (r: number, c: number) =>
-    !!sel && (sel.r === r || sel.c === c || (Math.floor(sel.r / BOX) === Math.floor(r / BOX) && Math.floor(sel.c / BOX) === Math.floor(c / BOX)));
+    !!sel && (sel.r === r || sel.c === c || (Math.floor(sel.r / bh) === Math.floor(r / bh) && Math.floor(sel.c / bw) === Math.floor(c / bw)));
 
   return (
     <div className="wrap">
@@ -141,13 +144,13 @@ export default function Game({ puzzle, initialGrid, onSave, onMenu, onNext, onRu
         </div>
       ) : (
         <>
-          <div ref={boardRef} className="board" role="grid" aria-label="Grade do Mini Sudoku 4 por 4" onKeyDown={onKey}>
+          <div ref={boardRef} className={`board n${N}`} style={{ gridTemplateColumns: `repeat(${N}, 1fr)` }} role="grid" aria-label={`Grade do Mini Sudoku ${N} por ${N}`} onKeyDown={onKey}>
             {grid.map((row, r) => row.map((v, c) => {
               const bad = conflictsAt(grid, r, c).length > 0;
               const g = isGiven(r, c);
               const isSel = sel?.r === r && sel?.c === c;
               const cls = ["cell", g && "given", related(r, c) && "rel", isSel && "sel", bad && "bad",
-                tip?.r === r && tip?.c === c && "tip", c === 1 && "bx-r", r === 1 && "bx-b"].filter(Boolean).join(" ");
+                tip?.r === r && tip?.c === c && "tip", (c + 1) % bw === 0 && c < N - 1 && "bx-r", (r + 1) % bh === 0 && r < N - 1 && "bx-b"].filter(Boolean).join(" ");
               const label = `Linha ${r + 1}, coluna ${c + 1}, ${g ? `pista ${v}` : v ? `número ${v}` : "vazia"}${bad ? ", conflito" : ""}${isSel ? ", selecionada" : ""}`;
               return (
                 <button key={`${r}-${c}`} data-rc={`${r}-${c}`} role="gridcell" className={cls} aria-label={label}
@@ -159,9 +162,9 @@ export default function Game({ puzzle, initialGrid, onSave, onMenu, onNext, onRu
             }))}
           </div>
 
-          <div className="pad" role="group" aria-label="Escolher número">
-            {DIGITS.map((d) => <button key={d} className="btn" onClick={() => enter(d)} aria-label={`Número ${d}`}>{d}</button>)}
-            <button className="btn sec erase" onClick={() => enter(0)} aria-label="Apagar número">Apagar</button>
+          <div className={`pad n${N}`} style={{ gridTemplateColumns: `repeat(${N + 1}, 1fr)` }} role="group" aria-label="Escolher número">
+            {digits.map((d) => <button key={d} className="btn" onClick={() => enter(d)} aria-label={`Número ${d}`}>{d}</button>)}
+            <button className="btn sec erase" onClick={() => enter(0)} aria-label="Apagar número">{N > 4 ? "⌫" : "Apagar"}</button>
           </div>
         </>
       )}

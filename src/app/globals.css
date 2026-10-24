@@ -138,3 +138,7 @@ label { font-weight: 600; display: block; margin-bottom: 4px; }
 .bnav button.on svg { color: var(--cyan); }
 .bnav button.on::before { content: ""; position: absolute; top: 0; width: 36px; height: 4px; border-radius: 0 0 4px 4px; background: var(--cyan); }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+
+/* Grade 6×6: células e fonte um pouco menores */
+.board.n6 .cell { font-size: 26px; }
+.pad.n6 { gap: 6px; } .pad.n6 .btn { font-size: 22px; min-width: 0; }

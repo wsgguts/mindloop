@@ -25,8 +25,8 @@ npm run build && npm start
 - Opinião do jogador: **somente demonstração**. Nada é enviado nem salvo (`src/lib/feedback.ts` é o ponto de integração futuro).
 
 ## Hipóteses a confirmar com os responsáveis
-1. **Regras do Mini Sudoku**: o manual não as define. Usamos Sudoku 4×4 convencional (dígitos 1–4; sem repetir em linha, coluna e subgrade 2×2).
-   Regras em `src/lib/sudoku.ts`; puzzles em `src/lib/puzzles.ts` (3 puzzles, solução única verificada por teste).
+1. **Regras do Mini Sudoku**: o manual não as define. Usamos Sudoku convencional em grades pequenas: 4×4 (dígitos 1–4, blocos 2×2) e 6×6 (dígitos 1–6, 6 blocos de 2 linhas × 3 colunas), sem repetir em linha, coluna e bloco.
+   Regras em `src/lib/sudoku.ts`; puzzles em `src/lib/puzzles.ts` (3 puzzles: dois 4×4 e o "Quase lá" 6×6; solução única verificada por teste).
 2. **Zip** (implementado em `src/lib/zip.ts`): o manual só diz "caminhos e conexões sequenciais"; regras provisórias: ligar números em ordem com um caminho único que cobre todas as casas e termina no maior número (3 puzzles, solução única por teste). Progresso do Zip não é salvo. **Tango e Patches** não têm regras no manual e não foram implementados.
 3. **Destino das avaliações** não existe; não há integração.
 4. **Logo e arte**: derivadas dos arquivos enviados, otimizadas em `public/`.

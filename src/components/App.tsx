@@ -135,7 +135,7 @@ export default function App() {
             {PUZZLES.map((p, i) => (
               <section key={p.id} className="card">
                 <h2>{p.name}</h2>
-                <p className="muted">{p.level}{save?.id === p.id ? " · Em andamento" : ""}</p>
+                <p className="muted">{p.level} · grade {p.rows.length}×{p.rows.length}{save?.id === p.id ? " · Em andamento" : ""}</p>
                 <div className="row">
                   <button className="btn" onClick={() => startGame("sudoku", i)}>{save?.id === p.id ? "Continuar" : "Jogar"}</button>
                   {save?.id === p.id && <button className="btn sec" onClick={() => { persist(null); startGame("sudoku", i); }}>Começar do zero</button>}
@@ -206,7 +206,7 @@ export default function App() {
         {activeSession?.game === "sudoku" && (
           <div hidden={!inGame}>
             <Game key={`s-${activeSession.idx}-${activeSession.round}`} puzzle={PUZZLES[activeSession.idx]}
-              initialGrid={save && save.id === PUZZLES[activeSession.idx].id ? save.grid : puzzleGrid(PUZZLES[activeSession.idx])}
+              initialGrid={save && save.id === PUZZLES[activeSession.idx].id && save.grid.length === PUZZLES[activeSession.idx].rows.length ? save.grid : puzzleGrid(PUZZLES[activeSession.idx])}
               onSave={(g) => persist(g ? { id: PUZZLES[activeSession.idx].id, grid: g } : null)}
               onMenu={() => setView("games")} onNext={() => startGame("sudoku", (activeSession.idx + 1) % PUZZLES.length)}
               onRules={() => openRules("sudoku")} />

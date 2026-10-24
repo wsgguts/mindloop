@@ -6,11 +6,13 @@ interface Props { title: string; onClose: () => void; children: React.ReactNode;
 // Painel sobre a tela atual: não troca de página, então o progresso do jogo é mantido.
 export default function Modal({ title, onClose, children, closeLabel = "Fechar" }: Props) {
   const ref = useRef<HTMLDivElement>(null);
+  const closeRef = useRef(onClose);
+  closeRef.current = onClose; // evita reexecutar o efeito (e roubar o foco) a cada tecla digitada
   useEffect(() => {
     const prev = document.activeElement as HTMLElement | null;
-    ref.current?.focus();
+    if (!ref.current?.contains(document.activeElement)) ref.current?.focus();
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
+      if (e.key === "Escape") closeRef.current();
       if (e.key === "Tab" && ref.current) {
         const f = ref.current.querySelectorAll<HTMLElement>("button, input, textarea, [href]");
         if (!f.length) return;
@@ -21,9 +23,9 @@ export default function Modal({ title, onClose, children, closeLabel = "Fechar" 
     };
     document.addEventListener("keydown", onKey);
     return () => { document.removeEventListener("keydown", onKey); prev?.focus?.(); };
-  }, [onClose]);
+  }, []);
   return (
-    <div className="scrim" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+    <div className="scrim" onMouseDown={(e) => { if (e.target === e.currentTarget) closeRef.current(); }}>
       <div className="modal" role="dialog" aria-modal="true" aria-label={title} tabIndex={-1} ref={ref}>
         <div className="modal-head">
           <h2>{title}</h2>

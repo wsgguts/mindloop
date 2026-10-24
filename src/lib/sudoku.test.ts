@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { PUZZLES, puzzleGrid } from "./puzzles";
 import {
-  candidates, conflictsAt, countSolutions, findHintCell, isFull, isSolved, parsePuzzle, setCell,
+  boxDims, candidates, conflictsAt, countSolutions, findHintCell, isFull, isSolved, parsePuzzle, setCell,
 } from "./sudoku";
 
 describe("puzzles", () => {
@@ -52,5 +52,23 @@ describe("dicas", () => {
     const hint = findHintCell(puzzleGrid(PUZZLES[0]));
     expect(hint).not.toBeNull();
     expect(candidates(puzzleGrid(PUZZLES[0]), hint!.r, hint!.c).length).toBeGreaterThan(0);
+  });
+});
+
+describe("grade 6×6 (blocos 2×3)", () => {
+  it("deriva o tamanho do bloco", () => {
+    expect(boxDims(4)).toEqual([2, 2]);
+    expect(boxDims(6)).toEqual([2, 3]);
+  });
+  const empty = parsePuzzle(["1.....", "......", "......", "......", "......", "......"]);
+  it("detecta conflito no bloco 2×3, mas não fora dele", () => {
+    expect(conflictsAt(setCell(empty, 1, 2, 1), 1, 2)).toContain("subgrade");
+    expect(conflictsAt(setCell(empty, 2, 0, 1), 2, 0)).toEqual(["coluna"]);
+    expect(conflictsAt(setCell(empty, 1, 3, 1), 1, 3)).toEqual([]);
+  });
+  it("reconhece solução correta 6×6", () => {
+    const sol = parsePuzzle(["256413", "413625", "532146", "641532", "364251", "125364"]);
+    expect(isSolved(sol)).toBe(true);
+    expect(isSolved(setCell(sol, 0, 0, 3))).toBe(false);
   });
 });
