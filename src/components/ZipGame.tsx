@@ -8,9 +8,9 @@ import {
 type Tone = "info" | "ok" | "warn" | "hint";
 const ICON: Record<Tone, string> = { info: "ℹ", ok: "✓", warn: "!", hint: "?" };
 
-interface Props { puzzle: ZipPuzzle; onMenu: () => void; onNext: () => void; onRules: () => void }
+interface Props { puzzle: ZipPuzzle; onMenu: () => void; onNext: () => void; onRules: () => void; onWin: () => void; nextLabel: string; winNote?: string }
 
-export default function ZipGame({ puzzle, onMenu, onNext, onRules }: Props) {
+export default function ZipGame({ puzzle, onMenu, onNext, onRules, onWin, nextLabel, winNote }: Props) {
   const z = useMemo(() => parseZip(puzzle.rows), [puzzle]);
   const [path, setPath] = useState<Pos[]>([z.start]);
   const [won, setWon] = useState(false);
@@ -41,7 +41,7 @@ export default function ZipGame({ puzzle, onMenu, onNext, onRules }: Props) {
     const next = [...path, p];
     setPath(next); setTip(null); setMoves((m) => m + 1);
     const n = z.nums[p.r][p.c];
-    if (isZipSolved(next, z)) { setWon(true); return; }
+    if (isZipSolved(next, z)) { setWon(true); onWin(); return; }
     if (next.length === z.size * z.size) say("warn", "Todas as casas foram usadas, mas o caminho precisa terminar no maior número. Que tal voltar e tentar outra rota?");
     else if (n > 0) say("ok", `Boa! Você alcançou o ${n}.${n === z.max ? " Agora preencha as casas que faltam." : ""}`);
     else say("info", `${next.length} de ${z.size * z.size} casas no caminho.`);
@@ -92,15 +92,16 @@ export default function ZipGame({ puzzle, onMenu, onNext, onRules }: Props) {
       {won ? (
         <section className="celebrate" aria-labelledby="zwin">
           <h2 id="zwin">Caminho completo! ✓</h2>
-          <p>Você ligou todos os números em ordem e passou por cada casa. Resumo: {moves} passos neste puzzle.</p>
+          <p>Você ligou todos os números em ordem e passou por cada casa. Resumo: {moves} passos neste nível.</p>
+          {winNote && <p><b>{winNote}</b></p>}
           <div className="row" style={{ justifyContent: "center" }}>
-            <button className="btn cta" onClick={onNext}>Jogar novamente</button>
-            <button className="btn sec" onClick={onMenu}>Voltar ao menu</button>
+            <button className="btn cta" onClick={onNext}>{nextLabel}</button>
+            <button className="btn sec" onClick={onMenu}>Voltar à jornada</button>
           </div>
         </section>
       ) : (
         <div className="zboard-wrap">
-          <div className="zboard" style={{ gridTemplateColumns: `repeat(${z.size}, 1fr)` }} role="grid" tabIndex={0}
+          <div className={`zboard n${z.size}`} style={{ gridTemplateColumns: `repeat(${z.size}, 1fr)` }} role="grid" tabIndex={0}
             aria-label={`Grade do Zip ${z.size} por ${z.size}. Use as setas para estender o caminho e Backspace para voltar.`}
             onKeyDown={onKey}
             onPointerDown={(e) => { const p = cellFrom(e); if (!p) return; drag.current = true; last.current = `${p.r}-${p.c}`; (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId); step(p, false); }}
@@ -117,7 +118,7 @@ export default function ZipGame({ puzzle, onMenu, onNext, onRules }: Props) {
               return (
                 <div key={`${r}-${c}`} data-rc={`${r}-${c}`} role="gridcell" aria-label={label}
                   className={["zcell", isHead && "head", tip && samePos(tip, p) && "tip"].filter(Boolean).join(" ")}>
-                  {n > 0 && <span className={`zdot ${inPath ? "done" : ""}`}>{n}</span>}
+                  {n > 0 && <span className={`zdot${inPath ? " done" : ""}${n > 9 ? " two" : ""}`}>{n}</span>}
                 </div>
               );
             }))}
@@ -142,7 +143,7 @@ export default function ZipGame({ puzzle, onMenu, onNext, onRules }: Props) {
           <button className="btn sec" onClick={hint}>Dica</button>
           <button className="btn sec" onClick={() => (path.length > 1 ? setConfirm(true) : restart())}>Reiniciar</button>
           <button className="btn sec" onClick={onRules}>Regras</button>
-          <button className="btn sec" onClick={onMenu}>Menu</button>
+          <button className="btn sec" onClick={onMenu}>Níveis</button>
         </div>
       )}
     </div>

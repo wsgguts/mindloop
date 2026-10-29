@@ -40,3 +40,12 @@ src/lib/            sudoku.ts (regras), puzzles.ts (dados), storage.ts, feedback
 Fontes: Space Grotesk (títulos) e Inter (texto) via Google Fonts, com fallback de sistema.
 
 > Observação: o ranking citado no briefing de UX **não** foi implementado (o escopo do MVP exclui ranking e comparação). O apelido identifica a pessoa apenas neste aparelho.
+
+## Jornada de níveis (100 por jogo)
+A seleção de puzzles virou uma trilha de **100 níveis por jogo** (Mini Sudoku e Zip), em **10 capítulos de 10 níveis**.
+- Os níveis abrem **em sequência**: concluir o nível N libera o N+1. O 10º de cada capítulo é o "desafio do capítulo".
+- O progresso fica só no aparelho (`mindloop:progress:sudoku` e `mindloop:progress:zip`, uma string de 100 caracteres "0"/"1").
+- **Mini Sudoku:** níveis 1–20 em 4×4 (de 12 a 5 pistas) e 21–100 em 6×6 com blocos 2×3 (de 24 a 11 pistas). Todos têm solução única e podem ser resolvidos só com lógica.
+- **Zip:** grades de 4×4 a 7×7; a dificuldade cresce com o tamanho e com a redução de pontos numerados. Todos têm solução única.
+- Os níveis são **gerados** por `python3 scripts/gen_sudoku.py` e `python3 scripts/gen_zip.py` (arquivos em `src/lib/data/`, não edite à mão). Os testes (`npm test`) conferem que os 100 níveis de cada jogo existem e têm solução única.
+- Código: `src/lib/journey.ts` (capítulos e progresso), `src/components/Journey.tsx` (tela da trilha).

@@ -4,11 +4,6 @@ import {
   boxDims, candidates, conflictsAt, countSolutions, findHintCell, isFull, isSolved, parsePuzzle, setCell,
 } from "./sudoku";
 
-describe("puzzles", () => {
-  it.each(PUZZLES)("$name tem solução única", (p) => {
-    expect(countSolutions(puzzleGrid(p), 2)).toBe(1);
-  });
-});
 
 describe("conflitos", () => {
   const g = parsePuzzle(["1...", "....", "....", "...."]);
@@ -39,11 +34,11 @@ describe("conclusão", () => {
 
 describe("desfazer/reiniciar (imutabilidade)", () => {
   it("setCell não altera a grade original", () => {
-    const base = puzzleGrid(PUZZLES[0]);
+    const base = parsePuzzle(["12.4", "3.12", "21.3", "4.21"]);
     const changed = setCell(base, 0, 2, 3);
     expect(base[0][2]).toBe(0);
     expect(changed[0][2]).toBe(3);
-    expect(puzzleGrid(PUZZLES[0])).toEqual(base);
+    expect(base).toEqual(parsePuzzle(["12.4", "3.12", "21.3", "4.21"]));
   });
 });
 

@@ -21,9 +21,12 @@ interface Props {
   onMenu: () => void;
   onNext: () => void;
   onRules: () => void;
+  onWin: () => void;
+  nextLabel: string;
+  winNote?: string;
 }
 
-export default function Game({ puzzle, initialGrid, onSave, onMenu, onNext, onRules }: Props) {
+export default function Game({ puzzle, initialGrid, onSave, onMenu, onNext, onRules, onWin, nextLabel, winNote }: Props) {
   const givens = useMemo(() => puzzleGrid(puzzle), [puzzle]);
   const N = givens.length;
   const [bh, bw] = boxDims(N);
@@ -47,7 +50,7 @@ export default function Game({ puzzle, initialGrid, onSave, onMenu, onNext, onRu
     setGrid(next);
     setTip(null);
     setMoves((m) => m + 1);
-    if (isSolved(next)) { setWon(true); onSave(null); return; }
+    if (isSolved(next)) { setWon(true); onSave(null); onWin(); return; }
     onSave(next);
     const kinds = conflictsAt(next, r, c);
     if (next[r][c] === 0) say("info", "Casa limpa. Observe as pistas e tente outra opção.");
@@ -130,10 +133,11 @@ export default function Game({ puzzle, initialGrid, onSave, onMenu, onNext, onRu
       {won ? (
         <section className="celebrate" aria-labelledby="win">
           <h2 id="win">Você completou a grade! ✓</h2>
-          <p>Cada número está no lugar certo, sem repetir em linha, coluna ou bloco. Resumo: {moves} jogadas neste puzzle.</p>
+          <p>Cada número está no lugar certo, sem repetir em linha, coluna ou bloco. Resumo: {moves} jogadas neste nível.</p>
+          {winNote && <p><b>{winNote}</b></p>}
           <div className="row" style={{ justifyContent: "center" }}>
-            <button className="btn cta" onClick={onNext}>Jogar novamente</button>
-            <button className="btn sec" onClick={onMenu}>Voltar ao menu</button>
+            <button className="btn cta" onClick={onNext}>{nextLabel}</button>
+            <button className="btn sec" onClick={onMenu}>Voltar à jornada</button>
           </div>
         </section>
       ) : paused ? (
@@ -192,7 +196,7 @@ export default function Game({ puzzle, initialGrid, onSave, onMenu, onNext, onRu
           <button className="btn sec" onClick={() => setPaused((p) => !p)}>{paused ? "Retomar" : "Pausar"}</button>
           <button className="btn sec" onClick={() => setConfirm("restart")}>Reiniciar</button>
           <button className="btn sec" onClick={onRules}>Regras</button>
-          <button className="btn sec" onClick={onMenu}>Menu (guardar)</button>
+          <button className="btn sec" onClick={onMenu}>Níveis (guardar)</button>
           <button className="btn sec" onClick={() => setConfirm("end")}>Encerrar</button>
         </div>
       )}

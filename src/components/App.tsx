@@ -3,21 +3,23 @@ import { useEffect, useState } from "react";
 import BottomNav, { type Tab } from "./BottomNav";
 import Game from "./Game";
 import Gem, { type GemKind } from "./Gem";
+import Journey from "./Journey";
 import Modal from "./Modal";
 import { RulesContent, type RulesGame } from "./Rules";
 import ZipGame from "./ZipGame";
 import { FEEDBACK_CONFIGURED } from "../lib/feedback";
+import { LEVELS_PER_GAME, chapterOf, doneCount, emptyProgress, markDone, parseProgress } from "../lib/journey";
 import { PUZZLES, puzzleGrid } from "../lib/puzzles";
 import type { Grid } from "../lib/sudoku";
 import { validateNick } from "../lib/nick";
 import { KEYS, readStore, writeStore } from "../lib/storage";
 import { ZIP_PUZZLES } from "../lib/zip";
 
-type View = "home" | "games" | "select" | "zselect" | "game" | "rules" | "profile" | "feedback";
+type View = "home" | "games" | "journey" | "game" | "rules" | "profile" | "feedback";
 type Save = { id: string; grid: Grid };
 type Session = { game: RulesGame; idx: number; round: number };
 
-const TAB_OF: Record<View, Tab> = { home: "home", games: "games", select: "games", zselect: "games", game: "games", rules: "rules", profile: "profile", feedback: "profile" };
+const TAB_OF: Record<View, Tab> = { home: "home", games: "games", journey: "games", game: "games", rules: "rules", profile: "profile", feedback: "profile" };
 const NAME: Record<RulesGame, string> = { sudoku: "Mini Sudoku", zip: "Zip" };
 
 export default function App() {
@@ -31,6 +33,8 @@ export default function App() {
   const [rulesModal, setRulesModal] = useState<RulesGame | null>(null);
   const [rulesTab, setRulesTab] = useState<RulesGame>("sudoku");
   const [save, setSave] = useState<Save | null>(null);
+  const [journeyGame, setJourneyGame] = useState<RulesGame>("sudoku");
+  const [progress, setProgress] = useState<Record<RulesGame, string>>({ sudoku: emptyProgress(), zip: emptyProgress() });
   const [session, setSession] = useState<Session | null>(null);
   const [rating, setRating] = useState<number | null>(null);
   const [comment, setComment] = useState("");
@@ -40,6 +44,7 @@ export default function App() {
     const n = readStore(KEYS.nick) ?? "";
     if (n && !validateNick(n)) setNick(n);
     setSeen({ sudoku: readStore(KEYS.rules) === "1", zip: readStore("mindloop:rules-zip") === "1" });
+    setProgress({ sudoku: parseProgress(readStore("mindloop:progress:sudoku")), zip: parseProgress(readStore("mindloop:progress:zip")) });
     try { const s = readStore(KEYS.save); if (s) setSave(JSON.parse(s) as Save); } catch { /* ignora */ }
     setReady(true);
   }, []);
@@ -66,6 +71,21 @@ export default function App() {
     setView("game");
     if (!seen[game]) { openRules(game); }
   }
+  function openJourney(game: RulesGame) { setJourneyGame(game); setView("journey"); }
+  /** Marca o nível como concluído e guarda no aparelho. */
+  function finishLevel(game: RulesGame, level: number) {
+    setProgress((p) => {
+      const next = markDone(p[game], level);
+      writeStore(`mindloop:progress:${game}`, next);
+      return { ...p, [game]: next };
+    });
+  }
+  const nextOf = (game: RulesGame, idx: number) => ({
+    label: idx + 1 < LEVELS_PER_GAME ? "Próximo nível" : "Concluir jornada",
+    go: () => (idx + 1 < LEVELS_PER_GAME ? startGame(game, idx + 1) : openJourney(game)),
+    note: (idx + 1) % 10 === 0 ? `Você concluiu o capítulo “${chapterOf(game, idx + 1).title}”!` : undefined,
+  });
+
   function openRules(game: RulesGame) {
     setRulesModal(game);
     if (!seen[game]) {
@@ -74,9 +94,9 @@ export default function App() {
     }
   }
 
-  const GAMES: { id: string; name: string; text: string; kind: GemKind; color: string; open?: () => void }[] = [
-    { id: "sudoku", name: "Mini Sudoku", text: "Complete a grade sem repetir números.", kind: "sudoku", color: "#F05BC8", open: () => setView("select") },
-    { id: "zip", name: "Zip", text: "Ligue os números em ordem, passando por todas as casas.", kind: "zip", color: "#12CFE0", open: () => setView("zselect") },
+  const GAMES: { id: RulesGame | "tango" | "patches"; name: string; text: string; kind: GemKind; color: string; open?: () => void }[] = [
+    { id: "sudoku", name: "Mini Sudoku", text: "Complete a grade sem repetir números.", kind: "sudoku", color: "#F05BC8", open: () => openJourney("sudoku") },
+    { id: "zip", name: "Zip", text: "Ligue os números em ordem, passando por todas as casas.", kind: "zip", color: "#12CFE0", open: () => openJourney("zip") },
     { id: "tango", name: "Tango", text: "Alternância e equilíbrio de estados binários.", kind: "tango", color: "#FFB020" },
     { id: "patches", name: "Patches", text: "Composição por encaixe modular.", kind: "patches", color: "#762CEB" },
   ];
@@ -111,12 +131,13 @@ export default function App() {
             <p className="lead">{nick ? `Boa, ${nick}! ` : ""}Toque num jogo para começar.</p>
             <div className="ggrid">
               {GAMES.map((g) => g.open ? (
-                <button key={g.id} className="gcard" style={{ "--gc": g.color } as React.CSSProperties} onClick={g.open} aria-label={`Jogar ${g.name}`}>
+                <button key={g.id} className="gcard" style={{ "--gc": g.color } as React.CSSProperties} onClick={g.open} aria-label={`Abrir jornada de ${g.name}`}>
                   <Gem kind={g.kind} size={88} />
                   <span className="badge">Disponível</span>
                   <span className="gname">{g.name}</span>
                   <span className="gtext">{g.text}</span>
-                  <span className="go">Jogar ›</span>
+                  <span className="gcount">{doneCount(progress[g.id as RulesGame])}/{LEVELS_PER_GAME} níveis</span>
+                  <span className="go">Jornada ›</span>
                 </button>
               ) : (
                 <div key={g.id} className="gcard soon" style={{ "--gc": g.color } as React.CSSProperties} aria-disabled="true">
@@ -128,35 +149,8 @@ export default function App() {
               ))}
             </div>
           </div>
-        ) : view === "select" ? (
-          <div className="wrap">
-            <h1>Mini Sudoku</h1>
-            <p className="muted">Escolha um puzzle.</p>
-            {PUZZLES.map((p, i) => (
-              <section key={p.id} className="card">
-                <h2>{p.name}</h2>
-                <p className="muted">{p.level} · grade {p.rows.length}×{p.rows.length}{save?.id === p.id ? " · Em andamento" : ""}</p>
-                <div className="row">
-                  <button className="btn" onClick={() => startGame("sudoku", i)}>{save?.id === p.id ? "Continuar" : "Jogar"}</button>
-                  {save?.id === p.id && <button className="btn sec" onClick={() => { persist(null); startGame("sudoku", i); }}>Começar do zero</button>}
-                </div>
-              </section>
-            ))}
-            <button className="btn sec" onClick={() => setView("games")}>Voltar aos jogos</button>
-          </div>
-        ) : view === "zselect" ? (
-          <div className="wrap">
-            <h1>Zip</h1>
-            <p className="muted">Escolha um puzzle.</p>
-            {ZIP_PUZZLES.map((p, i) => (
-              <section key={p.id} className="card">
-                <h2>{p.name}</h2>
-                <p className="muted">{p.level} · grade {p.rows.length}×{p.rows.length}</p>
-                <div className="row"><button className="btn" onClick={() => startGame("zip", i)}>Jogar</button></div>
-              </section>
-            ))}
-            <button className="btn sec" onClick={() => setView("games")}>Voltar aos jogos</button>
-          </div>
+        ) : view === "journey" ? (
+          <Journey key={journeyGame} game={journeyGame} done={progress[journeyGame]} onBack={() => setView("games")} onPlay={(n) => startGame(journeyGame, n - 1)} />
         ) : view === "rules" ? (
           <div className="wrap">
             <h1>Regras</h1>
@@ -208,15 +202,17 @@ export default function App() {
             <Game key={`s-${activeSession.idx}-${activeSession.round}`} puzzle={PUZZLES[activeSession.idx]}
               initialGrid={save && save.id === PUZZLES[activeSession.idx].id && save.grid.length === PUZZLES[activeSession.idx].rows.length ? save.grid : puzzleGrid(PUZZLES[activeSession.idx])}
               onSave={(g) => persist(g ? { id: PUZZLES[activeSession.idx].id, grid: g } : null)}
-              onMenu={() => setView("games")} onNext={() => startGame("sudoku", (activeSession.idx + 1) % PUZZLES.length)}
-              onRules={() => openRules("sudoku")} />
+              onMenu={() => openJourney("sudoku")} onNext={nextOf("sudoku", activeSession.idx).go}
+              nextLabel={nextOf("sudoku", activeSession.idx).label} winNote={nextOf("sudoku", activeSession.idx).note}
+              onWin={() => finishLevel("sudoku", activeSession.idx + 1)} onRules={() => openRules("sudoku")} />
           </div>
         )}
         {activeSession?.game === "zip" && (
           <div hidden={!inGame}>
             <ZipGame key={`z-${activeSession.idx}-${activeSession.round}`} puzzle={ZIP_PUZZLES[activeSession.idx]}
-              onMenu={() => setView("games")} onNext={() => startGame("zip", (activeSession.idx + 1) % ZIP_PUZZLES.length)}
-              onRules={() => openRules("zip")} />
+              onMenu={() => openJourney("zip")} onNext={nextOf("zip", activeSession.idx).go}
+              nextLabel={nextOf("zip", activeSession.idx).label} winNote={nextOf("zip", activeSession.idx).note}
+              onWin={() => finishLevel("zip", activeSession.idx + 1)} onRules={() => openRules("zip")} />
           </div>
         )}
       </main>
