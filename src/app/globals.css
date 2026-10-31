@@ -199,3 +199,9 @@ label { font-weight: 600; display: block; margin-bottom: 4px; }
 .congrats .btn { min-width: 200px; margin-top: 6px; }
 .congrats-hint { font-size: 14px; }
 @keyframes pop { from { transform: scale(.9); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+
+/* Opinião */
+.rating-box { border: 0; padding: 0; margin: 0; display: grid; gap: 8px; }
+.rating-box legend { font-weight: 600; padding: 0; margin-bottom: 8px; }
+.wrap { position: relative; }
+.rating label { position: relative; }

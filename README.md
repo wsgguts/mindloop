@@ -22,13 +22,13 @@ npm run build && npm start
 - Partida: seleção de casa, dígitos 1–4 (toque e teclado), conflitos com mensagem textual e ícone "!",
   desfazer, dica (indica uma casa, não revela o número), pausar/retomar, reiniciar e encerrar (com confirmação),
   progresso salvo localmente, tela de conclusão.
-- Opinião do jogador: **somente demonstração**. Nada é enviado nem salvo (`src/lib/feedback.ts` é o ponto de integração futuro).
+- Opinião do jogador (Perfil → Dar opinião): nota de 1 a 5 e comentário opcional, enviados ao **Netlify Forms** (veja abaixo). Anônima: não envia apelido nem contato.
 
 ## Hipóteses a confirmar com os responsáveis
 1. **Regras do Mini Sudoku**: o manual não as define. Usamos Sudoku convencional em grades pequenas: 4×4 (dígitos 1–4, blocos 2×2) e 6×6 (dígitos 1–6, 6 blocos de 2 linhas × 3 colunas), sem repetir em linha, coluna e bloco.
    Regras em `src/lib/sudoku.ts`; puzzles em `src/lib/puzzles.ts` (3 puzzles: dois 4×4 e o "Quase lá" 6×6; solução única verificada por teste).
 2. **Zip** (implementado em `src/lib/zip.ts`): o manual só diz "caminhos e conexões sequenciais"; regras provisórias: ligar números em ordem com um caminho único que cobre todas as casas e termina no maior número (3 puzzles, solução única por teste). Progresso do Zip não é salvo. **Tango e Patches** não têm regras no manual e não foram implementados.
-3. **Destino das avaliações** não existe; não há integração.
+3. **Opiniões:** guardadas no Netlify Forms; só funcionam no site publicado na Netlify.
 4. **Logo e arte**: derivadas dos arquivos enviados, otimizadas em `public/`.
 
 ## Estrutura
@@ -50,3 +50,18 @@ A seleção de puzzles virou uma trilha de **100 níveis por jogo** (Mini Sudoku
 - Os níveis são **gerados** por `python3 scripts/gen_sudoku.py` e `python3 scripts/gen_zip.py` (arquivos em `src/lib/data/`, não edite à mão). Os testes (`npm test`) conferem que os 100 níveis de cada jogo existem e têm solução única.
 - Ao concluir um nível aparece uma tela rápida de parabéns (`src/components/Congrats.tsx`) com o número do nível; ela volta sozinha para a trilha em ~3,5 s ou ao tocar em **Continuar**. No 10º nível de cada capítulo ela avisa que o capítulo foi concluído.
 - Código: `src/lib/journey.ts` (capítulos e progresso), `src/components/Journey.tsx` (tela da trilha).
+
+## Opiniões dos usuários (Netlify Forms)
+A tela **Perfil → Dar opinião** envia nota e comentário para o formulário `opiniao`. O arquivo `public/__forms.html` é um formulário "fantasma" que só serve para a Netlify detectar o formulário no deploy (o app em Next.js monta o formulário com JavaScript). **Não apague esse arquivo** e mantenha os nomes dos campos iguais aos de `src/lib/feedback.ts`.
+
+**Configuração (uma vez):**
+1. Publique o projeto na Netlify (como o restante do app).
+2. No painel da Netlify, abra o site → **Forms** e confirme que a detecção de formulários está ligada; se tiver acabado de ligar, faça um novo deploy.
+3. Abra o site publicado, envie uma opinião de teste e confira se ela aparece em **Forms → opiniao**.
+4. Para receber aviso por e-mail, crie uma notificação em **Forms → Form notifications** (os nomes dos menus podem variar um pouco).
+
+**Observações**
+- Rodando local (`npm run dev`) o envio mostra a mensagem de erro, pois o Netlify Forms só existe no site publicado.
+- Contra robôs há um campo-armadilha (`bot-field`) e o filtro da própria Netlify.
+- Limite de envios: depende do plano da conta (contas antigas: 100 por mês por site). Confira o seu na Netlify.
+- Privacidade: só nota e comentário são enviados; o texto da tela pede para não escrever dados pessoais. Como o público tem 15–18 anos, vale uma revisão de LGPD antes de divulgar.

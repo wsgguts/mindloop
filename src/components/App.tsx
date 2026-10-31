@@ -7,7 +7,7 @@ import Journey from "./Journey";
 import Modal from "./Modal";
 import { RulesContent, type RulesGame } from "./Rules";
 import ZipGame from "./ZipGame";
-import { FEEDBACK_CONFIGURED } from "../lib/feedback";
+import { COMMENT_MAX, submitFeedback, validateFeedback } from "../lib/feedback";
 import { LEVELS_PER_GAME, chapterOf, doneCount, emptyProgress, markDone, parseProgress } from "../lib/journey";
 import { PUZZLES, puzzleGrid } from "../lib/puzzles";
 import type { Grid } from "../lib/sudoku";
@@ -38,7 +38,9 @@ export default function App() {
   const [session, setSession] = useState<Session | null>(null);
   const [rating, setRating] = useState<number | null>(null);
   const [comment, setComment] = useState("");
-  const [demoMsg, setDemoMsg] = useState(false);
+  const [fbStatus, setFbStatus] = useState<"idle" | "sending" | "ok" | "error">("idle");
+  const [fbError, setFbError] = useState<string | null>(null);
+  const [bot, setBot] = useState(""); // campo-armadilha contra robôs
 
   useEffect(() => {
     const n = readStore(KEYS.nick) ?? "";
@@ -71,6 +73,20 @@ export default function App() {
     setView("game");
     if (!seen[game]) { openRules(game); }
   }
+  async function sendFeedback(e: React.FormEvent) {
+    e.preventDefault();
+    const erro = validateFeedback({ rating, comment });
+    if (erro) { setFbError(erro); return; }
+    setFbError(null); setFbStatus("sending");
+    try {
+      await submitFeedback({ rating, comment, honeypot: bot });
+      setFbStatus("ok"); setRating(null); setComment("");
+    } catch {
+      setFbStatus("error");
+      setFbError("Não conseguimos enviar agora. Confira a internet e tente de novo — seu texto foi mantido.");
+    }
+  }
+
   function openJourney(game: RulesGame) { setJourneyGame(game); setView("journey"); }
   /** Marca o nível como concluído e guarda no aparelho. */
   function finishLevel(game: RulesGame, level: number) {
@@ -174,24 +190,47 @@ export default function App() {
               <div className="card"><p>Você ainda não escolheu um apelido.</p><button className="btn cta" onClick={() => openNick("profile")}>Escolher apelido</button></div>
             )}
             <p className="muted">O apelido fica salvo só neste aparelho. Não pedimos cadastro nem outros dados.</p>
-            <button className="btn sec" onClick={() => { setRating(null); setComment(""); setDemoMsg(false); setView("feedback"); }}>Dar opinião</button>
+            <button className="btn sec" onClick={() => { setRating(null); setComment(""); setFbStatus("idle"); setFbError(null); setView("feedback"); }}>Dar opinião</button>
           </div>
         ) : view === "feedback" ? (
-          <form className="wrap" onSubmit={(e) => { e.preventDefault(); setDemoMsg(true); }}>
+          <form className="wrap" onSubmit={sendFeedback} noValidate>
             <h1>Sua opinião</h1>
-            <div className="note warn" role="note"><b aria-hidden="true">!</b>
-              <span>Esta tela é uma demonstração: {FEEDBACK_CONFIGURED ? "" : "ainda não existe um destino para as avaliações, então nada é enviado nem salvo."}</span></div>
-            <fieldset className="rating" aria-label="Nota de 1 a 5">
-              {[1, 2, 3, 4, 5].map((n) => (
-                <label key={n}><input type="radio" name="rating" value={n} checked={rating === n} onChange={() => setRating(n)} /><span aria-label={`Nota ${n}`}>{n}</span></label>
-              ))}
-            </fieldset>
-            <div><label htmlFor="cm">Comentário (opcional)</label><textarea id="cm" rows={4} value={comment} onChange={(e) => setComment(e.target.value)} /></div>
-            {demoMsg && <div className="note info" role="status"><b aria-hidden="true">ℹ</b><span>Obrigado por testar! Nesta versão a avaliação não foi enviada nem armazenada.</span></div>}
-            <div className="row">
-              <button className="btn" type="submit">Testar envio (demonstração)</button>
-              <button type="button" className="btn sec" onClick={() => setView("profile")}>Voltar ao perfil</button>
-            </div>
+            {fbStatus === "ok" ? (
+              <>
+                <div className="note ok" role="status"><b aria-hidden="true">✓</b><span>Obrigado! Sua opinião foi enviada e vai ajudar a melhorar o MindLoop.</span></div>
+                <div className="row">
+                  <button type="button" className="btn cta" onClick={() => setFbStatus("idle")}>Enviar outra opinião</button>
+                  <button type="button" className="btn sec" onClick={() => setView("profile")}>Voltar ao perfil</button>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="note info" role="note"><b aria-hidden="true">ℹ</b>
+                  <span>Sua opinião é anônima: não enviamos seu apelido nem pedimos contato. Não escreva dados pessoais (nome, telefone, endereço) no comentário.</span></div>
+                <fieldset className="rating-box">
+                  <legend>Como foi sua experiência? (opcional)</legend>
+                  <div className="rating" role="radiogroup" aria-label="Nota de 1 a 5">
+                    {[1, 2, 3, 4, 5].map((n) => (
+                      <label key={n}><input type="radio" name="rating" value={n} checked={rating === n} onChange={() => { setRating(n); setFbError(null); }} /><span aria-label={`Nota ${n}`}>{n}</span></label>
+                    ))}
+                  </div>
+                  <p className="muted">1 = não gostei · 5 = gostei muito</p>
+                </fieldset>
+                <div>
+                  <label htmlFor="cm">Comentário (opcional)</label>
+                  <textarea id="cm" rows={4} maxLength={COMMENT_MAX} value={comment} onChange={(e) => { setComment(e.target.value); setFbError(null); }} />
+                  <p className="muted" aria-live="off">{comment.length}/{COMMENT_MAX}</p>
+                </div>
+                <div aria-hidden="true" style={{ position: "absolute", left: "-9999px" }}>
+                  <label>Não preencha este campo<input tabIndex={-1} autoComplete="off" name="bot-field" value={bot} onChange={(e) => setBot(e.target.value)} /></label>
+                </div>
+                {fbError && <div className="note warn" role="alert"><b aria-hidden="true">!</b><span>{fbError}</span></div>}
+                <div className="row">
+                  <button className="btn cta" type="submit" disabled={fbStatus === "sending"}>{fbStatus === "sending" ? "Enviando…" : "Enviar opinião"}</button>
+                  <button type="button" className="btn sec" onClick={() => setView("profile")}>Voltar ao perfil</button>
+                </div>
+              </>
+            )}
           </form>
         ) : null}
 

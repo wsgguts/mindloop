@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="robots" content="noindex" />
+  <title>Formulários do MindLoop (detecção da Netlify)</title>
+</head>
+<body>
+  <!--
+    Este arquivo NÃO aparece no app. Ele existe só para a Netlify "enxergar" o formulário de opinião
+    na hora do deploy (o app em Next.js monta o formulário com JavaScript, e a Netlify não detecta isso).
+    Os campos aqui devem ter os MESMOS nomes que o app envia (ver src/lib/feedback.ts).
+  -->
+  <form name="opiniao" method="POST" data-netlify="true" netlify-honeypot="bot-field" hidden>
+    <input type="hidden" name="form-name" value="opiniao" />
+    <p><label>Não preencha: <input name="bot-field" /></label></p>
+    <input name="rating" />
+    <textarea name="comment"></textarea>
+  </form>
+</body>
+</html>
