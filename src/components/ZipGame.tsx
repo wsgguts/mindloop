@@ -1,4 +1,5 @@
 "use client";
+import Congrats from "./Congrats";
 import Gem from "./Gem";
 import { useMemo, useRef, useState } from "react";
 import {
@@ -8,9 +9,9 @@ import {
 type Tone = "info" | "ok" | "warn" | "hint";
 const ICON: Record<Tone, string> = { info: "ℹ", ok: "✓", warn: "!", hint: "?" };
 
-interface Props { puzzle: ZipPuzzle; onMenu: () => void; onNext: () => void; onRules: () => void; onWin: () => void; nextLabel: string; winNote?: string }
+interface Props { puzzle: ZipPuzzle; onMenu: () => void; onRules: () => void; onWin: () => void; winNote?: string }
 
-export default function ZipGame({ puzzle, onMenu, onNext, onRules, onWin, nextLabel, winNote }: Props) {
+export default function ZipGame({ puzzle, onMenu, onRules, onWin, winNote }: Props) {
   const z = useMemo(() => parseZip(puzzle.rows), [puzzle]);
   const [path, setPath] = useState<Pos[]>([z.start]);
   const [won, setWon] = useState(false);
@@ -90,15 +91,7 @@ export default function ZipGame({ puzzle, onMenu, onNext, onRules, onWin, nextLa
       </div>
 
       {won ? (
-        <section className="celebrate" aria-labelledby="zwin">
-          <h2 id="zwin">Caminho completo! ✓</h2>
-          <p>Você ligou todos os números em ordem e passou por cada casa. Resumo: {moves} passos neste nível.</p>
-          {winNote && <p><b>{winNote}</b></p>}
-          <div className="row" style={{ justifyContent: "center" }}>
-            <button className="btn cta" onClick={onNext}>{nextLabel}</button>
-            <button className="btn sec" onClick={onMenu}>Voltar à jornada</button>
-          </div>
-        </section>
+        <Congrats kind="zip" levelName={puzzle.name} note={winNote} onDone={onMenu} />
       ) : (
         <div className="zboard-wrap">
           <div className={`zboard n${z.size}`} style={{ gridTemplateColumns: `repeat(${z.size}, 1fr)` }} role="grid" tabIndex={0}

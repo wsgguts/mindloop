@@ -1,4 +1,5 @@
 "use client";
+import Congrats from "./Congrats";
 import Gem from "./Gem";
 import { useMemo, useRef, useState } from "react";
 import type { Puzzle } from "../lib/puzzles";
@@ -19,14 +20,12 @@ interface Props {
   initialGrid: Grid;
   onSave: (grid: Grid | null) => void;
   onMenu: () => void;
-  onNext: () => void;
   onRules: () => void;
   onWin: () => void;
-  nextLabel: string;
   winNote?: string;
 }
 
-export default function Game({ puzzle, initialGrid, onSave, onMenu, onNext, onRules, onWin, nextLabel, winNote }: Props) {
+export default function Game({ puzzle, initialGrid, onSave, onMenu, onRules, onWin, winNote }: Props) {
   const givens = useMemo(() => puzzleGrid(puzzle), [puzzle]);
   const N = givens.length;
   const [bh, bw] = boxDims(N);
@@ -131,15 +130,7 @@ export default function Game({ puzzle, initialGrid, onSave, onMenu, onNext, onRu
       </div>
 
       {won ? (
-        <section className="celebrate" aria-labelledby="win">
-          <h2 id="win">Você completou a grade! ✓</h2>
-          <p>Cada número está no lugar certo, sem repetir em linha, coluna ou bloco. Resumo: {moves} jogadas neste nível.</p>
-          {winNote && <p><b>{winNote}</b></p>}
-          <div className="row" style={{ justifyContent: "center" }}>
-            <button className="btn cta" onClick={onNext}>{nextLabel}</button>
-            <button className="btn sec" onClick={onMenu}>Voltar à jornada</button>
-          </div>
-        </section>
+        <Congrats kind="sudoku" levelName={puzzle.name} note={winNote} onDone={onMenu} />
       ) : paused ? (
         <div className="paused">
           <h2>Jogo pausado</h2>

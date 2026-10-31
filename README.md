@@ -48,4 +48,5 @@ A seleção de puzzles virou uma trilha de **100 níveis por jogo** (Mini Sudoku
 - **Mini Sudoku:** níveis 1–20 em 4×4 (de 12 a 5 pistas) e 21–100 em 6×6 com blocos 2×3 (de 24 a 11 pistas). Todos têm solução única e podem ser resolvidos só com lógica.
 - **Zip:** grades de 4×4 a 7×7; a dificuldade cresce com o tamanho e com a redução de pontos numerados. Todos têm solução única.
 - Os níveis são **gerados** por `python3 scripts/gen_sudoku.py` e `python3 scripts/gen_zip.py` (arquivos em `src/lib/data/`, não edite à mão). Os testes (`npm test`) conferem que os 100 níveis de cada jogo existem e têm solução única.
+- Ao concluir um nível aparece uma tela rápida de parabéns (`src/components/Congrats.tsx`) com o número do nível; ela volta sozinha para a trilha em ~3,5 s ou ao tocar em **Continuar**. No 10º nível de cada capítulo ela avisa que o capítulo foi concluído.
 - Código: `src/lib/journey.ts` (capítulos e progresso), `src/components/Journey.tsx` (tela da trilha).

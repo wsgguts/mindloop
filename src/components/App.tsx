@@ -80,11 +80,10 @@ export default function App() {
       return { ...p, [game]: next };
     });
   }
-  const nextOf = (game: RulesGame, idx: number) => ({
-    label: idx + 1 < LEVELS_PER_GAME ? "Próximo nível" : "Concluir jornada",
-    go: () => (idx + 1 < LEVELS_PER_GAME ? startGame(game, idx + 1) : openJourney(game)),
-    note: (idx + 1) % 10 === 0 ? `Você concluiu o capítulo “${chapterOf(game, idx + 1).title}”!` : undefined,
-  });
+  /** Mensagem extra na tela de parabéns: fim de capítulo ou da jornada. */
+  const winNoteOf = (game: RulesGame, idx: number): string | undefined =>
+    idx + 1 === LEVELS_PER_GAME ? "Você concluiu toda a jornada!"
+      : (idx + 1) % 10 === 0 ? `Capítulo “${chapterOf(game, idx + 1).title}” concluído!` : undefined;
 
   function openRules(game: RulesGame) {
     setRulesModal(game);
@@ -202,16 +201,14 @@ export default function App() {
             <Game key={`s-${activeSession.idx}-${activeSession.round}`} puzzle={PUZZLES[activeSession.idx]}
               initialGrid={save && save.id === PUZZLES[activeSession.idx].id && save.grid.length === PUZZLES[activeSession.idx].rows.length ? save.grid : puzzleGrid(PUZZLES[activeSession.idx])}
               onSave={(g) => persist(g ? { id: PUZZLES[activeSession.idx].id, grid: g } : null)}
-              onMenu={() => openJourney("sudoku")} onNext={nextOf("sudoku", activeSession.idx).go}
-              nextLabel={nextOf("sudoku", activeSession.idx).label} winNote={nextOf("sudoku", activeSession.idx).note}
+              onMenu={() => openJourney("sudoku")} winNote={winNoteOf("sudoku", activeSession.idx)}
               onWin={() => finishLevel("sudoku", activeSession.idx + 1)} onRules={() => openRules("sudoku")} />
           </div>
         )}
         {activeSession?.game === "zip" && (
           <div hidden={!inGame}>
             <ZipGame key={`z-${activeSession.idx}-${activeSession.round}`} puzzle={ZIP_PUZZLES[activeSession.idx]}
-              onMenu={() => openJourney("zip")} onNext={nextOf("zip", activeSession.idx).go}
-              nextLabel={nextOf("zip", activeSession.idx).label} winNote={nextOf("zip", activeSession.idx).note}
+              onMenu={() => openJourney("zip")} winNote={winNoteOf("zip", activeSession.idx)}
               onWin={() => finishLevel("zip", activeSession.idx + 1)} onRules={() => openRules("zip")} />
           </div>
         )}
