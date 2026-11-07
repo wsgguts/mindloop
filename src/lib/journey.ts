@@ -1,7 +1,7 @@
 // Jornada de níveis: 100 níveis por jogo, em 10 capítulos de 10 níveis.
 // Funções simples e puras (fáceis de testar). O progresso é uma string de 100 caracteres ("0" ou "1").
 
-export type JourneyGame = "sudoku" | "zip";
+export type JourneyGame = "sudoku" | "zip" | "tango";
 export const LEVELS_PER_GAME = 100;
 export const LEVELS_PER_CHAPTER = 10;
 
@@ -35,6 +35,18 @@ export const CHAPTERS: Record<JourneyGame, Chapter[]> = {
     ["Poucos pontos", "Quase nenhuma pista: confie no raciocínio."],
     ["Mestre dos caminhos", "Os percursos mais difíceis."],
   ]),
+  tango: make([
+    ["Primeiros símbolos", "Grade 4×4 com metade das casas já preenchidas."],
+    ["Sinais no caminho", "Ainda 4×4, agora com poucas pistas e os sinais = e ×."],
+    ["Grade maior", "Chega a grade 6×6, com bastante apoio."],
+    ["Pares e sanduíches", "Menos pistas: procure pares e casas entre iguais."],
+    ["Contando símbolos", "Linhas pela metade revelam o resto."],
+    ["Pistas raras", "O mínimo de pistas: cada sinal conta."],
+    ["E se…?", "Teste hipóteses: um símbolo errado gera contradição."],
+    ["Grade 8×8", "O maior tabuleiro da jornada, com bastante apoio."],
+    ["Olhar de mestre", "8×8 com poucas pistas."],
+    ["Mestre do equilíbrio", "Os desafios mais difíceis do Tango."],
+  ]),
 };
 
 export const chapterOf = (game: JourneyGame, level: number): Chapter =>
@@ -56,8 +68,27 @@ export function currentLevel(p: string): number {
   const i = p.indexOf("0");
   return i === -1 ? LEVELS_PER_GAME : i + 1;
 }
+/** Marca o nível como concluído. Repetir um nível já concluído não muda nada (o histórico nunca se perde). */
 export function markDone(p: string, level: number): string {
   return p.slice(0, level - 1) + "1" + p.slice(level);
+}
+/** Jornada inteira concluída: a partir daí todos os níveis ficam livres para repetir. */
+export const isComplete = (p: string): boolean => !p.includes("0");
+
+/**
+ * Nível que a trilha deve destacar (e para onde ela rola) ao abrir a jornada.
+ * - Jornada em andamento: o próximo nível a jogar (ex.: concluiu o 15 → destaca o 16).
+ *   Repetir um nível antigo também devolve a pessoa ao ponto em que parou.
+ * - Jornada completa: o último nível jogado (ex.: repetiu o 25 → volta ao 25, nunca salta para o 100).
+ */
+export function focusLevel(p: string, lastPlayed?: number | null): number {
+  if (isComplete(p) && lastPlayed && Number.isInteger(lastPlayed) && lastPlayed >= 1 && lastPlayed <= LEVELS_PER_GAME) return lastPlayed;
+  return currentLevel(p);
+}
+/** Lê o último nível jogado salvo (ou null). */
+export function parseLevel(raw: string | null): number | null {
+  const n = Number(raw);
+  return raw && Number.isInteger(n) && n >= 1 && n <= LEVELS_PER_GAME ? n : null;
 }
 export const chapterDone = (p: string, ch: Chapter): number =>
   [...p.slice(ch.from - 1, ch.to)].filter((c) => c === "1").length;

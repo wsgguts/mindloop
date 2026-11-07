@@ -1,6 +1,7 @@
 "use client";
-import Congrats from "./Congrats";
-import Gem from "./Gem";
+import GameHeader from "./GameHeader";
+import ZoomBoard from "./ZoomBoard";
+import { useLevelPlay } from "./useLevelPlay";
 import { useMemo, useRef, useState } from "react";
 import {
   type Pos, type ZipPuzzle, canStep, indexInPath, isAdjacent, isZipSolved, nextTarget, parseZip, samePos, visitedNumbers,
@@ -9,17 +10,23 @@ import {
 type Tone = "info" | "ok" | "warn" | "hint";
 const ICON: Record<Tone, string> = { info: "ℹ", ok: "✓", warn: "!", hint: "?" };
 
-interface Props { puzzle: ZipPuzzle; onMenu: () => void; onRules: () => void; onWin: () => void; winNote?: string }
+interface Props { puzzle: ZipPuzzle; active: boolean; onMenu: () => void; onRules: () => void; onWin: (ms: number) => void; onCelebrated: () => void }
 
-export default function ZipGame({ puzzle, onMenu, onRules, onWin, winNote }: Props) {
+// Animação de conclusão: um cometa percorre o caminho do 1 ao último número, acendendo as casas na ordem.
+const DRAW_MS = 1700;
+const FX_MS = 2900;
+
+export default function ZipGame({ puzzle, active, onMenu, onRules, onWin, onCelebrated }: Props) {
   const z = useMemo(() => parseZip(puzzle.rows), [puzzle]);
   const [path, setPath] = useState<Pos[]>([z.start]);
-  const [won, setWon] = useState(false);
+  const play = useLevelPlay({ active, onWin, onCelebrated, fxMs: FX_MS });
+  const won = play.won;
   const [moves, setMoves] = useState(0);
   const [tip, setTip] = useState<Pos | null>(null);
   const [confirm, setConfirm] = useState(false);
   const [msg, setMsg] = useState<{ tone: Tone; text: string }>({ tone: "info", text: "Vamos descobrir o próximo caminho? Arraste a partir do 1 ou toque nas casas vizinhas." });
   const drag = useRef(false);
+  const dragFrom = useRef<Pos[] | null>(null); // caminho antes do arrasto (para desfazer se virar pinça)
   const last = useRef<string>("");
   const say = (tone: Tone, text: string) => setMsg({ tone, text });
   const head = path[path.length - 1];
@@ -42,7 +49,7 @@ export default function ZipGame({ puzzle, onMenu, onRules, onWin, winNote }: Pro
     const next = [...path, p];
     setPath(next); setTip(null); setMoves((m) => m + 1);
     const n = z.nums[p.r][p.c];
-    if (isZipSolved(next, z)) { setWon(true); onWin(); return; }
+    if (isZipSolved(next, z)) { play.win(); say("ok", `Caminho completo! Do 1 ao ${z.max}, passando por todas as casas.`); return; }
     if (next.length === z.size * z.size) say("warn", "Todas as casas foram usadas, mas o caminho precisa terminar no maior número. Que tal voltar e tentar outra rota?");
     else if (n > 0) say("ok", `Boa! Você alcançou o ${n}.${n === z.max ? " Agora preencha as casas que faltam." : ""}`);
     else say("info", `${next.length} de ${z.size * z.size} casas no caminho.`);
@@ -77,12 +84,13 @@ export default function ZipGame({ puzzle, onMenu, onRules, onWin, winNote }: Pro
   }
 
   const pts = path.map((p) => `${p.c + 0.5},${p.r + 0.5}`).join(" ");
+  const order = useMemo(() => new Map(path.map((p, i) => [`${p.r}-${p.c}`, i])), [path]);
   const total = z.size * z.size;
   const reached = visitedNumbers(path, z);
 
   return (
     <div className="wrap">
-      <div className="title"><Gem kind="zip" size={48} /><div><h1>{puzzle.name}</h1><p className="muted">Zip · {puzzle.level}</p></div></div>
+      <GameHeader kind="zip" title={puzzle.name} subtitle={`Zip · ${puzzle.level}`} ms={play.ms} done={won} />
       <div>
         <div className="progress" role="progressbar" aria-label="Casas no caminho" aria-valuemin={0} aria-valuemax={total} aria-valuenow={path.length}>
           <i style={{ width: `${(path.length / total) * 100}%` }} />
@@ -90,34 +98,46 @@ export default function ZipGame({ puzzle, onMenu, onRules, onWin, winNote }: Pro
         <p className="muted" style={{ marginTop: 4 }}>{path.length} de {total} casas · números alcançados: {reached} de {z.max}</p>
       </div>
 
-      {won ? (
-        <Congrats kind="zip" levelName={puzzle.name} note={winNote} onDone={onMenu} />
-      ) : (
-        <div className="zboard-wrap">
-          <div className={`zboard n${z.size}`} style={{ gridTemplateColumns: `repeat(${z.size}, 1fr)` }} role="grid" tabIndex={0}
-            aria-label={`Grade do Zip ${z.size} por ${z.size}. Use as setas para estender o caminho e Backspace para voltar.`}
+      <ZoomBoard locked={won} panWithOneFinger={false} label="tabuleiro do Zip"
+        onGestureStart={() => { if (drag.current && dragFrom.current) setPath(dragFrom.current); drag.current = false; }}>
+          <div className={`zboard n${z.size}${won ? " win" : ""}`} role="grid" tabIndex={0}
+            style={{ gridTemplateColumns: `repeat(${z.size}, 1fr)`, "--zstep": `${DRAW_MS / total}ms` } as React.CSSProperties}
+            aria-label={won ? `Grade do Zip ${z.size} por ${z.size}, resolvida.` : `Grade do Zip ${z.size} por ${z.size}. Use as setas para estender o caminho e Backspace para voltar.`}
             onKeyDown={onKey}
-            onPointerDown={(e) => { const p = cellFrom(e); if (!p) return; drag.current = true; last.current = `${p.r}-${p.c}`; (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId); step(p, false); }}
+            onPointerDown={(e) => { if (won) return; const p = cellFrom(e); if (!p) return; drag.current = true; dragFrom.current = path; last.current = `${p.r}-${p.c}`; (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId); step(p, false); }}
             onPointerMove={(e) => { if (!drag.current) return; const p = cellFrom(e); if (!p) return; const k = `${p.r}-${p.c}`; if (k === last.current) return; last.current = k; step(p, true); }}
             onPointerUp={() => { drag.current = false; }} onPointerCancel={() => { drag.current = false; }}>
             <svg className="zline" viewBox={`0 0 ${z.size} ${z.size}`} aria-hidden="true">
               <polyline points={pts} fill="none" stroke="#762CEB" strokeWidth="0.2" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
+            {won && (
+              <svg className="zwin" viewBox={`0 0 ${z.size} ${z.size}`} aria-hidden="true">
+                <defs>
+                  <linearGradient id={`zg-${puzzle.id}`} x1="0" y1="0" x2="1" y2="1">
+                    <stop offset="0" stopColor="#12CFE0" /><stop offset=".5" stopColor="#F05BC8" /><stop offset="1" stopColor="#FFD23F" />
+                  </linearGradient>
+                </defs>
+                <polyline className="zwin-glow" points={pts} pathLength={1} style={{ animationDuration: `${DRAW_MS}ms` }} />
+                <polyline className="zwin-line" points={pts} pathLength={1} stroke={`url(#zg-${puzzle.id})`} style={{ animationDuration: `${DRAW_MS}ms` }} />
+                <circle className="zwin-comet" r="0.2">
+                  <animateMotion dur={`${DRAW_MS}ms`} fill="freeze" path={`M${pts.replace(/ /g, " L")}`} />
+                </circle>
+              </svg>
+            )}
             {z.nums.map((row, r) => row.map((n, c) => {
               const p = { r, c };
               const inPath = indexInPath(path, p) >= 0;
               const isHead = samePos(p, head);
               const label = `Linha ${r + 1}, coluna ${c + 1}${n ? `, número ${n}` : ""}${inPath ? ", no caminho" : ", livre"}${isHead ? ", ponta do caminho" : ""}`;
               return (
-                <div key={`${r}-${c}`} data-rc={`${r}-${c}`} role="gridcell" aria-label={label}
-                  className={["zcell", isHead && "head", tip && samePos(tip, p) && "tip"].filter(Boolean).join(" ")}>
+                <div key={`${r}-${c}`} data-rc={`${r}-${c}`} role="gridcell" aria-label={label} style={{ "--o": order.get(`${r}-${c}`) ?? 0 } as React.CSSProperties}
+                  className={["zcell", isHead && !won && "head", tip && samePos(tip, p) && "tip", won && n === z.max && "end"].filter(Boolean).join(" ")}>
                   {n > 0 && <span className={`zdot${inPath ? " done" : ""}${n > 9 ? " two" : ""}`}>{n}</span>}
                 </div>
               );
             }))}
           </div>
-        </div>
-      )}
+      </ZoomBoard>
 
       <div className={`note ${msg.tone}`} role="status" aria-live="polite"><b aria-hidden="true">{ICON[msg.tone]}</b><span>{msg.text}</span></div>
 

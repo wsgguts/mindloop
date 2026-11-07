@@ -1,78 +1,160 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import BottomNav, { type Tab } from "./BottomNav";
 import Game from "./Game";
 import Gem, { type GemKind } from "./Gem";
 import Journey from "./Journey";
+import LevelComplete, { type LevelResult } from "./LevelComplete";
 import Modal from "./Modal";
+import PatchesSoon from "./PatchesSoon";
 import { RulesContent, type RulesGame } from "./Rules";
+import TangoGame from "./TangoGame";
 import ZipGame from "./ZipGame";
 import { COMMENT_MAX, submitFeedback, validateFeedback } from "../lib/feedback";
-import { LEVELS_PER_GAME, chapterOf, doneCount, emptyProgress, markDone, parseProgress } from "../lib/journey";
+import { ALL_GAMES, GAME_META, PATCHES_META } from "../lib/games";
+import { LEVELS_PER_GAME, doneCount, emptyProgress, focusLevel, isComplete, isDone, markDone, parseLevel, parseProgress } from "../lib/journey";
 import { PUZZLES, puzzleGrid } from "../lib/puzzles";
+import { type Times, parseTimes, recordTime } from "../lib/records";
 import type { Grid } from "../lib/sudoku";
 import { validateNick } from "../lib/nick";
 import { KEYS, readStore, writeStore } from "../lib/storage";
+import { TANGO_PUZZLES } from "../lib/tango";
 import { ZIP_PUZZLES } from "../lib/zip";
 
-type View = "home" | "games" | "journey" | "game" | "rules" | "profile" | "feedback";
-type Save = { id: string; grid: Grid };
+type View = "home" | "journey" | "game" | "patches" | "rules" | "profile" | "feedback";
+type Save = { id: string; grid: Grid; ms?: number };
 type Session = { game: RulesGame; idx: number; round: number };
+/** Volta à trilha logo após uma vitória: qual nível animar como concluído e qual como recém-liberado. */
+type Arrival = { game: RulesGame; justDone: number; justUnlocked?: number };
+type PerGame<T> = Record<RulesGame, T>;
 
-const TAB_OF: Record<View, Tab> = { home: "home", games: "games", journey: "games", game: "games", rules: "rules", profile: "profile", feedback: "profile" };
-const NAME: Record<RulesGame, string> = { sudoku: "Mini Sudoku", zip: "Zip" };
+const TAB_OF: Record<View, Tab> = { home: "home", journey: "home", game: "home", patches: "home", rules: "rules", profile: "profile", feedback: "profile" };
+// Chave de "já viu as regras" de cada jogo (a do Sudoku é a original, mantida por compatibilidade).
+const RULES_KEY: PerGame<string> = { sudoku: KEYS.rules, zip: "mindloop:rules-zip", tango: "mindloop:rules-tango" };
+// Progresso salvo no aparelho, por jogo.
+const PROGRESS_KEY = (g: RulesGame) => `mindloop:progress:${g}`;
+const TIMES_KEY = (g: RulesGame) => `mindloop:times:${g}`; // melhor tempo de cada nível
+const LAST_KEY = (g: RulesGame) => `mindloop:last:${g}`; // último nível jogado (referência de retorno)
+const perGame = <T,>(f: (g: RulesGame) => T): PerGame<T> => ({ sudoku: f("sudoku"), zip: f("zip"), tango: f("tango") });
+
+// Áreas clicáveis sobre os cristais da arte do Início (em % da imagem home-art.jpg).
+const ART_SPOTS: { id: RulesGame | "patches"; left: number; top: number; width: number; height: number }[] = [
+  { id: "sudoku", left: 3, top: 38, width: 23, height: 19 },
+  { id: "zip", left: 74, top: 38, width: 24, height: 19 },
+  { id: "tango", left: 7, top: 57.5, width: 22, height: 19 },
+  { id: "patches", left: 66, top: 58.5, width: 27, height: 19 },
+];
 
 export default function App() {
   const [ready, setReady] = useState(false);
   const [view, setView] = useState<View>("home");
   const [nick, setNick] = useState("");
-  const [nickModal, setNickModal] = useState<null | View>(null); // para onde ir depois de salvar
+  const [nickModal, setNickModal] = useState<null | { then: () => void }>(null); // o que fazer depois de salvar
   const [draft, setDraft] = useState("");
   const [nickError, setNickError] = useState<string | null>(null);
-  const [seen, setSeen] = useState<Record<RulesGame, boolean>>({ sudoku: false, zip: false });
+  const [seen, setSeen] = useState<PerGame<boolean>>({ sudoku: false, zip: false, tango: false });
   const [rulesModal, setRulesModal] = useState<RulesGame | null>(null);
   const [rulesTab, setRulesTab] = useState<RulesGame>("sudoku");
   const [save, setSave] = useState<Save | null>(null);
   const [journeyGame, setJourneyGame] = useState<RulesGame>("sudoku");
-  const [progress, setProgress] = useState<Record<RulesGame, string>>({ sudoku: emptyProgress(), zip: emptyProgress() });
+  const [progress, setProgress] = useState<PerGame<string>>(() => perGame(emptyProgress));
+  const [times, setTimes] = useState<PerGame<Times>>(() => perGame(() => ({})));
+  const [lastPlayed, setLastPlayed] = useState<PerGame<number | null>>(() => perGame(() => null));
   const [session, setSession] = useState<Session | null>(null);
+  const [result, setResult] = useState<LevelResult | null>(null); // vitória recém-conquistada
+  const [showComplete, setShowComplete] = useState(false); // tela de parabéns aberta
+  const [arrival, setArrival] = useState<Arrival | null>(null);
   const [rating, setRating] = useState<number | null>(null);
   const [comment, setComment] = useState("");
   const [fbStatus, setFbStatus] = useState<"idle" | "sending" | "ok" | "error">("idle");
   const [fbError, setFbError] = useState<string | null>(null);
   const [bot, setBot] = useState(""); // campo-armadilha contra robôs
+  const viewRef = useRef(view);
+  viewRef.current = view;
+  const toCards = useRef(false); // ao voltar para o Início, rolar até os cards dos jogos
 
   useEffect(() => {
     const n = readStore(KEYS.nick) ?? "";
     if (n && !validateNick(n)) setNick(n);
-    setSeen({ sudoku: readStore(KEYS.rules) === "1", zip: readStore("mindloop:rules-zip") === "1" });
-    setProgress({ sudoku: parseProgress(readStore("mindloop:progress:sudoku")), zip: parseProgress(readStore("mindloop:progress:zip")) });
+    setSeen(perGame((g) => readStore(RULES_KEY[g]) === "1"));
+    setProgress(perGame((g) => parseProgress(readStore(PROGRESS_KEY(g)))));
+    setTimes(perGame((g) => parseTimes(readStore(TIMES_KEY(g)))));
+    setLastPlayed(perGame((g) => parseLevel(readStore(LAST_KEY(g)))));
     try { const s = readStore(KEYS.save); if (s) setSave(JSON.parse(s) as Save); } catch { /* ignora */ }
     setReady(true);
   }, []);
 
+  // Cada tela começa do topo; a jornada cuida da própria rolagem (centraliza o nível destacado).
+  useEffect(() => {
+    if (view === "journey") return;
+    if (view === "home" && toCards.current) {
+      toCards.current = false;
+      document.getElementById("jogos")?.scrollIntoView({ block: "start" });
+    } else window.scrollTo(0, 0);
+    setArrival(null); // a animação de chegada vale só para a volta imediata à trilha
+  }, [view]);
+
   const persist = (s: Save | null) => { setSave(s); writeStore(KEYS.save, s ? JSON.stringify(s) : null); };
 
-  function openNick(next: View) { setDraft(nick); setNickError(null); setNickModal(next); }
-  function onPlay() { if (nick) setView("games"); else openNick("games"); }
+  function openNick(then: () => void) { setDraft(nick); setNickError(null); setNickModal({ then }); }
   function confirmNick(e: React.FormEvent) {
     e.preventDefault();
     const err = validateNick(draft);
     if (err) return setNickError(err);
     const v = draft.trim();
     setNick(v); writeStore(KEYS.nick, v);
-    const next = nickModal ?? "games";
-    setNickModal(null); setView(next);
+    const then = nickModal?.then;
+    setNickModal(null);
+    then?.();
   }
-  function onTab(t: Tab) {
-    if (t === "games" && !nick) return openNick("games");
-    setView(t);
+  function onTab(t: Tab) { setView(t); }
+  function goHome(cards = false) { toCards.current = cards; setView("home"); if (cards && view === "home") document.getElementById("jogos")?.scrollIntoView({ behavior: "smooth", block: "start" }); }
+
+  /** Card, nome, arte ou "Jogar agora" de um jogo: abre a jornada dele (pedindo o apelido na primeira vez). */
+  function openGame(id: RulesGame | "patches") {
+    if (id === "patches") return setView("patches");
+    if (nick) openJourney(id);
+    else openNick(() => openJourney(id));
   }
+  function openJourney(game: RulesGame) { setJourneyGame(game); setArrival(null); setView("journey"); }
+
   function startGame(game: RulesGame, idx: number) {
     setSession((s) => ({ game, idx, round: (s?.round ?? 0) + 1 }));
+    setLastPlayed((l) => ({ ...l, [game]: idx + 1 }));
+    writeStore(LAST_KEY(game), String(idx + 1));
+    setResult(null); setShowComplete(false);
     setView("game");
     if (!seen[game]) { openRules(game); }
   }
+
+  /** Nível resolvido: salva na hora o progresso e o tempo (mesmo que a pessoa feche o app durante a animação). */
+  function winLevel(game: RulesGame, level: number, ms: number) {
+    const before = progress[game];
+    const after = markDone(before, level); // repetir um nível não altera nada do histórico
+    const t = recordTime(times[game], level, ms);
+    setProgress((p) => ({ ...p, [game]: after }));
+    writeStore(PROGRESS_KEY(game), after);
+    setTimes((all) => ({ ...all, [game]: t.times }));
+    writeStore(TIMES_KEY(game), JSON.stringify(t.times));
+    setLastPlayed((l) => ({ ...l, [game]: level }));
+    writeStore(LAST_KEY(game), String(level));
+    setResult({ game, level, ms, best: t.best, previous: t.previous, isRecord: t.isRecord, before, after });
+  }
+  /** A animação no tabuleiro terminou: mostra a tela de parabéns (se a pessoa ainda está na partida). */
+  function celebrated() {
+    if (viewRef.current === "game") setShowComplete(true);
+    else setResult(null);
+  }
+  /** Com a tela de parabéns cobrindo tudo, troca para a jornada do jogo, já no nível certo. */
+  function arriveAtJourney() {
+    if (!result) return;
+    const { game, level, before } = result;
+    const firstTime = !isDone(before, level);
+    setJourneyGame(game);
+    setView("journey");
+    setArrival({ game, justDone: level, justUnlocked: firstTime && level < LEVELS_PER_GAME ? level + 1 : undefined });
+  }
+
   async function sendFeedback(e: React.FormEvent) {
     e.preventDefault();
     const erro = validateFeedback({ rating, comment });
@@ -87,37 +169,30 @@ export default function App() {
     }
   }
 
-  function openJourney(game: RulesGame) { setJourneyGame(game); setView("journey"); }
-  /** Marca o nível como concluído e guarda no aparelho. */
-  function finishLevel(game: RulesGame, level: number) {
-    setProgress((p) => {
-      const next = markDone(p[game], level);
-      writeStore(`mindloop:progress:${game}`, next);
-      return { ...p, [game]: next };
-    });
-  }
-  /** Mensagem extra na tela de parabéns: fim de capítulo ou da jornada. */
-  const winNoteOf = (game: RulesGame, idx: number): string | undefined =>
-    idx + 1 === LEVELS_PER_GAME ? "Você concluiu toda a jornada!"
-      : (idx + 1) % 10 === 0 ? `Capítulo “${chapterOf(game, idx + 1).title}” concluído!` : undefined;
-
   function openRules(game: RulesGame) {
     setRulesModal(game);
     if (!seen[game]) {
       setSeen((s) => ({ ...s, [game]: true }));
-      writeStore(game === "zip" ? "mindloop:rules-zip" : KEYS.rules, "1");
+      writeStore(RULES_KEY[game], "1");
     }
   }
 
-  const GAMES: { id: RulesGame | "tango" | "patches"; name: string; text: string; kind: GemKind; color: string; open?: () => void }[] = [
-    { id: "sudoku", name: "Mini Sudoku", text: "Complete a grade sem repetir números.", kind: "sudoku", color: "#F05BC8", open: () => openJourney("sudoku") },
-    { id: "zip", name: "Zip", text: "Ligue os números em ordem, passando por todas as casas.", kind: "zip", color: "#12CFE0", open: () => openJourney("zip") },
-    { id: "tango", name: "Tango", text: "Alternância e equilíbrio de estados binários.", kind: "tango", color: "#FFB020" },
-    { id: "patches", name: "Patches", text: "Composição por encaixe modular.", kind: "patches", color: "#762CEB" },
+  const CARDS: { id: RulesGame | "patches"; name: string; text: string; kind: GemKind; color: string }[] = [
+    ...ALL_GAMES.map((g) => ({ id: g, kind: g, ...GAME_META[g] })),
+    { id: "patches", kind: "patches", ...PATCHES_META },
   ];
 
-  const inGame = session && view === "game";
+  const inGame = !!session && view === "game";
+  // O cronômetro só corre com a partida na tela e nada por cima.
+  const playing = inGame && !rulesModal && !nickModal && !showComplete;
   const activeSession = session;
+  const sessionProps = (game: RulesGame, idx: number) => ({
+    active: playing,
+    onMenu: () => openJourney(game),
+    onRules: () => openRules(game),
+    onWin: (ms: number) => winLevel(game, idx + 1, ms),
+    onCelebrated: celebrated,
+  });
 
   return (
     <>
@@ -132,62 +207,85 @@ export default function App() {
         {!ready ? (
           <div className="wrap"><p role="status">Carregando…</p></div>
         ) : view === "home" ? (
-          <section className="home" aria-label="Início">
-            <div className="fill sky" aria-hidden="true" />
-            <div className="art">
-              <img src="/home-art.jpg" width={1080} height={1244} alt="MindLoop — Desafie sua mente. Um cubo mágico de quebra-cabeça sobre ilhas flutuantes, com os cristais dos jogos Mini Sudoku, Zip, Tango e Patches." fetchPriority="high" />
-              <button className="hotspot" onClick={onPlay} aria-label="Jogar"><span aria-hidden="true">Jogar</span></button>
-            </div>
-            <div className="fill ground" aria-hidden="true" />
-          </section>
-        ) : view === "games" ? (
-          <div className="screen">
-            <h1>Escolha um jogo</h1>
-            <p className="lead">{nick ? `Boa, ${nick}! ` : ""}Toque num jogo para começar.</p>
-            <div className="ggrid">
-              {GAMES.map((g) => g.open ? (
-                <button key={g.id} className="gcard" style={{ "--gc": g.color } as React.CSSProperties} onClick={g.open} aria-label={`Abrir jornada de ${g.name}`}>
-                  <Gem kind={g.kind} size={88} />
-                  <span className="badge">Disponível</span>
-                  <span className="gname">{g.name}</span>
-                  <span className="gtext">{g.text}</span>
-                  <span className="gcount">{doneCount(progress[g.id as RulesGame])}/{LEVELS_PER_GAME} níveis</span>
-                  <span className="go">Jornada ›</span>
+          <>
+            <section className="home" aria-label="Início">
+              <div className="fill sky" aria-hidden="true" />
+              <div className="art">
+                <img src="/home-art.jpg" width={1080} height={1244} alt="MindLoop — Desafie sua mente. Um cubo mágico de quebra-cabeça sobre ilhas flutuantes, com os cristais dos jogos Mini Sudoku, Zip, Tango e Patches." fetchPriority="high" />
+                {ART_SPOTS.map((s) => (
+                  <button key={s.id} className="gspot" onClick={() => openGame(s.id)}
+                    style={{ left: `${s.left}%`, top: `${s.top}%`, width: `${s.width}%`, height: `${s.height}%` }}
+                    aria-label={s.id === "patches" ? "Patches: em breve" : `Jogar ${GAME_META[s.id].name}`} />
+                ))}
+                <button className="hotspot" onClick={() => document.getElementById("jogos")?.scrollIntoView({ behavior: "smooth", block: "start" })} aria-label="Jogar agora: ver os jogos">
+                  <span aria-hidden="true">Jogar agora</span>
                 </button>
-              ) : (
-                <div key={g.id} className="gcard soon" style={{ "--gc": g.color } as React.CSSProperties} aria-disabled="true">
-                  <Gem kind={g.kind} size={88} />
-                  <span className="badge soon">Em breve</span>
-                  <span className="gname">{g.name}</span>
-                  <span className="gtext">{g.text}</span>
-                </div>
-              ))}
-            </div>
-          </div>
+              </div>
+              <div className="fill ground" aria-hidden="true" />
+            </section>
+
+            <section id="jogos" className="screen games-home" aria-labelledby="jogos-title">
+              <h1 id="jogos-title">Escolha um jogo</h1>
+              <p className="lead">{nick ? `Boa, ${nick}! ` : ""}Toque em um jogo para abrir a jornada dele.</p>
+              <div className="ggrid">
+                {CARDS.map((g) => {
+                  const soon = g.id === "patches";
+                  const p = soon ? "" : progress[g.id as RulesGame];
+                  const count = soon ? 0 : doneCount(p);
+                  const full = !soon && isComplete(p);
+                  return (
+                    // O card inteiro é clicável (mouse/toque); o botão é o alvo do teclado e leitores de tela.
+                    <article key={g.id} className={`gcard${soon ? " soon" : ""}`} style={{ "--gc": g.color } as React.CSSProperties} onClick={() => openGame(g.id)}>
+                      <Gem kind={g.kind} size={88} />
+                      <span className={`badge${soon ? " soon" : full ? " full" : ""}`}>{soon ? "Em breve" : full ? "★ Jornada completa" : "Disponível"}</span>
+                      <h2 className="gname">{g.name}</h2>
+                      <p className="gtext">{g.text}</p>
+                      {!soon && (
+                        <>
+                          <div className="gprog" aria-hidden="true"><i style={{ width: `${count}%` }} /></div>
+                          <span className="gcount">{count}/{LEVELS_PER_GAME} níveis</span>
+                        </>
+                      )}
+                      <button className={`btn ${soon ? "sec gsoon" : "cta"} gplay`} onClick={(e) => { e.stopPropagation(); openGame(g.id); }}
+                        aria-label={soon ? "Conhecer o Patches (em breve)" : `Jogar ${g.name} agora — ${count} de ${LEVELS_PER_GAME} níveis concluídos`}>
+                        {soon ? "Em breve ›" : "Jogar agora"}
+                      </button>
+                    </article>
+                  );
+                })}
+              </div>
+            </section>
+          </>
         ) : view === "journey" ? (
-          <Journey key={journeyGame} game={journeyGame} done={progress[journeyGame]} onBack={() => setView("games")} onPlay={(n) => startGame(journeyGame, n - 1)} />
+          <Journey key={journeyGame} game={journeyGame} done={progress[journeyGame]}
+            focus={focusLevel(progress[journeyGame], lastPlayed[journeyGame])}
+            justDone={arrival?.game === journeyGame ? arrival.justDone : undefined}
+            justUnlocked={arrival?.game === journeyGame ? arrival.justUnlocked : undefined}
+            onBack={() => goHome(true)} onPlay={(n) => startGame(journeyGame, n - 1)} />
+        ) : view === "patches" ? (
+          <PatchesSoon onBack={() => goHome(true)} />
         ) : view === "rules" ? (
           <div className="wrap">
             <h1>Regras</h1>
             <div className="seg" role="group" aria-label="Escolher jogo">
-              {(["sudoku", "zip"] as RulesGame[]).map((g) => (
+              {ALL_GAMES.map((g) => (
                 <button key={g} className={rulesTab === g ? "on" : ""} aria-pressed={rulesTab === g} onClick={() => setRulesTab(g)}>
-                  <Gem kind={g} size={28} />{NAME[g]}
+                  <Gem kind={g} size={28} />{GAME_META[g].name}
                 </button>
               ))}
             </div>
-            <h2>Como jogar o {NAME[rulesTab]}</h2>
+            <h2>Como jogar o {GAME_META[rulesTab].name}</h2>
             <RulesContent game={rulesTab} />
-            <p className="muted">Tango e Patches ainda estão chegando — as regras aparecem aqui quando os jogos forem lançados.</p>
+            <p className="muted">Patches ainda está chegando — as regras aparecem aqui quando o jogo for lançado.</p>
           </div>
         ) : view === "profile" ? (
           <div className="wrap">
             <h1>Perfil</h1>
             {nick ? (
               <div className="card"><span className="muted">Seu apelido</span><h2>{nick}</h2>
-                <button className="btn sec" onClick={() => openNick("profile")}>Alterar apelido</button></div>
+                <button className="btn sec" onClick={() => openNick(() => setView("profile"))}>Alterar apelido</button></div>
             ) : (
-              <div className="card"><p>Você ainda não escolheu um apelido.</p><button className="btn cta" onClick={() => openNick("profile")}>Escolher apelido</button></div>
+              <div className="card"><p>Você ainda não escolheu um apelido.</p><button className="btn cta" onClick={() => openNick(() => setView("profile"))}>Escolher apelido</button></div>
             )}
             <p className="muted">O apelido fica salvo só neste aparelho. Não pedimos cadastro nem outros dados.</p>
             <button className="btn sec" onClick={() => { setRating(null); setComment(""); setFbStatus("idle"); setFbError(null); setView("feedback"); }}>Dar opinião</button>
@@ -235,26 +333,36 @@ export default function App() {
         ) : null}
 
         {/* Partidas ficam montadas enquanto a pessoa navega, para não perder o progresso. */}
-        {activeSession?.game === "sudoku" && (
-          <div hidden={!inGame}>
-            <Game key={`s-${activeSession.idx}-${activeSession.round}`} puzzle={PUZZLES[activeSession.idx]}
-              initialGrid={save && save.id === PUZZLES[activeSession.idx].id && save.grid.length === PUZZLES[activeSession.idx].rows.length ? save.grid : puzzleGrid(PUZZLES[activeSession.idx])}
-              onSave={(g) => persist(g ? { id: PUZZLES[activeSession.idx].id, grid: g } : null)}
-              onMenu={() => openJourney("sudoku")} winNote={winNoteOf("sudoku", activeSession.idx)}
-              onWin={() => finishLevel("sudoku", activeSession.idx + 1)} onRules={() => openRules("sudoku")} />
-          </div>
-        )}
+        {activeSession?.game === "sudoku" && (() => {
+          const pz = PUZZLES[activeSession.idx];
+          const resume = save && save.id === pz.id && save.grid.length === pz.rows.length ? save : null;
+          return (
+            <div hidden={!inGame}>
+              <Game key={`s-${activeSession.idx}-${activeSession.round}`} puzzle={pz}
+                initialGrid={resume ? resume.grid : puzzleGrid(pz)} initialMs={resume?.ms ?? 0}
+                onSave={(g, ms) => persist(g ? { id: pz.id, grid: g, ms } : null)}
+                {...sessionProps("sudoku", activeSession.idx)} />
+            </div>
+          );
+        })()}
         {activeSession?.game === "zip" && (
           <div hidden={!inGame}>
-            <ZipGame key={`z-${activeSession.idx}-${activeSession.round}`} puzzle={ZIP_PUZZLES[activeSession.idx]}
-              onMenu={() => openJourney("zip")} winNote={winNoteOf("zip", activeSession.idx)}
-              onWin={() => finishLevel("zip", activeSession.idx + 1)} onRules={() => openRules("zip")} />
+            <ZipGame key={`z-${activeSession.idx}-${activeSession.round}`} puzzle={ZIP_PUZZLES[activeSession.idx]} {...sessionProps("zip", activeSession.idx)} />
+          </div>
+        )}
+        {activeSession?.game === "tango" && (
+          <div hidden={!inGame}>
+            <TangoGame key={`t-${activeSession.idx}-${activeSession.round}`} puzzle={TANGO_PUZZLES[activeSession.idx]} {...sessionProps("tango", activeSession.idx)} />
           </div>
         )}
       </main>
 
+      {result && showComplete && (
+        <LevelComplete result={result} onSwitch={arriveAtJourney} onClose={() => { setShowComplete(false); setResult(null); }} />
+      )}
+
       {rulesModal && (
-        <Modal title={`Como jogar o ${NAME[rulesModal]}`} onClose={() => setRulesModal(null)} closeLabel="Fechar regras">
+        <Modal title={`Como jogar o ${GAME_META[rulesModal].name}`} onClose={() => setRulesModal(null)} closeLabel="Fechar regras">
           <RulesContent game={rulesModal} />
           <button className="btn cta" onClick={() => setRulesModal(null)} style={{ marginTop: 16 }}>Entendi, continuar jogando</button>
         </Modal>

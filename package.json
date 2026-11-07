@@ -3,7 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
+    "predev": "node scripts/link-next.mjs",
     "dev": "next dev",
+    "prebuild": "node scripts/link-next.mjs",
     "build": "next build",
     "start": "next start",
     "typecheck": "tsc --noEmit",

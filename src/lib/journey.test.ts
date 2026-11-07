@@ -6,7 +6,7 @@ import { puzzleGrid } from "./puzzles";
 
 describe("jornada", () => {
   it("tem 10 capítulos por jogo cobrindo exatamente os níveis 1–100", () => {
-    for (const g of ["sudoku", "zip"] as const) {
+    for (const g of ["sudoku", "zip", "tango"] as const) {
       expect(CHAPTERS[g]).toHaveLength(10);
       expect(CHAPTERS[g][0].from).toBe(1);
       expect(CHAPTERS[g][9].to).toBe(100);

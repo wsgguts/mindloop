@@ -1,14 +1,14 @@
 "use client";
-export type Tab = "home" | "games" | "rules" | "profile";
+// "Início" é a central dos jogos (a antiga aba "Jogos" foi unificada a ela).
+export type Tab = "home" | "rules" | "profile";
 
 const ICONS: Record<Tab, React.ReactNode> = {
   home: <path d="M3 11.5 12 4l9 7.5M5.5 10v10h13V10M10 20v-6h4v6" />,
-  games: <><rect x="3.5" y="3.5" width="7" height="7" rx="1.5" /><rect x="13.5" y="3.5" width="7" height="7" rx="1.5" /><rect x="3.5" y="13.5" width="7" height="7" rx="1.5" /><rect x="13.5" y="13.5" width="7" height="7" rx="1.5" /></>,
   rules: <path d="M5 4.5h11a3 3 0 0 1 3 3V20H8a3 3 0 0 1-3-3zM5 17a3 3 0 0 1 3-3h11M9 8.5h6" />,
   profile: <><circle cx="12" cy="8.5" r="3.8" /><path d="M4.5 20c.8-4 3.6-6 7.5-6s6.700 2 7.500 6" /></>,
 };
 const ITEMS: { id: Tab; label: string }[] = [
-  { id: "home", label: "Início" }, { id: "games", label: "Jogos" }, { id: "rules", label: "Regras" }, { id: "profile", label: "Perfil" },
+  { id: "home", label: "Início" }, { id: "rules", label: "Regras" }, { id: "profile", label: "Perfil" },
 ];
 
 export default function BottomNav({ active, onChange }: { active: Tab; onChange: (t: Tab) => void }) {

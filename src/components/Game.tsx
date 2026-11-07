@@ -1,6 +1,7 @@
 "use client";
-import Congrats from "./Congrats";
-import Gem from "./Gem";
+import GameHeader from "./GameHeader";
+import ZoomBoard from "./ZoomBoard";
+import { useLevelPlay } from "./useLevelPlay";
 import { useMemo, useRef, useState } from "react";
 import type { Puzzle } from "../lib/puzzles";
 import { puzzleGrid } from "../lib/puzzles";
@@ -18,14 +19,21 @@ type Move = { r: number; c: number; prev: number };
 interface Props {
   puzzle: Puzzle;
   initialGrid: Grid;
-  onSave: (grid: Grid | null) => void;
+  /** Tempo já jogado, quando a partida foi guardada e retomada. */
+  initialMs?: number;
+  /** A partida está na tela, sem nada por cima (o cronômetro só conta assim). */
+  active: boolean;
+  onSave: (grid: Grid | null, ms?: number) => void;
   onMenu: () => void;
   onRules: () => void;
-  onWin: () => void;
-  winNote?: string;
+  onWin: (ms: number) => void;
+  onCelebrated: () => void;
 }
 
-export default function Game({ puzzle, initialGrid, onSave, onMenu, onRules, onWin, winNote }: Props) {
+// Duração da animação de conclusão: linhas → colunas → blocos → brilho geral.
+const FX_MS = 3100;
+
+export default function Game({ puzzle, initialGrid, initialMs = 0, active, onSave, onMenu, onRules, onWin, onCelebrated }: Props) {
   const givens = useMemo(() => puzzleGrid(puzzle), [puzzle]);
   const N = givens.length;
   const [bh, bw] = boxDims(N);
@@ -35,11 +43,12 @@ export default function Game({ puzzle, initialGrid, onSave, onMenu, onRules, onW
   const [sel, setSel] = useState<Cell | null>(null);
   const [tip, setTip] = useState<Cell | null>(null);
   const [paused, setPaused] = useState(false);
-  const [won, setWon] = useState(false);
   const [moves, setMoves] = useState(0);
   const [confirm, setConfirm] = useState<null | "restart" | "end">(null);
   const [msg, setMsg] = useState<{ tone: Tone; text: string }>({ tone: "info", text: "Vamos descobrir o próximo passo? Toque numa casa vazia." });
   const boardRef = useRef<HTMLDivElement>(null);
+  const play = useLevelPlay({ active: active && !paused, onWin, onCelebrated, fxMs: FX_MS, initialMs });
+  const won = play.won;
 
   const say = (tone: Tone, text: string) => setMsg({ tone, text });
   const isGiven = (r: number, c: number) => givens[r][c] !== 0;
@@ -49,8 +58,8 @@ export default function Game({ puzzle, initialGrid, onSave, onMenu, onRules, onW
     setGrid(next);
     setTip(null);
     setMoves((m) => m + 1);
-    if (isSolved(next)) { setWon(true); onSave(null); onWin(); return; }
-    onSave(next);
+    if (isSolved(next)) { onSave(null); play.win(); say("ok", "Grade completa! Todas as linhas, colunas e blocos fecharam."); return; }
+    onSave(next, play.read());
     const kinds = conflictsAt(next, r, c);
     if (next[r][c] === 0) say("info", "Casa limpa. Observe as pistas e tente outra opção.");
     else if (kinds.length) say("warn", `Esse número já aparece ${WHERE[kinds[0]]}. Quer tentar outra opção?`);
@@ -72,14 +81,14 @@ export default function Game({ puzzle, initialGrid, onSave, onMenu, onRules, onW
     const last = history[history.length - 1];
     const next = setCell(grid, last.r, last.c, last.prev);
     setHistory(history.slice(0, -1));
-    setGrid(next); setTip(null); setSel({ r: last.r, c: last.c }); onSave(next);
+    setGrid(next); setTip(null); setSel({ r: last.r, c: last.c }); onSave(next, play.read());
     say("info", "Última jogada desfeita.");
   }
 
   function restart() {
     const fresh = cloneGrid(givens);
     setGrid(fresh); setHistory([]); setSel(null); setTip(null); setMoves(0); setConfirm(null); setPaused(false);
-    onSave(fresh);
+    onSave(fresh, play.read());
     say("info", "Puzzle restaurado ao início. Vamos de novo?");
   }
 
@@ -117,10 +126,7 @@ export default function Game({ puzzle, initialGrid, onSave, onMenu, onRules, onW
 
   return (
     <div className="wrap">
-      <div className="title"><Gem kind="sudoku" size={48} /><div>
-        <h1>{puzzle.name}</h1>
-        <p className="muted">Mini Sudoku · {puzzle.level}</p>
-      </div></div>
+      <GameHeader kind="sudoku" title={puzzle.name} subtitle={`Mini Sudoku · ${puzzle.level}`} ms={play.ms} done={won} />
 
       <div>
         <div className="progress" role="progressbar" aria-label="Casas preenchidas" aria-valuemin={0} aria-valuemax={total} aria-valuenow={filled}>
@@ -129,9 +135,7 @@ export default function Game({ puzzle, initialGrid, onSave, onMenu, onRules, onW
         <p className="muted" style={{ marginTop: 4 }}>{filled} de {total} casas preenchidas</p>
       </div>
 
-      {won ? (
-        <Congrats kind="sudoku" levelName={puzzle.name} note={winNote} onDone={onMenu} />
-      ) : paused ? (
+      {paused ? (
         <div className="paused">
           <h2>Jogo pausado</h2>
           <p className="muted">A grade fica escondida até você voltar.</p>
@@ -139,16 +143,19 @@ export default function Game({ puzzle, initialGrid, onSave, onMenu, onRules, onW
         </div>
       ) : (
         <>
-          <div ref={boardRef} className={`board n${N}`} style={{ gridTemplateColumns: `repeat(${N}, 1fr)` }} role="grid" aria-label={`Grade do Mini Sudoku ${N} por ${N}`} onKeyDown={onKey}>
+          <ZoomBoard locked={won} label="tabuleiro do Mini Sudoku">
+          <div ref={boardRef} className={`board n${N}${won ? " win" : ""}`} style={{ gridTemplateColumns: `repeat(${N}, 1fr)` }} role="grid"
+            aria-label={`Grade do Mini Sudoku ${N} por ${N}${won ? ", resolvida" : ""}`} onKeyDown={onKey}>
             {grid.map((row, r) => row.map((v, c) => {
               const bad = conflictsAt(grid, r, c).length > 0;
               const g = isGiven(r, c);
-              const isSel = sel?.r === r && sel?.c === c;
+              const isSel = !won && sel?.r === r && sel?.c === c;
               const cls = ["cell", g && "given", related(r, c) && "rel", isSel && "sel", bad && "bad",
                 tip?.r === r && tip?.c === c && "tip", (c + 1) % bw === 0 && c < N - 1 && "bx-r", (r + 1) % bh === 0 && r < N - 1 && "bx-b"].filter(Boolean).join(" ");
               const label = `Linha ${r + 1}, coluna ${c + 1}, ${g ? `pista ${v}` : v ? `número ${v}` : "vazia"}${bad ? ", conflito" : ""}${isSel ? ", selecionada" : ""}`;
               return (
                 <button key={`${r}-${c}`} data-rc={`${r}-${c}`} role="gridcell" className={cls} aria-label={label}
+                  style={{ "--r": r, "--c": c, "--b": Math.floor(r / bh) * (N / bw) + Math.floor(c / bw) } as React.CSSProperties}
                   aria-pressed={isSel} tabIndex={isSel || (!sel && r === 0 && c === 0) ? 0 : -1}
                   onClick={() => { setSel({ r, c }); if (g) say("info", "Essa é uma pista fixa. Use as pistas para descobrir as casas vazias."); }}>
                   {v || ""}
@@ -156,10 +163,11 @@ export default function Game({ puzzle, initialGrid, onSave, onMenu, onRules, onW
               );
             }))}
           </div>
+          </ZoomBoard>
 
-          <div className={`pad n${N}`} style={{ gridTemplateColumns: `repeat(${N + 1}, 1fr)` }} role="group" aria-label="Escolher número">
-            {digits.map((d) => <button key={d} className="btn" onClick={() => enter(d)} aria-label={`Número ${d}`}>{d}</button>)}
-            <button className="btn sec erase" onClick={() => enter(0)} aria-label="Apagar número">{N > 4 ? "⌫" : "Apagar"}</button>
+          <div className={`pad n${N}${won ? " off" : ""}`} style={{ gridTemplateColumns: `repeat(${N + 1}, 1fr)` }} role="group" aria-label="Escolher número">
+            {digits.map((d) => <button key={d} className="btn" onClick={() => enter(d)} disabled={won} aria-label={`Número ${d}`}>{d}</button>)}
+            <button className="btn sec erase" onClick={() => enter(0)} disabled={won} aria-label="Apagar número">{N > 4 ? "⌫" : "Apagar"}</button>
           </div>
         </>
       )}
