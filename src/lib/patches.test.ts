@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   PATCHES_EXAMPLE, PATCHES_PUZZLES, countPatchesSolutions, encodePatches, findProblems, isPatchesSolved, nextDeduction,
-  parsePatches, pieceProblem, rectFrom, shapesOf, solveLogically, type PatchesBoard, type Rect,
+  fitsKind, kindOf, parsePatches, pieceProblem, rectFrom, shapesOf, solveLogically, type PatchesBoard, type Rect,
 } from "./patches";
 
 const boards = PATCHES_PUZZLES.map((p) => parsePatches(p.raw));
@@ -38,9 +38,9 @@ describe("patches: níveis", () => {
     PATCHES_PUZZLES.forEach((p, i) => expect(encodePatches(boards[i])).toBe(p.raw));
   });
   it("o exemplo das regras tem solução única e é a mostrada", () => {
-    const b: PatchesBoard = { n: 4, clues: PATCHES_EXAMPLE.clues.map(([r, c, v]) => ({ r, c, v })) };
+    const b: PatchesBoard = { n: 4, clues: PATCHES_EXAMPLE.clues.map(([r, c, v, kind]) => ({ r, c, v, kind })) };
     // A grade do exemplo tem 3 linhas × 4 colunas: completa a 4ª linha com uma peça fixa de 4 casas para usar o solucionador quadrado.
-    b.clues.push({ r: 3, c: 0, v: 4 });
+    b.clues.push({ r: 3, c: 0, v: 4, kind: "h" });
     expect(countPatchesSolutions(b, 2)).toBe(1);
     const pieces: Rect[] = [...PATCHES_EXAMPLE.pieces.map(([r, c, h, w]) => ({ r, c, h, w })), { r: 3, c: 0, h: 1, w: 4 }];
     expect(isPatchesSolved(b, pieces)).toBe(true);
@@ -70,6 +70,38 @@ describe("patches: regras", () => {
       expect(q.h * q.w).toBe(3);
       expect(q.r >= 0 && q.c >= 0 && q.r + q.h <= 3 && q.c + q.w <= 3).toBe(true);
     }
+  });
+});
+
+describe("patches: formato das peças (etiqueta do número)", () => {
+  it("a etiqueta de cada número combina com a peça da solução", () => {
+    boards.forEach((b, i) => {
+      const sol = solveLogically(b).pieces!;
+      b.clues.forEach((k, j) => expect(fitsKind(k.kind, sol[j]), `nível ${i + 1}, número ${j + 1}`).toBe(true));
+    });
+  });
+  it("capítulos 1 e 2 mostram o formato de todos os números; os últimos escondem a maioria", () => {
+    const shown = (ch: number) => {
+      const bs = boards.slice((ch - 1) * 10, ch * 10);
+      return bs.reduce((s, b) => s + b.clues.filter((k) => k.kind !== "a").length, 0) / bs.reduce((s, b) => s + b.clues.length, 0);
+    };
+    expect(shown(1)).toBe(1);
+    expect(shown(2)).toBe(1);
+    expect(shown(10)).toBeLessThan(shown(3));
+    expect(shown(10)).toBeLessThanOrEqual(0.5);
+  });
+  it("classifica quadrada, em pé e deitada", () => {
+    expect(kindOf({ r: 0, c: 0, h: 2, w: 2 })).toBe("q");
+    expect(kindOf({ r: 0, c: 0, h: 3, w: 1 })).toBe("v");
+    expect(kindOf({ r: 0, c: 0, h: 2, w: 3 })).toBe("h");
+    expect(fitsKind("a", { r: 0, c: 0, h: 1, w: 5 })).toBe(true);
+  });
+  it("acusa peça com o formato errado e só lista encaixes do formato pedido", () => {
+    const b = parsePatches("3|2....34..|hva");
+    // 2 (deitada) . .  /  . . 3 (em pé)  /  4 (qualquer) . .
+    expect(pieceProblem(b, rectFrom([0, 0], [1, 0]))?.kind).toBe("formato");
+    expect(pieceProblem(b, rectFrom([0, 0], [0, 1]))).toBeNull();
+    expect(shapesOf(b, b.clues[1]).every((q) => q.h > q.w)).toBe(true);
   });
 });
 

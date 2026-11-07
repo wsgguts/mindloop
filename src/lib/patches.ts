@@ -13,9 +13,9 @@ export const PATCHES_PUZZLES: PatchesPuzzle[] = PATCHES_RAW.map((raw, i) => ({
   raw,
 }));
 
-// Exemplo 3×4 mostrado nas regras: números [linha, coluna, valor] e a solução [linha, coluna, altura, largura, cor].
+// Exemplo 3×4 mostrado nas regras: números [linha, coluna, valor, formato] e a solução [linha, coluna, altura, largura, cor].
 // (patches.test.ts confere que a solução é a única.)
 export const PATCHES_EXAMPLE = {
-  clues: [[0, 1, 3], [1, 3, 3], [1, 2, 2], [2, 0, 4]] as [number, number, number][],
+  clues: [[0, 1, 3, "h"], [1, 3, 3, "v"], [1, 2, 2, "v"], [2, 0, 4, "q"]] as [number, number, number, "q" | "v" | "h" | "a"][],
   pieces: [[0, 0, 1, 3, "#F05BC8"], [0, 3, 3, 1, "#12CFE0"], [1, 2, 2, 1, "#FFD23F"], [1, 0, 2, 2, "#4FD6B1"]] as [number, number, number, number, string][],
 };

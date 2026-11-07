@@ -1,6 +1,7 @@
 import TangoSymbol from "./TangoSymbol";
 import type { JourneyGame } from "../lib/journey";
 import { PATCHES_EXAMPLE } from "../lib/patches";
+import PatchesTag, { KIND_HELP } from "./PatchesTag";
 
 export type RulesGame = JourneyGame;
 
@@ -49,7 +50,7 @@ function PatchesExample() {
     <span className="pex">
       {Array.from({ length: 12 }, (_, i) => <span key={i} className="pex-cell" style={{ gridRow: Math.floor(i / 4) + 1, gridColumn: (i % 4) + 1 }} />)}
       {withPieces && PATCHES_EXAMPLE.pieces.map(([r, c, h, w, color], i) => <span key={i} className="pex-piece" style={{ gridRow: `${r + 1} / span ${h}`, gridColumn: `${c + 1} / span ${w}`, "--pc": color } as React.CSSProperties} />)}
-      {PATCHES_EXAMPLE.clues.map(([r, c, v], i) => <b key={i} className="pex-num" style={{ gridRow: r + 1, gridColumn: c + 1 }}>{v}</b>)}
+      {PATCHES_EXAMPLE.clues.map(([r, c, v, kind], i) => <span key={i} className="pex-num" style={{ gridRow: r + 1, gridColumn: c + 1 }}><PatchesTag v={v} kind={kind} color={PATCHES_EXAMPLE.pieces[i][4]} /></span>)}
     </span>
   );
   return <div className="pex-row" aria-hidden="true">{grid(false)}<span className="pex-arrow">→</span>{grid(true)}</div>;
@@ -64,9 +65,17 @@ function PatchesRules() {
         <li><b>Um número por peça.</b> Cada peça precisa conter exatamente um número.</li>
         <li><b>O número é o tamanho.</b> Ele diz quantas casas a peça ocupa: um 6 pode ser 1×6, 2×3, 3×2 ou 6×1.</li>
         <li><b>Grade completa.</b> Toda casa fica dentro de uma peça, e as peças não se sobrepõem.</li>
+        <li><b>O formato da etiqueta é o formato da peça.</b>
+          <ul className="ptlegend big">
+            {(["q", "v", "h", "a"] as const).map((kd) => (
+              <li key={kd}><span className="ptl-tag" aria-hidden="true"><PatchesTag v={kd === "q" ? 4 : kd === "a" ? 2 : 6} kind={kd} color="#9A6BFF" /></span>
+                <span><b>{kd === "q" ? "Quadrada" : kd === "v" ? "Em pé" : kd === "h" ? "Deitada" : "Empilhada"}:</b> {KIND_HELP[kd]}.</span></li>
+            ))}
+          </ul>
+        </li>
       </ol>
       <PatchesExample />
-      <p className="muted">No exemplo: o 3 de cima vira uma faixa deitada (1×3), o 3 da direita fica em pé (3×1), o 2 ocupa as duas casas do meio e o 4 forma um quadrado (2×2). Cada nível tem uma única solução e pode ser resolvido só com lógica, sem chutar.</p>
+      <p className="muted">No exemplo: o 3 com etiqueta deitada vira uma faixa 1×3, o 3 e o 2 com etiquetas em pé ficam de pé (3×1 e 2×1) e o 4 com etiqueta quadrada forma um quadrado 2×2. Cada nível tem uma única solução e pode ser resolvido só com lógica, sem chutar.</p>
 
       <h3>Como jogar</h3>
       <ul className="list">

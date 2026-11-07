@@ -1,19 +1,22 @@
 // Lógica pura do Patches (sem imports: usada pelo jogo, pelos testes e por scripts/gen_patches.mjs).
 // Quebra-cabeça de encaixe: cobrir toda a grade com peças retangulares (quadrados também valem).
 // Regras: (1) toda casa fica coberta por exatamente uma peça; (2) cada peça contém exatamente um número;
-// (3) o número diz quantas casas a peça ocupa.
+// (3) o número diz quantas casas a peça ocupa; (4) o formato da etiqueta do número diz o formato da peça:
+//     quadrada, em pé (mais alta que larga), deitada (mais larga que alta) ou qualquer formato.
 
 export type Cell = [number, number];
-export interface Clue { r: number; c: number; v: number }
+/** Formato pedido pelo número: q quadrada, v em pé, h deitada, a qualquer formato. */
+export type Kind = "q" | "v" | "h" | "a";
+export interface Clue { r: number; c: number; v: number; kind: Kind }
 /** Peça: canto de cima à esquerda (r, c), altura h e largura w, em casas. */
 export interface Rect { r: number; c: number; h: number; w: number }
 export interface PatchesBoard { n: number; clues: Clue[] }
 
 const DIGITS = "0123456789abcdefghijklmnopqrstuvwxyz";
 
-/** Formato: "6|<n·n casas: '.' vazia; 1–9 e a–z (10–35) são os números>" */
+/** Formato: "6|<n·n casas: '.' vazia; 1–9 e a–z (10–35) são os números>|<formato de cada número, na ordem de leitura>" */
 export function parsePatches(raw: string): PatchesBoard {
-  const [ns, cells = ""] = raw.split("|");
+  const [ns, cells = "", kinds = ""] = raw.split("|");
   const n = Number(ns);
   if (!Number.isInteger(n) || n < 2 || cells.length !== n * n) throw new Error(`Nível inválido: ${raw}`);
   const clues: Clue[] = [];
@@ -22,18 +25,31 @@ export function parsePatches(raw: string): PatchesBoard {
     if (ch === ".") continue;
     const v = DIGITS.indexOf(ch);
     if (v < 1) throw new Error(`Número inválido "${ch}" em ${raw}`);
-    clues.push({ r: Math.floor(i / n), c: i % n, v });
+    const kind = (kinds[clues.length] ?? "a") as Kind;
+    if (!"qvha".includes(kind)) throw new Error(`Formato inválido "${kind}" em ${raw}`);
+    clues.push({ r: Math.floor(i / n), c: i % n, v, kind });
   }
   return { n, clues };
 }
 export function encodePatches(b: PatchesBoard): string {
   const cells = Array<string>(b.n * b.n).fill(".");
   for (const k of b.clues) cells[k.r * b.n + k.c] = DIGITS[k.v];
-  return `${b.n}|${cells.join("")}`;
+  const sorted = [...b.clues].sort((x, y) => x.r - y.r || x.c - y.c);
+  return `${b.n}|${cells.join("")}|${sorted.map((k) => k.kind).join("")}`;
 }
 
 // ---------- Geometria ----------
 export const area = (q: Rect) => q.h * q.w;
+/** Formato real de uma peça. */
+export const kindOf = (q: Rect): Exclude<Kind, "a"> => (q.h === q.w ? "q" : q.h > q.w ? "v" : "h");
+/** A peça tem o formato que o número pede? */
+export const fitsKind = (kind: Kind, q: Rect) => kind === "a" || kindOf(q) === kind;
+/** Algum retângulo com essa área tem esse formato? (ex.: 6 nunca é quadrado) */
+export function kindPossible(v: number, kind: Kind): boolean {
+  if (kind === "a") return true;
+  for (let h = 1; h <= v; h++) if (v % h === 0 && fitsKind(kind, { r: 0, c: 0, h, w: v / h })) return true;
+  return false;
+}
 export const inRect = (q: Rect, r: number, c: number) => r >= q.r && r < q.r + q.h && c >= q.c && c < q.c + q.w;
 export const overlaps = (a: Rect, b: Rect) => a.r < b.r + b.h && b.r < a.r + a.h && a.c < b.c + b.w && b.c < a.c + a.w;
 export const sameRect = (a: Rect, b: Rect) => a.r === b.r && a.c === b.c && a.h === b.h && a.w === b.w;
@@ -50,7 +66,7 @@ export const cluesIn = (b: PatchesBoard, q: Rect) => b.clues.filter((k) => inRec
 export const pieceAt = (pieces: Rect[], r: number, c: number) => pieces.find((q) => inRect(q, r, c));
 
 // ---------- Validação ----------
-export type ProblemKind = "vazia" | "varios" | "tamanho";
+export type ProblemKind = "vazia" | "varios" | "tamanho" | "formato";
 export interface Problem { kind: ProblemKind; piece: Rect; clues: Clue[] }
 
 /** O que está errado numa peça sozinha (ou null se ela está de acordo com as regras). */
@@ -59,6 +75,7 @@ export function pieceProblem(b: PatchesBoard, q: Rect): Problem | null {
   if (!ks.length) return { kind: "vazia", piece: q, clues: ks };
   if (ks.length > 1) return { kind: "varios", piece: q, clues: ks };
   if (ks[0].v !== area(q)) return { kind: "tamanho", piece: q, clues: ks };
+  if (!fitsKind(ks[0].kind, q)) return { kind: "formato", piece: q, clues: ks };
   return null;
 }
 export const findProblems = (b: PatchesBoard, pieces: Rect[]): Problem[] =>
@@ -69,13 +86,13 @@ export const isPatchesSolved = (b: PatchesBoard, pieces: Rect[]) =>
   coveredCount(pieces) === b.n * b.n && findProblems(b, pieces).length === 0;
 
 // ---------- Peças possíveis ----------
-/** Todos os encaixes de um número: área certa, dentro da grade e sem nenhum outro número dentro. */
+/** Todos os encaixes de um número: área e formato certos, dentro da grade e sem nenhum outro número dentro. */
 export function shapesOf(b: PatchesBoard, k: Clue): Rect[] {
   const out: Rect[] = [];
   for (let h = 1; h <= k.v; h++) {
     if (k.v % h) continue;
     const w = k.v / h;
-    if (h > b.n || w > b.n) continue;
+    if (h > b.n || w > b.n || !fitsKind(k.kind, { r: 0, c: 0, h, w })) continue;
     for (let r = k.r - h + 1; r <= k.r; r++) for (let c = k.c - w + 1; c <= k.c; c++) {
       if (r < 0 || c < 0 || r + h > b.n || c + w > b.n) continue;
       const q = { r, c, h, w };

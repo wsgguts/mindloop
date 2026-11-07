@@ -2,10 +2,11 @@
 import GameHeader from "./GameHeader";
 import ZoomBoard from "./ZoomBoard";
 import { useLevelPlay } from "./useLevelPlay";
+import PatchesTag, { KIND_HELP, KIND_NAME } from "./PatchesTag";
 import { useMemo, useRef, useState } from "react";
 import {
   type Cell, type Clue, type Deduction, type PatchesPuzzle, type Problem, type Rect,
-  area, cluesIn, coveredCount, findProblems, isPatchesSolved, nextDeduction, overlaps, parsePatches, pieceAt,
+  area, cluesIn, coveredCount, kindOf, findProblems, isPatchesSolved, nextDeduction, overlaps, parsePatches, pieceAt,
   pieceProblem, rectFrom, sameRect, solveLogically,
 } from "../lib/patches";
 
@@ -23,7 +24,8 @@ const PALETTE = ["#F05BC8", "#12CFE0", "#FFD23F", "#9A6BFF", "#4FD6B1", "#FFB020
 const NEUTRAL = "#C9B8EC";
 
 const at = ([r, c]: Cell) => `linha ${r + 1}, coluna ${c + 1}`;
-const clueAt = (k: Clue) => `${k.v} da ${at([k.r, k.c])}`;
+/** "6 (peça em pé) da linha 2, coluna 3" — o formato só aparece quando o número pede um. */
+const clueAt = (k: Clue) => `${k.v}${k.kind === "a" ? "" : ` (peça ${KIND_NAME[k.kind]})`} da ${at([k.r, k.c])}`;
 const plural = (n: number, um: string, varios: string) => `${n} ${n === 1 ? um : varios}`;
 const shape = (q: Rect) => `${plural(q.h, "linha", "linhas")} × ${plural(q.w, "coluna", "colunas")}`;
 const sameCell = (a: Cell, b: Cell) => a[0] === b[0] && a[1] === b[1];
@@ -33,6 +35,10 @@ function problemText(p: Problem): string {
   const a = area(p.piece);
   if (p.kind === "vazia") return `Essa peça de ${a} casas não tem nenhum número. Cada peça precisa conter exatamente um número.`;
   if (p.kind === "varios") return `Essa peça cobre ${p.clues.length} números (${p.clues.map((k) => k.v).join(" e ")}). Cada peça pode ter só um.`;
+  if (p.kind === "formato") {
+    const k = p.clues[0];
+    return `O ${k.v} pede uma peça ${KIND_NAME[k.kind]} (${KIND_HELP[k.kind]}), mas essa ficou ${KIND_NAME[kindOf(p.piece)]}. Veja o formato da etiqueta do número.`;
+  }
   return `Essa peça tem ${a} casas, mas o número dentro dela é ${p.clues[0].v}. O número diz quantas casas a peça ocupa.`;
 }
 
@@ -43,10 +49,10 @@ function hintText(d: Deduction, clues: Clue[]): string {
     case "unico":
       return `O ${clueAt(k)} só cabe de um jeito: uma peça de ${shape(d.rect)}, sem cobrir outro número nem sair da grade. O encaixe está destacado — desenhe-o.`;
     case "casa":
-      return `A casa marcada (${at(d.cell!)}) só pode ser coberta pelo ${k.v}: nenhum outro número alcança essa casa. Passando por ela, a peça do ${k.v} só tem um formato: ${shape(d.rect)}.`;
+      return `A casa marcada (${at(d.cell!)}) só pode ser coberta pelo ${clueAt(k)}: nenhum outro número alcança essa casa. Passando por ela, a peça do ${k.v} só tem um formato: ${shape(d.rect)}.`;
     case "reserva": {
       const o = clues[d.other!];
-      return `Todo encaixe possível do ${clueAt(o)} usa algumas casas em comum — elas ficam reservadas para ele. Sem essas casas, o ${k.v} só tem um encaixe: ${shape(d.rect)}.`;
+      return `Todo encaixe possível do ${clueAt(o)} usa algumas casas em comum — elas ficam reservadas para ele. Sem essas casas, o ${clueAt(k)} só tem um encaixe: ${shape(d.rect)}.`;
     }
   }
 }
@@ -74,6 +80,8 @@ export default function PatchesGame({ puzzle, active, onMenu, onRules, onWin, on
   const badSet = useMemo(() => new Set(problems.map((p) => p.piece)), [problems]);
   const clueIndex = (q: Rect) => { const ks = cluesIn(board, q); return ks.length === 1 ? clues.indexOf(ks[0]) : -1; };
   const covered = coveredCount(pieces);
+  // Legenda: só os formatos que aparecem neste nível, sempre na mesma ordem.
+  const kindsUsed = (["q", "v", "h", "a"] as const).filter((kd) => clues.some((k) => k.kind === kd));
   const placedOk = pieces.length - problems.length;
 
   function commit(next: Rect[]) {
@@ -89,7 +97,7 @@ export default function PatchesGame({ puzzle, active, onMenu, onRules, onWin, on
     const replaced = pieces.length - kept.length;
     const next = [...kept, q];
     commit(next);
-    if (isPatchesSolved(board, next)) { setAnchor(null); setCursor(null); play.win(); say("ok", "Grade completa! Cada peça tem um número e o tamanho certo."); return; }
+    if (isPatchesSolved(board, next)) { setAnchor(null); setCursor(null); play.win(); say("ok", "Grade completa! Cada peça tem um número, o tamanho e o formato certos."); return; }
     const prob = pieceProblem(board, q);
     const out = replaced ? ` (${replaced === 1 ? "a peça que estava ali saiu" : `${replaced} peças que estavam ali saíram`})` : "";
     if (prob) return say("warn", `${problemText(prob)} Toque na peça para tirá-la ou desenhe outra por cima.`);
@@ -234,7 +242,7 @@ export default function PatchesGame({ puzzle, active, onMenu, onRules, onWin, on
             const q = pieceAt(pieces, r, c);
             const isAnchor = !!anchor && sameCell(anchor, [r, c]);
             const isCur = !!cursor && sameCell(cursor, [r, c]);
-            const label = `Linha ${r + 1}, coluna ${c + 1}${k ? `, número ${k.v}` : ""}${q ? `, coberta por peça de ${area(q)} casas${badSet.has(q) ? ", com erro" : ""}` : ", livre"}${isAnchor ? ", canto marcado" : ""}`;
+            const label = `Linha ${r + 1}, coluna ${c + 1}${k ? `, número ${k.v}, peça ${KIND_NAME[k.kind]}` : ""}${q ? `, coberta por peça de ${area(q)} casas${badSet.has(q) ? ", com erro" : ""}` : ", livre"}${isAnchor ? ", canto marcado" : ""}`;
             return (
               <div key={i} data-rc={`${r}-${c}`} role="gridcell" aria-label={label} aria-selected={isCur || undefined}
                 className={["ptcell", c === n - 1 && "edge-c", r === n - 1 && "edge-r", isAnchor && "anchor", isCur && "cur", tip?.cell && sameCell(tip.cell, [r, c]) && "tip"].filter(Boolean).join(" ")}
@@ -256,13 +264,24 @@ export default function PatchesGame({ puzzle, active, onMenu, onRules, onWin, on
           {clues.map((k, i) => {
             const q = pieceAt(pieces, k.r, k.c);
             const ok = !!q && !badSet.has(q);
-            return <span key={i} className={["ptclue", ok && "ok", k.v > 9 && "two", tip?.clue === i && "tip"].filter(Boolean).join(" ")}
-              style={{ gridRow: k.r + 1, gridColumn: k.c + 1, "--i": q ? order.get(q) ?? 0 : 0 } as React.CSSProperties} aria-hidden="true">{k.v}</span>;
+            return (
+              <span key={i} className={["ptclue", ok && "ok", k.v > 9 && "two", tip?.clue === i && "tip"].filter(Boolean).join(" ")}
+                style={{ gridRow: k.r + 1, gridColumn: k.c + 1, "--i": q ? order.get(q) ?? 0 : 0 } as React.CSSProperties} aria-hidden="true">
+                <PatchesTag v={k.v} kind={k.kind} color={PALETTE[i % PALETTE.length]} />
+              </span>
+            );
           })}
         </div>
       </ZoomBoard>
 
       <div className="gctrl">
+        {kindsUsed.length > 0 && (
+          <ul className="ptlegend" aria-label="Formato das peças">
+            {kindsUsed.map((kd) => (
+              <li key={kd}><span className="ptl-tag" aria-hidden="true"><PatchesTag v="" kind={kd} color="#9A6BFF" /></span>{kd === "a" ? "qualquer" : KIND_NAME[kd]}</li>
+            ))}
+          </ul>
+        )}
         <div className={`note ${msg.tone}`} role="status" aria-live="polite"><b aria-hidden="true">{ICON[msg.tone]}</b><span>{msg.text}</span></div>
 
         {confirm && (
