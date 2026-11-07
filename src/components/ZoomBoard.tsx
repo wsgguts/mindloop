@@ -6,11 +6,17 @@ import { useCallback, useEffect, useRef, useState } from "react";
 // - Um dedo: nos jogos de tocar (Sudoku, Tango), arrastar move o tabuleiro ampliado; sem zoom, rola a página.
 //   No Zip um dedo continua traçando o caminho (a movimentação é feita com dois dedos).
 // - Computador: Ctrl + roda do mouse (ou pinça do touchpad) e os botões − / + abaixo do tabuleiro.
+// - Também dá para reduzir um pouco abaixo do tamanho normal (até 60%): ajuda quem usa a lupa do celular
+//   a enxergar o tabuleiro inteiro dentro da área ampliada. Menor que o normal, ele fica centralizado.
 // O tabuleiro só é movido com CSS transform, então toques e cliques continuam caindo na casa certa.
 
-export const MIN_ZOOM = 1;
+export const MIN_ZOOM = 0.6;
 export const MAX_ZOOM = 3;
-const STEP = 0.5;
+/** Paradas dos botões − / +: passos curtos abaixo do normal, maiores acima. */
+const LEVELS = [0.6, 0.7, 0.8, 0.9, 1, 1.5, 2, 2.5, 3];
+const nextLevel = (s: number) => LEVELS.find((l) => l > s + 0.001) ?? MAX_ZOOM;
+const prevLevel = (s: number) => [...LEVELS].reverse().find((l) => l < s - 0.001) ?? MIN_ZOOM;
+const isNormal = (s: number) => Math.abs(s - 1) < 0.001;
 const DRAG_PX = 8; // quanto o dedo precisa andar para virar "arrastar" (e não "tocar")
 
 type T = { s: number; x: number; y: number };
@@ -47,12 +53,13 @@ export default function ZoomBoard({ children, maxWidth = 360, panWithOneFinger =
   const gestureCb = useRef(onGestureStart);
   gestureCb.current = onGestureStart;
 
-  /** Mantém o tabuleiro cobrindo a área visível (nunca sobra espaço vazio ao arrastar). */
+  /** Ampliado: o tabuleiro cobre a área visível (nunca sobra espaço vazio ao arrastar). Reduzido: fica centralizado. */
   const clamp = useCallback((n: T): T => {
     const el = box.current;
     if (!el) return n;
     const w = el.clientWidth, h = el.clientHeight;
-    return { s: n.s, x: Math.min(0, Math.max(w - w * n.s, n.x)), y: Math.min(0, Math.max(h - h * n.s, n.y)) };
+    const fit = (v: number, size: number) => (n.s <= 1 ? (size - size * n.s) / 2 : Math.min(0, Math.max(size - size * n.s, v)));
+    return { s: n.s, x: fit(n.x, w), y: fit(n.y, h) };
   }, []);
 
   const apply = useCallback((n: T, animate = false) => {
@@ -174,7 +181,7 @@ export default function ZoomBoard({ children, maxWidth = 360, panWithOneFinger =
     if (st.mode === "pinch") {
       e.stopPropagation();
       st.mode = pts.current.size ? "ended" : "idle"; // o dedo que sobrou não faz nada até soltar
-      if (t.current.s < 1.05) reset(); // soltou quase sem zoom: encaixa no tamanho normal
+      if (Math.abs(t.current.s - 1) < 0.05) reset(); // soltou perto do normal: encaixa no tamanho normal
     } else if (!pts.current.size) st.mode = "idle";
   }
 
@@ -200,16 +207,16 @@ export default function ZoomBoard({ children, maxWidth = 360, panWithOneFinger =
   const pct = Math.round(scale * 100);
   return (
     <div className="zoom-area" style={{ "--zw": `${maxWidth}px` } as React.CSSProperties}>
-      <div ref={box} className={`zoom${scale > 1.001 ? " zoomed" : ""}`}
+      <div ref={box} className={`zoom${scale > 1.001 ? " zoomed" : scale < 0.999 ? " shrunk" : ""}`}
         onPointerDownCapture={down} onPointerMoveCapture={move} onPointerUpCapture={up} onPointerCancelCapture={up}
         onClickCapture={click} onFocusCapture={focusIn}>
         <div ref={layer} className="zoom-layer">{children}</div>
       </div>
       <div className="zoom-bar" role="group" aria-label={`Zoom do ${label}`}>
-        <span className="zoom-hint" aria-hidden="true">{scale > 1.001 ? (panWithOneFinger ? "Arraste para mover" : "Dois dedos para mover") : "Pinça para ampliar"}</span>
-        <button type="button" onClick={() => zoomAt(t.current.s - STEP, center(), true)} disabled={locked || scale <= MIN_ZOOM + 0.001} aria-label="Diminuir zoom">−</button>
-        <button type="button" className="zoom-pct" onClick={reset} disabled={locked || scale <= MIN_ZOOM + 0.001} aria-label={`Zoom em ${pct}%. Voltar ao tamanho normal`}>{pct}%</button>
-        <button type="button" onClick={() => zoomAt(t.current.s + STEP, center(), true)} disabled={locked || scale >= MAX_ZOOM - 0.001} aria-label="Aumentar zoom">+</button>
+        <span className="zoom-hint" aria-hidden="true">{scale > 1.001 ? (panWithOneFinger ? "Arraste para mover" : "Dois dedos para mover") : "Pinça para ampliar ou reduzir"}</span>
+        <button type="button" onClick={() => zoomAt(prevLevel(t.current.s), center(), true)} disabled={locked || scale <= MIN_ZOOM + 0.001} aria-label="Diminuir zoom">−</button>
+        <button type="button" className="zoom-pct" onClick={reset} disabled={locked || isNormal(scale)} aria-label={`Zoom em ${pct}%. Voltar ao tamanho normal`}>{pct}%</button>
+        <button type="button" onClick={() => zoomAt(nextLevel(t.current.s), center(), true)} disabled={locked || scale >= MAX_ZOOM - 0.001} aria-label="Aumentar zoom">+</button>
       </div>
     </div>
   );

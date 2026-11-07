@@ -89,14 +89,13 @@ export default function ZipGame({ puzzle, active, onMenu, onRules, onWin, onCele
   const reached = visitedNumbers(path, z);
 
   return (
-    <div className="wrap">
-      <GameHeader kind="zip" title={puzzle.name} subtitle={`Zip · ${puzzle.level}`} ms={play.ms} done={won} />
-      <div>
+    <div className="wrap play">
+      <GameHeader kind="zip" title={puzzle.name} subtitle={`Zip · ${puzzle.level}`} ms={play.ms} done={won}>
         <div className="progress" role="progressbar" aria-label="Casas no caminho" aria-valuemin={0} aria-valuemax={total} aria-valuenow={path.length}>
           <i style={{ width: `${(path.length / total) * 100}%` }} />
         </div>
         <p className="muted" style={{ marginTop: 4 }}>{path.length} de {total} casas · números alcançados: {reached} de {z.max}</p>
-      </div>
+      </GameHeader>
 
       <ZoomBoard locked={won} panWithOneFinger={false} label="tabuleiro do Zip"
         onGestureStart={() => { if (drag.current && dragFrom.current) setPath(dragFrom.current); drag.current = false; }}>
@@ -139,6 +138,7 @@ export default function ZipGame({ puzzle, active, onMenu, onRules, onWin, onCele
           </div>
       </ZoomBoard>
 
+      <div className="gctrl">
       <div className={`note ${msg.tone}`} role="status" aria-live="polite"><b aria-hidden="true">{ICON[msg.tone]}</b><span>{msg.text}</span></div>
 
       {confirm && (
@@ -159,6 +159,7 @@ export default function ZipGame({ puzzle, active, onMenu, onRules, onWin, onCele
           <button className="btn sec" onClick={onMenu}>Níveis</button>
         </div>
       )}
+      </div>
     </div>
   );
 }

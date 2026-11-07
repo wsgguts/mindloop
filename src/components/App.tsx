@@ -6,39 +6,40 @@ import Gem, { type GemKind } from "./Gem";
 import Journey from "./Journey";
 import LevelComplete, { type LevelResult } from "./LevelComplete";
 import Modal from "./Modal";
-import PatchesSoon from "./PatchesSoon";
 import { RulesContent, type RulesGame } from "./Rules";
+import PatchesGame from "./PatchesGame";
 import TangoGame from "./TangoGame";
 import ZipGame from "./ZipGame";
 import { COMMENT_MAX, submitFeedback, validateFeedback } from "../lib/feedback";
-import { ALL_GAMES, GAME_META, PATCHES_META } from "../lib/games";
+import { ALL_GAMES, GAME_META } from "../lib/games";
 import { LEVELS_PER_GAME, doneCount, emptyProgress, focusLevel, isComplete, isDone, markDone, parseLevel, parseProgress } from "../lib/journey";
 import { PUZZLES, puzzleGrid } from "../lib/puzzles";
 import { type Times, parseTimes, recordTime } from "../lib/records";
 import type { Grid } from "../lib/sudoku";
 import { validateNick } from "../lib/nick";
 import { KEYS, readStore, writeStore } from "../lib/storage";
+import { PATCHES_PUZZLES } from "../lib/patches";
 import { TANGO_PUZZLES } from "../lib/tango";
 import { ZIP_PUZZLES } from "../lib/zip";
 
-type View = "home" | "journey" | "game" | "patches" | "rules" | "profile" | "feedback";
+type View = "home" | "journey" | "game" | "rules" | "profile" | "feedback";
 type Save = { id: string; grid: Grid; ms?: number };
 type Session = { game: RulesGame; idx: number; round: number };
 /** Volta à trilha logo após uma vitória: qual nível animar como concluído e qual como recém-liberado. */
 type Arrival = { game: RulesGame; justDone: number; justUnlocked?: number };
 type PerGame<T> = Record<RulesGame, T>;
 
-const TAB_OF: Record<View, Tab> = { home: "home", journey: "home", game: "home", patches: "home", rules: "rules", profile: "profile", feedback: "profile" };
+const TAB_OF: Record<View, Tab> = { home: "home", journey: "home", game: "home", rules: "rules", profile: "profile", feedback: "profile" };
 // Chave de "já viu as regras" de cada jogo (a do Sudoku é a original, mantida por compatibilidade).
-const RULES_KEY: PerGame<string> = { sudoku: KEYS.rules, zip: "mindloop:rules-zip", tango: "mindloop:rules-tango" };
+const RULES_KEY: PerGame<string> = { sudoku: KEYS.rules, zip: "mindloop:rules-zip", tango: "mindloop:rules-tango", patches: "mindloop:rules-patches" };
 // Progresso salvo no aparelho, por jogo.
 const PROGRESS_KEY = (g: RulesGame) => `mindloop:progress:${g}`;
 const TIMES_KEY = (g: RulesGame) => `mindloop:times:${g}`; // melhor tempo de cada nível
 const LAST_KEY = (g: RulesGame) => `mindloop:last:${g}`; // último nível jogado (referência de retorno)
-const perGame = <T,>(f: (g: RulesGame) => T): PerGame<T> => ({ sudoku: f("sudoku"), zip: f("zip"), tango: f("tango") });
+const perGame = <T,>(f: (g: RulesGame) => T): PerGame<T> => ({ sudoku: f("sudoku"), zip: f("zip"), tango: f("tango"), patches: f("patches") });
 
 // Áreas clicáveis sobre os cristais da arte do Início (em % da imagem home-art.jpg).
-const ART_SPOTS: { id: RulesGame | "patches"; left: number; top: number; width: number; height: number }[] = [
+const ART_SPOTS: { id: RulesGame; left: number; top: number; width: number; height: number }[] = [
   { id: "sudoku", left: 3, top: 38, width: 23, height: 19 },
   { id: "zip", left: 74, top: 38, width: 24, height: 19 },
   { id: "tango", left: 7, top: 57.5, width: 22, height: 19 },
@@ -52,7 +53,7 @@ export default function App() {
   const [nickModal, setNickModal] = useState<null | { then: () => void }>(null); // o que fazer depois de salvar
   const [draft, setDraft] = useState("");
   const [nickError, setNickError] = useState<string | null>(null);
-  const [seen, setSeen] = useState<PerGame<boolean>>({ sudoku: false, zip: false, tango: false });
+  const [seen, setSeen] = useState<PerGame<boolean>>(() => perGame(() => false));
   const [rulesModal, setRulesModal] = useState<RulesGame | null>(null);
   const [rulesTab, setRulesTab] = useState<RulesGame>("sudoku");
   const [save, setSave] = useState<Save | null>(null);
@@ -111,8 +112,7 @@ export default function App() {
   function goHome(cards = false) { toCards.current = cards; setView("home"); if (cards && view === "home") document.getElementById("jogos")?.scrollIntoView({ behavior: "smooth", block: "start" }); }
 
   /** Card, nome, arte ou "Jogar agora" de um jogo: abre a jornada dele (pedindo o apelido na primeira vez). */
-  function openGame(id: RulesGame | "patches") {
-    if (id === "patches") return setView("patches");
+  function openGame(id: RulesGame) {
     if (nick) openJourney(id);
     else openNick(() => openJourney(id));
   }
@@ -177,10 +177,7 @@ export default function App() {
     }
   }
 
-  const CARDS: { id: RulesGame | "patches"; name: string; text: string; kind: GemKind; color: string }[] = [
-    ...ALL_GAMES.map((g) => ({ id: g, kind: g, ...GAME_META[g] })),
-    { id: "patches", kind: "patches", ...PATCHES_META },
-  ];
+  const CARDS: { id: RulesGame; name: string; text: string; kind: GemKind; color: string }[] = ALL_GAMES.map((g) => ({ id: g, kind: g, ...GAME_META[g] }));
 
   const inGame = !!session && view === "game";
   // O cronômetro só corre com a partida na tela e nada por cima.
@@ -197,7 +194,7 @@ export default function App() {
   return (
     <>
       {view !== "home" && (
-        <header className="top">
+        <header className={`top${view === "game" ? " in-game" : ""}`}>
           <span className="brand"><img src="/cube.png" alt="" width={36} height={34} /><span className="wordmark">MindLoop</span></span>
           {nick && <span className="chip" aria-label={`Apelido: ${nick}`}>{nick}</span>}
         </header>
@@ -215,7 +212,7 @@ export default function App() {
                 {ART_SPOTS.map((s) => (
                   <button key={s.id} className="gspot" onClick={() => openGame(s.id)}
                     style={{ left: `${s.left}%`, top: `${s.top}%`, width: `${s.width}%`, height: `${s.height}%` }}
-                    aria-label={s.id === "patches" ? "Patches: em breve" : `Jogar ${GAME_META[s.id].name}`} />
+                    aria-label={`Jogar ${GAME_META[s.id].name}`} />
                 ))}
                 <button className="hotspot" onClick={() => document.getElementById("jogos")?.scrollIntoView({ behavior: "smooth", block: "start" })} aria-label="Jogar agora: ver os jogos">
                   <span aria-hidden="true">Jogar agora</span>
@@ -229,26 +226,21 @@ export default function App() {
               <p className="lead">{nick ? `Boa, ${nick}! ` : ""}Toque em um jogo para abrir a jornada dele.</p>
               <div className="ggrid">
                 {CARDS.map((g) => {
-                  const soon = g.id === "patches";
-                  const p = soon ? "" : progress[g.id as RulesGame];
-                  const count = soon ? 0 : doneCount(p);
-                  const full = !soon && isComplete(p);
+                  const p = progress[g.id];
+                  const count = doneCount(p);
+                  const full = isComplete(p);
                   return (
                     // O card inteiro é clicável (mouse/toque); o botão é o alvo do teclado e leitores de tela.
-                    <article key={g.id} className={`gcard${soon ? " soon" : ""}`} style={{ "--gc": g.color } as React.CSSProperties} onClick={() => openGame(g.id)}>
+                    <article key={g.id} className="gcard" style={{ "--gc": g.color } as React.CSSProperties} onClick={() => openGame(g.id)}>
                       <Gem kind={g.kind} size={88} />
-                      <span className={`badge${soon ? " soon" : full ? " full" : ""}`}>{soon ? "Em breve" : full ? "★ Jornada completa" : "Disponível"}</span>
+                      <span className={`badge${full ? " full" : ""}`}>{full ? "★ Jornada completa" : "Disponível"}</span>
                       <h2 className="gname">{g.name}</h2>
                       <p className="gtext">{g.text}</p>
-                      {!soon && (
-                        <>
-                          <div className="gprog" aria-hidden="true"><i style={{ width: `${count}%` }} /></div>
-                          <span className="gcount">{count}/{LEVELS_PER_GAME} níveis</span>
-                        </>
-                      )}
-                      <button className={`btn ${soon ? "sec gsoon" : "cta"} gplay`} onClick={(e) => { e.stopPropagation(); openGame(g.id); }}
-                        aria-label={soon ? "Conhecer o Patches (em breve)" : `Jogar ${g.name} agora — ${count} de ${LEVELS_PER_GAME} níveis concluídos`}>
-                        {soon ? "Em breve ›" : "Jogar agora"}
+                      <div className="gprog" aria-hidden="true"><i style={{ width: `${count}%` }} /></div>
+                      <span className="gcount">{count}/{LEVELS_PER_GAME} níveis</span>
+                      <button className="btn cta gplay" onClick={(e) => { e.stopPropagation(); openGame(g.id); }}
+                        aria-label={`Jogar ${g.name} agora — ${count} de ${LEVELS_PER_GAME} níveis concluídos`}>
+                        Jogar agora
                       </button>
                     </article>
                   );
@@ -262,8 +254,6 @@ export default function App() {
             justDone={arrival?.game === journeyGame ? arrival.justDone : undefined}
             justUnlocked={arrival?.game === journeyGame ? arrival.justUnlocked : undefined}
             onBack={() => goHome(true)} onPlay={(n) => startGame(journeyGame, n - 1)} />
-        ) : view === "patches" ? (
-          <PatchesSoon onBack={() => goHome(true)} />
         ) : view === "rules" ? (
           <div className="wrap">
             <h1>Regras</h1>
@@ -276,7 +266,6 @@ export default function App() {
             </div>
             <h2>Como jogar o {GAME_META[rulesTab].name}</h2>
             <RulesContent game={rulesTab} />
-            <p className="muted">Patches ainda está chegando — as regras aparecem aqui quando o jogo for lançado.</p>
           </div>
         ) : view === "profile" ? (
           <div className="wrap">
@@ -353,6 +342,11 @@ export default function App() {
         {activeSession?.game === "tango" && (
           <div hidden={!inGame}>
             <TangoGame key={`t-${activeSession.idx}-${activeSession.round}`} puzzle={TANGO_PUZZLES[activeSession.idx]} {...sessionProps("tango", activeSession.idx)} />
+          </div>
+        )}
+        {activeSession?.game === "patches" && (
+          <div hidden={!inGame}>
+            <PatchesGame key={`p-${activeSession.idx}-${activeSession.round}`} puzzle={PATCHES_PUZZLES[activeSession.idx]} {...sessionProps("patches", activeSession.idx)} />
           </div>
         )}
       </main>

@@ -1,6 +1,8 @@
 import TangoSymbol from "./TangoSymbol";
+import type { JourneyGame } from "../lib/journey";
+import { PATCHES_EXAMPLE } from "../lib/patches";
 
-export type RulesGame = "sudoku" | "zip" | "tango";
+export type RulesGame = JourneyGame;
 
 const C = () => <TangoSymbol v={1} size={20} />;
 const O = () => <TangoSymbol v={2} size={20} />;
@@ -41,9 +43,57 @@ function TangoRules() {
   );
 }
 
+/** Mini tabuleiro de exemplo: os números (antes) e as peças encaixadas (depois). */
+function PatchesExample() {
+  const grid = (withPieces: boolean) => (
+    <span className="pex">
+      {Array.from({ length: 12 }, (_, i) => <span key={i} className="pex-cell" style={{ gridRow: Math.floor(i / 4) + 1, gridColumn: (i % 4) + 1 }} />)}
+      {withPieces && PATCHES_EXAMPLE.pieces.map(([r, c, h, w, color], i) => <span key={i} className="pex-piece" style={{ gridRow: `${r + 1} / span ${h}`, gridColumn: `${c + 1} / span ${w}`, "--pc": color } as React.CSSProperties} />)}
+      {PATCHES_EXAMPLE.clues.map(([r, c, v], i) => <b key={i} className="pex-num" style={{ gridRow: r + 1, gridColumn: c + 1 }}>{v}</b>)}
+    </span>
+  );
+  return <div className="pex-row" aria-hidden="true">{grid(false)}<span className="pex-arrow">→</span>{grid(true)}</div>;
+}
+
+function PatchesRules() {
+  return (
+    <div className="stack">
+      <p><b>Objetivo:</b> cobrir toda a grade com peças retangulares (quadrados também valem), sem deixar casa vazia e sem sobrepor peças.</p>
+      <h3>Regras</h3>
+      <ol className="list">
+        <li><b>Um número por peça.</b> Cada peça precisa conter exatamente um número.</li>
+        <li><b>O número é o tamanho.</b> Ele diz quantas casas a peça ocupa: um 6 pode ser 1×6, 2×3, 3×2 ou 6×1.</li>
+        <li><b>Grade completa.</b> Toda casa fica dentro de uma peça, e as peças não se sobrepõem.</li>
+      </ol>
+      <PatchesExample />
+      <p className="muted">No exemplo: o 3 de cima vira uma faixa deitada (1×3), o 3 da direita fica em pé (3×1), o 2 ocupa as duas casas do meio e o 4 forma um quadrado (2×2). Cada nível tem uma única solução e pode ser resolvido só com lógica, sem chutar.</p>
+
+      <h3>Como jogar</h3>
+      <ul className="list">
+        <li><b>Arraste</b> de um canto da peça até o canto oposto. Enquanto arrasta, o tamanho aparece na peça (ex.: 2×3 = 6).</li>
+        <li>Prefere tocar? <b>Toque num canto</b> e depois <b>no canto oposto</b>.</li>
+        <li><b>Toque numa peça</b> para tirá-la. Desenhar por cima também troca as peças que estavam ali.</li>
+        <li>Se uma peça quebrar uma regra, ela ganha um “!” e uma mensagem explica o motivo.</li>
+        <li>Desfazer volta a última jogada. Dica mostra o próximo encaixe lógico e explica o porquê.</li>
+        <li>No teclado: setas escolhem a casa, Enter marca os cantos e Delete tira a peça.</li>
+      </ul>
+
+      <h3>Dicas para resolver</h3>
+      <ul className="list tips">
+        <li><b>Encaixe único:</b> números perto de cantos e bordas costumam ter poucos formatos. Comece por eles.</li>
+        <li><b>Números primos:</b> 2, 3, 5, 7, 11 e 13 só formam faixas retas (1×5 ou 5×1, por exemplo).</li>
+        <li><b>Casa sem dono:</b> procure casas que só um número consegue alcançar — a peça dele precisa passar por ali.</li>
+        <li><b>Casas reservadas:</b> se todo encaixe possível de um número usa a mesma casa, nenhum outro número pode usá-la.</li>
+        <li><b>Vizinhos apertados:</b> quando dois números estão próximos, as peças de um limitam os formatos do outro.</li>
+      </ul>
+    </div>
+  );
+}
+
 // Regras provisórias (hipóteses a confirmar com a equipe MindLoop).
 export function RulesContent({ game }: { game: RulesGame }) {
   if (game === "tango") return <TangoRules />;
+  if (game === "patches") return <PatchesRules />;
   return game === "zip" ? (
     <div className="stack">
       <p><b>Objetivo:</b> traçar um único caminho que liga os números em ordem (1, 2, 3…), passa por todas as casas uma só vez e termina no maior número.</p>

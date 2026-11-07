@@ -2,11 +2,12 @@
 import Gem, { type GemKind } from "./Gem";
 import { formatTime, spokenTime } from "../lib/records";
 
-interface Props { kind: GemKind; title: string; subtitle: string; ms: number; done: boolean }
+interface Props { kind: GemKind; title: string; subtitle: string; ms: number; done: boolean; children?: React.ReactNode }
 
 // Cabeçalho comum das partidas: cristal + nome do nível + cronômetro.
 // O cronômetro "gruda" no topo da tela ao rolar, então fica visível durante toda a partida.
-export default function GameHeader({ kind, title, subtitle, ms, done }: Props) {
+// `children` (barra de progresso) entra no mesmo bloco: no celular deitado ele vira a coluna ao lado do tabuleiro.
+export default function GameHeader({ kind, title, subtitle, ms, done, children }: Props) {
   return (
     <>
       <div className="gtimer-slot">
@@ -20,10 +21,13 @@ export default function GameHeader({ kind, title, subtitle, ms, done }: Props) {
           <time aria-hidden="true">{formatTime(ms)}</time>
         </span>
       </div>
+      <div className="ghead">
       <div className="title game-title"><Gem kind={kind} size={48} /><div>
         <h1>{title}</h1>
         <p className="muted">{subtitle}</p>
       </div></div>
+      {children && <div className="gprogress">{children}</div>}
+      </div>
     </>
   );
 }

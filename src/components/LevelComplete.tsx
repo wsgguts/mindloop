@@ -88,6 +88,8 @@ export default function LevelComplete({ result, onSwitch, onClose }: Props) {
       {phase === "show" && <Celebration accent={meta.color} />}
       {phase !== "reveal" && (
         <section className="lc" role="dialog" aria-modal="true" aria-labelledby="lc-title" aria-describedby="lc-desc">
+          {/* Em pé: tudo numa coluna. Celular deitado: herói à esquerda, números à direita. */}
+          <div className="lc-hero">
           <div className="lc-gem" aria-hidden="true">
             <span className="lc-rays" />
             <Gem kind={r.game} size={96} />
@@ -96,6 +98,9 @@ export default function LevelComplete({ result, onSwitch, onClose }: Props) {
           <p className="lc-eyebrow">{meta.name} · Nível {r.level}</p>
           <h2 id="lc-title">Parabéns!</h2>
           <p className="lc-sub" id="lc-desc">Nível {r.level} concluído em {spokenTime(r.ms)}.</p>
+          </div>
+
+          <div className="lc-info">
 
           <dl className="lc-stats">
             <div className="lc-stat">
@@ -121,6 +126,7 @@ export default function LevelComplete({ result, onSwitch, onClose }: Props) {
           <button ref={btn} className="btn cta lc-go" onClick={leave}>Continuar</button>
           <div className="lc-auto" aria-hidden="true"><i style={{ animationDuration: `${AUTO_CONTINUE_MS}ms` }} /></div>
           <p className="lc-hint">Voltando para a jornada…</p>
+          </div>
         </section>
       )}
     </div>,

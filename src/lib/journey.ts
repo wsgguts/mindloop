@@ -1,7 +1,7 @@
 // Jornada de níveis: 100 níveis por jogo, em 10 capítulos de 10 níveis.
 // Funções simples e puras (fáceis de testar). O progresso é uma string de 100 caracteres ("0" ou "1").
 
-export type JourneyGame = "sudoku" | "zip" | "tango";
+export type JourneyGame = "sudoku" | "zip" | "tango" | "patches";
 export const LEVELS_PER_GAME = 100;
 export const LEVELS_PER_CHAPTER = 10;
 
@@ -46,6 +46,18 @@ export const CHAPTERS: Record<JourneyGame, Chapter[]> = {
     ["Grade 8×8", "O maior tabuleiro da jornada, com bastante apoio."],
     ["Olhar de mestre", "8×8 com poucas pistas."],
     ["Mestre do equilíbrio", "Os desafios mais difíceis do Tango."],
+  ]),
+  patches: make([
+    ["Primeiras peças", "Grade 5×5 com peças pequenas: aprenda o encaixe jogando."],
+    ["Encaixe certo", "Ainda 5×5, agora com peças de até 8 casas."],
+    ["Grade 6×6", "Mais espaço e mais formatos possíveis."],
+    ["Peças maiores", "Números grandes pedem atenção aos formatos."],
+    ["Cantos e bordas", "Grade 7×7: comece pelos cantos, onde há menos saídas."],
+    ["Só um lugar", "Procure casas que só um número consegue alcançar."],
+    ["Grade 8×8", "Tabuleiro grande, com peças de até 12 casas."],
+    ["Casas reservadas", "Quando todo encaixe de um número usa a mesma casa, ela é dele."],
+    ["Grade 9×9", "O maior tabuleiro da jornada."],
+    ["Mestre do encaixe", "Os desafios mais difíceis do Patches."],
   ]),
 };
 

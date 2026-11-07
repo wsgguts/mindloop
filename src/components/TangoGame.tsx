@@ -192,14 +192,13 @@ export default function TangoGame({ puzzle, active, onMenu, onRules, onWin, onCe
   const isSrc = (r: number, c: number) => !!tip?.from.some(([fr, fc]) => fr === r && fc === c);
 
   return (
-    <div className="wrap">
-      <GameHeader kind="tango" title={puzzle.name} subtitle={`Tango · ${puzzle.level}`} ms={play.ms} done={won} />
-      <div>
+    <div className="wrap play">
+      <GameHeader kind="tango" title={puzzle.name} subtitle={`Tango · ${puzzle.level}`} ms={play.ms} done={won}>
         <div className="progress" role="progressbar" aria-label="Casas preenchidas" aria-valuemin={0} aria-valuemax={total} aria-valuenow={filled}>
           <i style={{ width: `${(filled / total) * 100}%` }} />
         </div>
         <p className="muted" style={{ marginTop: 4 }}>{filled} de {total} casas · {half} Cristais e {half} Orbes em cada linha e coluna</p>
-      </div>
+      </GameHeader>
 
       <>
           <ZoomBoard locked={won} maxWidth={n === 8 ? 400 : 360} label="tabuleiro do Tango">
@@ -228,13 +227,14 @@ export default function TangoGame({ puzzle, active, onMenu, onRules, onWin, onCe
             })}
           </div>
           </ZoomBoard>
+      </>
 
+      <div className="gctrl">
           <div className={`tpad${won ? " off" : ""}`} role="group" aria-label="Escolher símbolo para a casa selecionada">
             <button className="btn sec" onClick={() => enter(CRISTAL)} disabled={won}><TangoSymbol v={CRISTAL} size={26} />Cristal</button>
             <button className="btn sec" onClick={() => enter(ORBE)} disabled={won}><TangoSymbol v={ORBE} size={26} />Orbe</button>
             <button className="btn sec" onClick={() => enter(0)} disabled={won}>Apagar</button>
           </div>
-      </>
 
       <div className={`note ${msg.tone}`} role="status" aria-live="polite"><b aria-hidden="true">{ICON[msg.tone]}</b><span>{msg.text}</span></div>
 
@@ -256,6 +256,7 @@ export default function TangoGame({ puzzle, active, onMenu, onRules, onWin, onCe
           <button className="btn sec" onClick={onMenu}>Níveis</button>
         </div>
       )}
+      </div>
     </div>
   );
 }

@@ -125,15 +125,13 @@ export default function Game({ puzzle, initialGrid, initialMs = 0, active, onSav
     !!sel && (sel.r === r || sel.c === c || (Math.floor(sel.r / bh) === Math.floor(r / bh) && Math.floor(sel.c / bw) === Math.floor(c / bw)));
 
   return (
-    <div className="wrap">
-      <GameHeader kind="sudoku" title={puzzle.name} subtitle={`Mini Sudoku · ${puzzle.level}`} ms={play.ms} done={won} />
-
-      <div>
+    <div className="wrap play">
+      <GameHeader kind="sudoku" title={puzzle.name} subtitle={`Mini Sudoku · ${puzzle.level}`} ms={play.ms} done={won}>
         <div className="progress" role="progressbar" aria-label="Casas preenchidas" aria-valuemin={0} aria-valuemax={total} aria-valuenow={filled}>
           <i style={{ width: `${(filled / total) * 100}%` }} />
         </div>
         <p className="muted" style={{ marginTop: 4 }}>{filled} de {total} casas preenchidas</p>
-      </div>
+      </GameHeader>
 
       {paused ? (
         <div className="paused">
@@ -164,12 +162,15 @@ export default function Game({ puzzle, initialGrid, initialMs = 0, active, onSav
             }))}
           </div>
           </ZoomBoard>
+        </>
+      )}
 
+      <div className="gctrl">
+      {!paused && (
           <div className={`pad n${N}${won ? " off" : ""}`} style={{ gridTemplateColumns: `repeat(${N + 1}, 1fr)` }} role="group" aria-label="Escolher número">
             {digits.map((d) => <button key={d} className="btn" onClick={() => enter(d)} disabled={won} aria-label={`Número ${d}`}>{d}</button>)}
             <button className="btn sec erase" onClick={() => enter(0)} disabled={won} aria-label="Apagar número">{N > 4 ? "⌫" : "Apagar"}</button>
           </div>
-        </>
       )}
 
       <div className={`note ${msg.tone}`} role="status" aria-live="polite">
@@ -199,6 +200,7 @@ export default function Game({ puzzle, initialGrid, initialMs = 0, active, onSav
           <button className="btn sec" onClick={() => setConfirm("end")}>Encerrar</button>
         </div>
       )}
+      </div>
     </div>
   );
 }
