@@ -3,7 +3,7 @@ import GameHeader from "./GameHeader";
 import ZoomBoard from "./ZoomBoard";
 import { useLevelPlay } from "./useLevelPlay";
 import TangoSymbol, { SYMBOL_NAME, SYMBOL_PLURAL } from "./TangoSymbol";
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   CRISTAL, ORBE, type Cell, type Deduction, type Problem, type TGrid, type TangoPuzzle,
   cloneT, filledT, findProblems, isTangoSolved, nextDeduction, other, parseTango, signCells, solveLogically,
@@ -14,6 +14,10 @@ const ICON: Record<Tone, string> = { info: "ℹ", ok: "✓", warn: "!", hint: "?
 type Move = { r: number; c: number; prev: number };
 
 interface Props { puzzle: TangoPuzzle; active: boolean; onMenu: () => void; onRules: () => void; onWin: (ms: number) => void; onCelebrated: () => void }
+
+// Tocar numa casa passa por vazia → Cristal → Orbe. Quem quer um Orbe passa pelo Cristal no caminho,
+// então o erro causado por um toque só aparece se a casa ficar assim por um instante.
+export const ERROR_DELAY_MS = 900;
 
 // Animação de conclusão: os símbolos "dançam" em onda, cada sinal = / × se confirma e as linhas equilibradas acendem.
 const FX_MS = 3200;
@@ -58,7 +62,16 @@ export default function TangoGame({ puzzle, active, onMenu, onRules, onWin, onCe
   const isGiven = (r: number, c: number) => givens[r][c] !== 0;
 
   const problems = useMemo(() => findProblems(grid, signs), [grid, signs]);
-  const bad = useMemo(() => new Set(problems.flatMap((p) => p.cells.map(([r, c]) => `${r}-${c}`))), [problems]);
+  // Casa recém-tocada cujo erro ainda está "em espera" (a pessoa pode tocar de novo para trocar o símbolo).
+  const [pending, setPending] = useState<string | null>(null);
+  const pendingTimer = useRef<number | undefined>(undefined);
+  const gridRef = useRef(grid);
+  gridRef.current = grid;
+  useEffect(() => () => window.clearTimeout(pendingTimer.current), []);
+  const touches = (p: Problem, key: string) => p.cells.some(([r, c]) => `${r}-${c}` === key);
+  const shown = useMemo(() => (pending ? problems.filter((p) => !touches(p, pending)) : problems), [problems, pending]);
+  const bad = useMemo(() => new Set(shown.flatMap((p) => p.cells.map(([r, c]) => `${r}-${c}`))), [shown]);
+  function clearPending() { window.clearTimeout(pendingTimer.current); setPending(null); }
 
   // Sinais tocando cada casa, para descrever a grade a leitores de tela.
   const signNotes = useMemo(() => {
@@ -73,10 +86,12 @@ export default function TangoGame({ puzzle, active, onMenu, onRules, onWin, onCe
     return m;
   }, [signs]);
 
-  function put(r: number, c: number, v: number) {
+  /** delayErrors: jogada feita tocando na casa (ciclo de símbolos) — o erro espera um instante antes de aparecer. */
+  function put(r: number, c: number, v: number, delayErrors = false) {
     if (won) return;
     if (isGiven(r, c)) return say("info", "Essa é uma pista fixa. Use-a para descobrir as casas vizinhas.");
     if (grid[r][c] === v) return;
+    clearPending();
     const next = cloneT(grid);
     next[r][c] = v;
     setHistory((h) => [...h, { r, c, prev: grid[r][c] }]);
@@ -84,6 +99,17 @@ export default function TangoGame({ puzzle, active, onMenu, onRules, onWin, onCe
     if (isTangoSolved(next, signs)) { setSel(null); play.win(); say("ok", "Grade equilibrada! Todas as linhas, colunas e sinais estão certos."); return; }
     const probs = findProblems(next, signs);
     const mine = probs.find((p) => p.cells.some(([pr, pc]) => pr === r && pc === c));
+    if (mine && delayErrors) {
+      const key = `${r}-${c}`;
+      setPending(key);
+      say("info", v === CRISTAL ? "Cristal colocado. Toque de novo para trocar por um Orbe." : "Orbe colocado. Toque de novo para deixar a casa vazia.");
+      pendingTimer.current = window.setTimeout(() => {
+        setPending(null);
+        const now = findProblems(gridRef.current, signs).find((p) => touches(p, key));
+        if (now) say("warn", `${problemText(now, half)} Quer tentar outro símbolo?`);
+      }, ERROR_DELAY_MS);
+      return;
+    }
     if (mine) say("warn", `${problemText(mine, half)} Quer tentar outro símbolo?`);
     else if (probs.length) say("warn", "Ainda há casas marcadas com “!”. Toque nelas para ver o que corrigir.");
     else if (!v) say("info", "Casa limpa.");
@@ -96,7 +122,7 @@ export default function TangoGame({ puzzle, active, onMenu, onRules, onWin, onCe
     setSel([r, c]);
     if (isGiven(r, c)) return say("info", "Essa é uma pista fixa. Use-a para descobrir as casas vizinhas.");
     const v = grid[r][c];
-    put(r, c, v === 0 ? CRISTAL : v === CRISTAL ? ORBE : 0); // vazia → Cristal → Orbe → vazia
+    put(r, c, v === 0 ? CRISTAL : v === CRISTAL ? ORBE : 0, true); // vazia → Cristal → Orbe → vazia
   }
 
   function enter(v: number) {
@@ -110,17 +136,20 @@ export default function TangoGame({ puzzle, active, onMenu, onRules, onWin, onCe
     const last = history[history.length - 1];
     const next = cloneT(grid);
     next[last.r][last.c] = last.prev;
+    clearPending();
     setHistory(history.slice(0, -1)); setGrid(next); setTip(null); setSel([last.r, last.c]);
     say("info", "Última jogada desfeita.");
   }
 
   function restart() {
+    clearPending();
     setGrid(cloneT(givens)); setHistory([]); setSel(null); setTip(null); setConfirm(false);
     say("info", "Grade restaurada ao início. Vamos de novo?");
   }
 
   function hint() {
     if (won) return;
+    clearPending(); // pediu ajuda: mostra tudo o que está errado agora
     if (problems.length) {
       const p = problems[0];
       setTip({ cell: p.cells[0], from: p.cells.slice(1) });
