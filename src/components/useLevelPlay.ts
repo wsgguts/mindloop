@@ -19,6 +19,8 @@ export const prefersReducedMotion = () =>
 /**
  * Cronômetro único de todos os jogos: conta só enquanto `running` (e a página está visível).
  * Usa o relógio do sistema, então não "atrasa" se o navegador demorar a redesenhar.
+ * A tela só é atualizada quando o segundo mostrado muda (1×/s), para não redesenhar o tabuleiro à toa;
+ * `read()` continua dando o tempo exato em milissegundos.
  */
 export function useStopwatch(running: boolean, initialMs = 0) {
   const visible = usePageVisible();
@@ -30,7 +32,10 @@ export function useStopwatch(running: boolean, initialMs = 0) {
   useEffect(() => {
     if (!on) return;
     since.current = performance.now();
-    const id = window.setInterval(() => setMs(base.current + performance.now() - since.current!), 250);
+    const id = window.setInterval(() => {
+      const now = base.current + performance.now() - since.current!;
+      setMs((prev) => (Math.floor(prev / 1000) === Math.floor(now / 1000) ? prev : now));
+    }, 250);
     return () => {
       window.clearInterval(id);
       base.current += performance.now() - (since.current ?? performance.now());

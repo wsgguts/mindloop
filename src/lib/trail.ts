@@ -1,8 +1,8 @@
-// Trilha ilustrada (public/journey-trail.jpg, 900×1600): pontos sobre o caminho de pedras.
+// Trilha ilustrada (public/journey-trail.webp, 900×1600; original em journey-trail.jpg): pontos sobre o caminho de pedras.
 // Cada capítulo tem 10 níveis; o nível 1 fica no primeiro plano e o 10 (desafio) perto do castelo.
 // Coordenadas em porcentagem da imagem — assim acompanham a arte em qualquer tamanho de tela.
 
-export const TRAIL_IMAGE = { src: "/journey-trail.jpg", width: 900, height: 1600 };
+export const TRAIL_IMAGE = { src: "/journey-trail.webp", width: 900, height: 1600 };
 
 export interface TrailPoint { x: number; y: number; k: number } // x/y em %, k = escala de perspectiva
 

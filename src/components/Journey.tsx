@@ -95,7 +95,7 @@ export default function Journey({ game, done, focus, justDone, justUnlocked, onP
 
       <section className="jch" aria-labelledby={`ch-${game}-${ch.id}`}>
         <div className="jbanner">
-          <img src={ch.id % 2 ? "/avatar-cat.png" : "/avatar-kid.png"} alt="" width={64} height={64} />
+          <img src={ch.id % 2 ? "/avatar-cat.webp" : "/avatar-kid.webp"} alt="" width={64} height={64} decoding="async" />
           <div>
             <span className="cap">CAPÍTULO {ch.id}</span>
             <h2 id={`ch-${game}-${ch.id}`}>{ch.title}</h2>

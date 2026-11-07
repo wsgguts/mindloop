@@ -38,7 +38,7 @@ const TIMES_KEY = (g: RulesGame) => `mindloop:times:${g}`; // melhor tempo de ca
 const LAST_KEY = (g: RulesGame) => `mindloop:last:${g}`; // último nível jogado (referência de retorno)
 const perGame = <T,>(f: (g: RulesGame) => T): PerGame<T> => ({ sudoku: f("sudoku"), zip: f("zip"), tango: f("tango"), patches: f("patches") });
 
-// Áreas clicáveis sobre os cristais da arte do Início (em % da imagem home-art.jpg).
+// Áreas clicáveis sobre os cristais da arte do Início (em % da imagem home-art.webp; original em home-art.jpg).
 const ART_SPOTS: { id: RulesGame; left: number; top: number; width: number; height: number }[] = [
   { id: "sudoku", left: 3, top: 38, width: 23, height: 19 },
   { id: "zip", left: 74, top: 38, width: 24, height: 19 },
@@ -208,7 +208,7 @@ export default function App() {
             <section className="home" aria-label="Início">
               <div className="fill sky" aria-hidden="true" />
               <div className="art">
-                <img src="/home-art.jpg" width={1080} height={1244} alt="MindLoop — Desafie sua mente. Um cubo mágico de quebra-cabeça sobre ilhas flutuantes, com os cristais dos jogos Mini Sudoku, Zip, Tango e Patches." fetchPriority="high" />
+                <img src="/home-art.webp" width={1080} height={1244} decoding="async" alt="MindLoop — Desafie sua mente. Um cubo mágico de quebra-cabeça sobre ilhas flutuantes, com os cristais dos jogos Mini Sudoku, Zip, Tango e Patches." fetchPriority="high" />
                 {ART_SPOTS.map((s) => (
                   <button key={s.id} className="gspot" onClick={() => openGame(s.id)}
                     style={{ left: `${s.left}%`, top: `${s.top}%`, width: `${s.width}%`, height: `${s.height}%` }}

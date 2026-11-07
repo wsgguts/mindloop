@@ -43,7 +43,6 @@ export default function Game({ puzzle, initialGrid, initialMs = 0, active, onSav
   const [sel, setSel] = useState<Cell | null>(null);
   const [tip, setTip] = useState<Cell | null>(null);
   const [paused, setPaused] = useState(false);
-  const [moves, setMoves] = useState(0);
   const [confirm, setConfirm] = useState<null | "restart" | "end">(null);
   const [msg, setMsg] = useState<{ tone: Tone; text: string }>({ tone: "info", text: "Vamos descobrir o próximo passo? Toque numa casa vazia." });
   const boardRef = useRef<HTMLDivElement>(null);
@@ -57,7 +56,6 @@ export default function Game({ puzzle, initialGrid, initialMs = 0, active, onSav
     setHistory((h) => [...h, { r, c, prev }]);
     setGrid(next);
     setTip(null);
-    setMoves((m) => m + 1);
     if (isSolved(next)) { onSave(null); play.win(); say("ok", "Grade completa! Todas as linhas, colunas e blocos fecharam."); return; }
     onSave(next, play.read());
     const kinds = conflictsAt(next, r, c);
@@ -87,7 +85,7 @@ export default function Game({ puzzle, initialGrid, initialMs = 0, active, onSav
 
   function restart() {
     const fresh = cloneGrid(givens);
-    setGrid(fresh); setHistory([]); setSel(null); setTip(null); setMoves(0); setConfirm(null); setPaused(false);
+    setGrid(fresh); setHistory([]); setSel(null); setTip(null); setConfirm(null); setPaused(false);
     onSave(fresh, play.read());
     say("info", "Puzzle restaurado ao início. Vamos de novo?");
   }

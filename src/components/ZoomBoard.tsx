@@ -84,6 +84,9 @@ export default function ZoomBoard({ children, maxWidth = 360, panWithOneFinger =
   const center = (): Pt => ({ x: (box.current?.clientWidth ?? 0) / 2, y: (box.current?.clientHeight ?? 0) / 2 });
   const reset = useCallback(() => apply({ s: 1, x: 0, y: 0 }, true), [apply]);
 
+  // Ao sair da tela, cancela o quadro de animação pendente.
+  useEffect(() => () => cancelAnimationFrame(raf.current), []);
+
   // Ao travar (fim da partida), volta ao tamanho normal para mostrar o tabuleiro inteiro.
   useEffect(() => { if (locked) { pts.current.clear(); g.current.mode = "idle"; reset(); } }, [locked, reset]);
 

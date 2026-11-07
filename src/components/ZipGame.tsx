@@ -21,7 +21,6 @@ export default function ZipGame({ puzzle, active, onMenu, onRules, onWin, onCele
   const [path, setPath] = useState<Pos[]>([z.start]);
   const play = useLevelPlay({ active, onWin, onCelebrated, fxMs: FX_MS });
   const won = play.won;
-  const [moves, setMoves] = useState(0);
   const [tip, setTip] = useState<Pos | null>(null);
   const [confirm, setConfirm] = useState(false);
   const [msg, setMsg] = useState<{ tone: Tone; text: string }>({ tone: "info", text: "Vamos descobrir o próximo caminho? Arraste a partir do 1 ou toque nas casas vizinhas." });
@@ -47,7 +46,7 @@ export default function ZipGame({ puzzle, active, onMenu, onRules, onWin, onCele
       return;
     }
     const next = [...path, p];
-    setPath(next); setTip(null); setMoves((m) => m + 1);
+    setPath(next); setTip(null);
     const n = z.nums[p.r][p.c];
     if (isZipSolved(next, z)) { play.win(); say("ok", `Caminho completo! Do 1 ao ${z.max}, passando por todas as casas.`); return; }
     if (next.length === z.size * z.size) say("warn", "Todas as casas foram usadas, mas o caminho precisa terminar no maior número. Que tal voltar e tentar outra rota?");
@@ -75,7 +74,7 @@ export default function ZipGame({ puzzle, active, onMenu, onRules, onWin, onCele
     if (path.length < 2 || won) return say("info", "Ainda não há nada para desfazer.");
     setPath(path.slice(0, -1)); setTip(null); say("info", "Último passo desfeito.");
   }
-  function restart() { setPath([z.start]); setTip(null); setMoves(0); setConfirm(false); say("info", "Caminho reiniciado. Vamos de novo?"); }
+  function restart() { setPath([z.start]); setTip(null); setConfirm(false); say("info", "Caminho reiniciado. Vamos de novo?"); }
   function hint() {
     const t = nextTarget(path, z);
     if (!t) return say("hint", "Todos os números já foram alcançados. Falta preencher as casas restantes e terminar no maior número.");
