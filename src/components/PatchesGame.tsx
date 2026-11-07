@@ -232,7 +232,7 @@ export default function PatchesGame({ puzzle, active, onMenu, onRules, onWin, on
 
       <ZoomBoard locked={won} panWithOneFinger={false} maxWidth={n >= 8 ? 400 : 360} label="tabuleiro do Patches" onGestureStart={cancelDrag}>
         <div ref={boardRef} className={`ptboard n${n}${won ? " win" : ""}${anchor ? " picking" : ""}`} role="grid" tabIndex={0}
-          style={{ gridTemplateColumns: `repeat(${n}, 1fr)`, gridTemplateRows: `repeat(${n}, 1fr)`, "--n": n, "--pstep": `${Math.round(WAVE_MS / Math.max(1, pieces.length))}ms` } as React.CSSProperties}
+          style={{ gridTemplateColumns: `repeat(${n}, minmax(0, 1fr))`, gridTemplateRows: `repeat(${n}, minmax(0, 1fr))`, "--n": n, "--pstep": `${Math.round(WAVE_MS / Math.max(1, pieces.length))}ms` } as React.CSSProperties}
           aria-label={won ? `Grade do Patches ${n} por ${n}, resolvida.` : `Grade do Patches ${n} por ${n}. Use as setas para escolher uma casa, Enter para marcar os cantos de uma peça e Delete para tirar uma peça.`}
           onKeyDown={onKey} onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp} onPointerCancel={cancelDrag}
           onBlur={() => setCursor(null)}>
@@ -278,7 +278,7 @@ export default function PatchesGame({ puzzle, active, onMenu, onRules, onWin, on
         {kindsUsed.length > 0 && (
           <ul className="ptlegend" aria-label="Formato das peças">
             {kindsUsed.map((kd) => (
-              <li key={kd}><span className="ptl-tag" aria-hidden="true"><PatchesTag v="" kind={kd} color="#9A6BFF" /></span>{kd === "a" ? "qualquer" : KIND_NAME[kd]}</li>
+              <li key={kd}><span className="ptl-tag" aria-hidden="true"><PatchesTag v="" kind={kd} color="#9A6BFF" /></span>{kd === "a" ? "livre" : KIND_NAME[kd]}</li>
             ))}
           </ul>
         )}

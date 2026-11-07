@@ -1,7 +1,8 @@
 import type { Kind } from "../lib/patches";
 
 // Etiqueta do número no Patches: o FORMATO da etiqueta mostra o formato da peça.
-//   quadrada → peça quadrada · alta → peça em pé · larga → peça deitada · empilhada → qualquer formato.
+//   quadrada → peça quadrada · alta → peça em pé · larga → peça deitada ·
+//   quadrado com uma faixa deitada e uma em pé cruzando atrás → qualquer formato (livre).
 // A cor é a mesma da peça daquele número.
 
 export const KIND_NAME: Record<Kind, string> = { q: "quadrada", v: "em pé", h: "deitada", a: "de qualquer formato" };
@@ -9,7 +10,7 @@ export const KIND_HELP: Record<Kind, string> = {
   q: "a peça é um quadrado",
   v: "a peça é mais alta que larga",
   h: "a peça é mais larga que alta",
-  a: "a peça pode ter qualquer formato",
+  a: "a peça pode ter qualquer formato: deitada, em pé ou quadrada",
 };
 
 const INK = "#26104D";

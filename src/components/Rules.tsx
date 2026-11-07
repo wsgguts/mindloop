@@ -69,7 +69,7 @@ function PatchesRules() {
           <ul className="ptlegend big">
             {(["q", "v", "h", "a"] as const).map((kd) => (
               <li key={kd}><span className="ptl-tag" aria-hidden="true"><PatchesTag v={kd === "q" ? 4 : kd === "a" ? 2 : 6} kind={kd} color="#9A6BFF" /></span>
-                <span><b>{kd === "q" ? "Quadrada" : kd === "v" ? "Em pé" : kd === "h" ? "Deitada" : "Empilhada"}:</b> {KIND_HELP[kd]}.</span></li>
+                <span><b>{kd === "q" ? "Quadrada" : kd === "v" ? "Em pé" : kd === "h" ? "Deitada" : "Livre"}:</b> {KIND_HELP[kd]}.</span></li>
             ))}
           </ul>
         </li>
