@@ -1,6 +1,7 @@
 "use client";
 import GameHeader from "./GameHeader";
 import ZoomBoard from "./ZoomBoard";
+import GameToolbar from "./GameToolbar";
 import { useLevelPlay } from "./useLevelPlay";
 import TangoSymbol, { SYMBOL_NAME, SYMBOL_PLURAL } from "./TangoSymbol";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -13,7 +14,7 @@ type Tone = "info" | "ok" | "warn" | "hint";
 const ICON: Record<Tone, string> = { info: "ℹ", ok: "✓", warn: "!", hint: "?" };
 type Move = { r: number; c: number; prev: number };
 
-interface Props { puzzle: TangoPuzzle; active: boolean; onMenu: () => void; onRules: () => void; onWin: (ms: number) => void; onCelebrated: () => void }
+interface Props { puzzle: TangoPuzzle; active: boolean; onMenu: () => void; onRules: () => void; onFeedback: () => void; onWin: (ms: number) => void; onCelebrated: () => void }
 
 // Tocar numa casa passa por vazia → Cristal → Orbe. Quem quer um Orbe passa pelo Cristal no caminho,
 // então o erro causado por um toque só aparece se a casa ficar assim por um instante.
@@ -44,7 +45,7 @@ function hintText(d: Deduction, half: number): string {
   }
 }
 
-export default function TangoGame({ puzzle, active, onMenu, onRules, onWin, onCelebrated }: Props) {
+export default function TangoGame({ puzzle, active, onMenu, onRules, onFeedback, onWin, onCelebrated }: Props) {
   const board = useMemo(() => parseTango(puzzle.raw), [puzzle]);
   const { n, givens, signs } = board;
   const half = n / 2;
@@ -193,11 +194,11 @@ export default function TangoGame({ puzzle, active, onMenu, onRules, onWin, onCe
 
   return (
     <div className="wrap play">
-      <GameHeader kind="tango" title={puzzle.name} subtitle={`Tango · ${puzzle.level}`} ms={play.ms} done={won} onHelp={onRules}>
+      <GameHeader kind="tango" title={puzzle.name} subtitle={`Tango · ${puzzle.level}`} ms={play.ms} done={won} onHelp={onRules} onBack={onMenu}>
         <div className="progress" role="progressbar" aria-label="Casas preenchidas" aria-valuemin={0} aria-valuemax={total} aria-valuenow={filled}>
           <i style={{ width: `${(filled / total) * 100}%` }} />
         </div>
-        <p className="muted" style={{ marginTop: 4 }}>{filled} de {total} casas · {half} Cristais e {half} Orbes em cada linha e coluna</p>
+        <p className="muted" style={{ marginTop: 4 }}>{filled}/{total} casas · {half} de cada símbolo por linha e coluna</p>
       </GameHeader>
 
       <>
@@ -248,13 +249,18 @@ export default function TangoGame({ puzzle, active, onMenu, onRules, onWin, onCe
       )}
 
       {!won && (
-        <div className="row">
-          <button className="btn sec" onClick={undo} disabled={!history.length}>Desfazer</button>
-          <button className="btn sec" onClick={hint}>Dica</button>
-          <button className="btn sec" onClick={() => (history.length ? setConfirm(true) : restart())}>Reiniciar</button>
-          <button className="btn sec" onClick={onRules}>Como jogar</button>
-          <button className="btn sec" onClick={onMenu}>Níveis</button>
-        </div>
+        <GameToolbar
+          main={[
+          { label: "Desfazer", icon: "undo", onClick: undo, disabled: !history.length },
+          { label: "Dica", icon: "hint", onClick: hint },
+          { label: "Reiniciar", icon: "restart", onClick: () => (history.length ? setConfirm(true) : restart()) },
+          { label: "Ajuda", ariaLabel: "Como jogar", icon: "help", onClick: onRules },
+          ]}
+          more={[
+          { label: "Níveis", icon: "levels", onClick: onMenu },
+          { label: "Dar opinião", icon: "feedback", onClick: onFeedback },
+          ]}
+        />
       )}
       </div>
     </div>

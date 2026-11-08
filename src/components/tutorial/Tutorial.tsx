@@ -114,6 +114,25 @@ export default function Tutorial({ game, steps, first, finishLabel = "Concluir",
   const last = i === steps.length - 1;
   const beat = useBeats(step.demo.beats, `${i}:${play}`, speed);
   const box = useRef<HTMLElement>(null);
+  // Largura da demonstração: ajustada à altura real da tela para o passo inteiro caber sem rolar
+  // (celular em pé; no celular deitado o CSS cuida da coluna da demonstração).
+  const [demoW, setDemoW] = useState(256);
+  const fit = useCallback(() => {
+    const tut = box.current;
+    const main = tut?.querySelector<HTMLElement>(".tut-main"), board = tut?.querySelector<HTMLElement>(".tut-board"), stage = tut?.querySelector<HTMLElement>(".tut-stage");
+    if (!tut || !main || !board || !stage) return;
+    if (window.matchMedia("(orientation: landscape) and (max-height: 540px)").matches) return;
+    const pad = parseFloat(getComputedStyle(tut.parentElement!).paddingTop) || 0;
+    // tamanhos de layout (offset*), que não sofrem a animação de entrada (escala) do painel
+    const spare = window.innerHeight - 2 * pad - tut.offsetHeight; // sobra abaixo do painel
+    const over = main.scrollHeight - main.clientHeight; // o que não coube
+    // só o tabuleiro encolhe/cresce (teclados e contagens da demonstração mantêm a largura cheia)
+    const d = { width: board.offsetWidth, height: board.offsetHeight };
+    if (!d.width || !d.height) return;
+    const maxW = Math.min(256, stage.clientWidth - 16);
+    const next = Math.round(Math.max(110, Math.min(maxW, d.width + ((spare - over) * d.width) / d.height)));
+    setDemoW((w) => (Math.abs(w - next) > 2 ? next : w));
+  }, []);
   const done = useRef(onDone);
   done.current = onDone;
   const { name, color } = GAME_META[game];
@@ -140,6 +159,17 @@ export default function Tutorial({ game, steps, first, finishLabel = "Concluir",
     return () => { document.removeEventListener("keydown", onKey); prev?.focus?.(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+  useLayoutEffect(fit, [i, demoW, beat, fit]);
+  useEffect(() => {
+    // reajusta quando a janela muda ou quando o texto muda de altura (ex.: as fontes terminam de carregar)
+    window.addEventListener("resize", fit);
+    const ro = typeof ResizeObserver !== "undefined" ? new ResizeObserver(() => fit()) : null;
+    const txt = box.current?.querySelector(".tut-text"), look = box.current?.querySelector(".tut-look");
+    if (txt) ro?.observe(txt);
+    if (look) ro?.observe(look);
+    return () => { window.removeEventListener("resize", fit); ro?.disconnect(); };
+  }, [fit, i]);
+
   function onKeyNav(e: React.KeyboardEvent) {
     if ((e.target as HTMLElement).closest(".tut-dots")) return;
     if (e.key === "ArrowRight" && !last) go(i + 1);
@@ -149,7 +179,7 @@ export default function Tutorial({ game, steps, first, finishLabel = "Concluir",
   return (
     <div className="scrim tut-scrim">
       <section ref={box} className="tut" role="dialog" aria-modal="true" aria-labelledby="tut-title" tabIndex={-1} onKeyDown={onKeyNav}
-        style={{ "--gc": color, "--tut-k": 1 / speed } as React.CSSProperties}>
+        style={{ "--gc": color, "--tut-k": 1 / speed, "--demo-w": `${demoW}px` } as React.CSSProperties}>
         <header className="tut-head">
           <Gem kind={game} size={40} />
           <div className="tut-name">
@@ -184,12 +214,12 @@ export default function Tutorial({ game, steps, first, finishLabel = "Concluir",
             <div className="tut-demo" key={`${i}:${play}`} aria-hidden="true">{step.demo.render(beat)}</div>
             <p className="tut-say" aria-live="polite">{step.demo.say[beat] ?? ""}</p>
             <div className="tut-ctl">
-            <button type="button" className="tut-replay" onClick={() => setPlay((p) => p + 1)}>
+            <button type="button" className="tut-replay" onClick={() => setPlay((p) => p + 1)} aria-label="Repetir animação">
               <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8" /><path d="M3 3v5h5" /></svg>
-              Repetir animação
+              <span>Repetir</span>
             </button>
             <div className="tut-speed" role="group" aria-label="Velocidade da animação">
-              <span className="tut-speed-label" aria-hidden="true">Velocidade</span>
+              <span className="tut-speed-label" aria-hidden="true" title="Velocidade"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M4 18a8 8 0 1 1 16 0" /><path d="M12 18l4-6" /></svg></span>
               {SPEEDS.map((v) => (
                 <button key={v} type="button" className={v === speed ? "on" : ""} aria-pressed={v === speed} onClick={() => chooseSpeed(v)}
                   aria-label={`Velocidade ${fmtSpeed(v)}${v === DEFAULT_SPEED ? " (padrão, um pouco mais lenta)" : v < 1 ? " (mais lenta)" : v > 1 ? " (mais rápida)" : " (normal)"}`}>

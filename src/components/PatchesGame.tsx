@@ -1,6 +1,7 @@
 "use client";
 import GameHeader from "./GameHeader";
 import ZoomBoard from "./ZoomBoard";
+import GameToolbar from "./GameToolbar";
 import { useLevelPlay } from "./useLevelPlay";
 import PatchesTag, { KIND_HELP, KIND_NAME } from "./PatchesTag";
 import { useMemo, useRef, useState } from "react";
@@ -13,7 +14,7 @@ import {
 type Tone = "info" | "ok" | "warn" | "hint";
 const ICON: Record<Tone, string> = { info: "ℹ", ok: "✓", warn: "!", hint: "?" };
 
-interface Props { puzzle: PatchesPuzzle; active: boolean; onMenu: () => void; onRules: () => void; onWin: (ms: number) => void; onCelebrated: () => void }
+interface Props { puzzle: PatchesPuzzle; active: boolean; onMenu: () => void; onRules: () => void; onFeedback: () => void; onWin: (ms: number) => void; onCelebrated: () => void }
 
 // Animação de conclusão: as peças "encaixam" em onda, os números brilham e a moldura acende.
 const FX_MS = 3000;
@@ -57,7 +58,7 @@ function hintText(d: Deduction, clues: Clue[]): string {
   }
 }
 
-export default function PatchesGame({ puzzle, active, onMenu, onRules, onWin, onCelebrated }: Props) {
+export default function PatchesGame({ puzzle, active, onMenu, onRules, onFeedback, onWin, onCelebrated }: Props) {
   const board = useMemo(() => parsePatches(puzzle.raw), [puzzle]);
   const { n, clues } = board;
   const total = n * n;
@@ -223,7 +224,7 @@ export default function PatchesGame({ puzzle, active, onMenu, onRules, onWin, on
 
   return (
     <div className="wrap play">
-      <GameHeader kind="patches" title={puzzle.name} subtitle={`Patches · ${puzzle.level}`} ms={play.ms} done={won} onHelp={onRules}>
+      <GameHeader kind="patches" title={puzzle.name} subtitle={`Patches · ${puzzle.level}`} ms={play.ms} done={won} onHelp={onRules} onBack={onMenu}>
         <div className="progress" role="progressbar" aria-label="Casas cobertas" aria-valuemin={0} aria-valuemax={total} aria-valuenow={covered}>
           <i style={{ width: `${(covered / total) * 100}%` }} />
         </div>
@@ -294,13 +295,18 @@ export default function PatchesGame({ puzzle, active, onMenu, onRules, onWin, on
         )}
 
         {!won && (
-          <div className="row">
-            <button className="btn sec" onClick={undo} disabled={!history.length}>Desfazer</button>
-            <button className="btn sec" onClick={hint}>Dica</button>
-            <button className="btn sec" onClick={() => (pieces.length ? setConfirm(true) : restart())}>Reiniciar</button>
-            <button className="btn sec" onClick={onRules}>Como jogar</button>
-            <button className="btn sec" onClick={onMenu}>Níveis</button>
-          </div>
+          <GameToolbar
+            main={[
+            { label: "Desfazer", icon: "undo", onClick: undo, disabled: !history.length },
+            { label: "Dica", icon: "hint", onClick: hint },
+            { label: "Reiniciar", icon: "restart", onClick: () => (pieces.length ? setConfirm(true) : restart()) },
+            { label: "Ajuda", ariaLabel: "Como jogar", icon: "help", onClick: onRules },
+            ]}
+            more={[
+            { label: "Níveis", icon: "levels", onClick: onMenu },
+            { label: "Dar opinião", icon: "feedback", onClick: onFeedback },
+            ]}
+          />
         )}
       </div>
     </div>

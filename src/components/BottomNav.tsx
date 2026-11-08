@@ -11,9 +11,10 @@ const ITEMS: { id: Tab; label: string }[] = [
   { id: "home", label: "Início" }, { id: "rules", label: "Regras" }, { id: "profile", label: "Perfil" },
 ];
 
-export default function BottomNav({ active, onChange }: { active: Tab; onChange: (t: Tab) => void }) {
+// Na partida (celular em pé) a barra some para o tabuleiro ganhar altura; a volta é pelo botão ‹ do cabeçalho.
+export default function BottomNav({ active, onChange, inGame = false }: { active: Tab; onChange: (t: Tab) => void; inGame?: boolean }) {
   return (
-    <nav className="bnav" aria-label="Navegação principal">
+    <nav className={`bnav${inGame ? " in-game" : ""}`} aria-label="Navegação principal">
       <ul>
         {ITEMS.map((it) => (
           <li key={it.id}>

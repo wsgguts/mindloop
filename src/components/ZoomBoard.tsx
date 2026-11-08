@@ -87,6 +87,36 @@ export default function ZoomBoard({ children, maxWidth = 360, panWithOneFinger =
   // Ao sair da tela, cancela o quadro de animação pendente.
   useEffect(() => () => cancelAnimationFrame(raf.current), []);
 
+  // Tamanho do tabuleiro na partida (celular em pé): o maior possível sem empurrar o resto da partida
+  // (cabeçalho, mensagem, teclado e barra de ações) para fora da tela. Mede o espaço real — a altura da
+  // mensagem, do progresso etc. muda de jogo para jogo — e se reajusta quando algo muda de tamanho.
+  const area = useRef<HTMLDivElement>(null);
+  const [fit, setFit] = useState<number | null>(null);
+  const lockedRef = useRef(locked);
+  lockedRef.current = locked;
+  useEffect(() => {
+    const a = area.current, wrap = a?.closest<HTMLElement>(".wrap.play");
+    if (!a || !wrap) return;
+    const measure = () => {
+      if (window.matchMedia("(orientation: landscape) and (max-height: 540px)").matches || window.innerWidth > 760) return setFit(null);
+      const w = wrap.getBoundingClientRect(), ar = a.getBoundingClientRect(), z = box.current?.getBoundingClientRect();
+      if (!w.height || !z) return; // partida escondida (outra tela aberta)
+      if (lockedRef.current) return; // na animação de vitória o tabuleiro não muda de tamanho
+      const main = wrap.closest("main");
+      const bottomPad = main ? parseFloat(getComputedStyle(main).paddingBottom) || 0 : 0;
+      const others = w.height - ar.height; // tudo na partida menos o tabuleiro e sua barra de zoom
+      const bar = ar.height - z.height;
+      const avail = Math.floor(window.innerHeight - (w.top + window.scrollY) - others - bar - bottomPad) - 4; // 4px de folga (arredondamentos)
+      const next = Math.max(window.innerHeight < 600 ? 186 : 220, avail);
+      setFit((cur) => (cur !== null && Math.abs(cur - next) <= 2 ? cur : next));
+    };
+    measure();
+    const ro = typeof ResizeObserver !== "undefined" ? new ResizeObserver(measure) : null;
+    ro?.observe(wrap);
+    window.addEventListener("resize", measure);
+    return () => { ro?.disconnect(); window.removeEventListener("resize", measure); };
+  }, []);
+
   // Ao travar (fim da partida), volta ao tamanho normal para mostrar o tabuleiro inteiro.
   useEffect(() => { if (locked) { pts.current.clear(); g.current.mode = "idle"; reset(); } }, [locked, reset]);
 
@@ -209,7 +239,7 @@ export default function ZoomBoard({ children, maxWidth = 360, panWithOneFinger =
 
   const pct = Math.round(scale * 100);
   return (
-    <div className="zoom-area" style={{ "--zw": `${maxWidth}px` } as React.CSSProperties}>
+    <div ref={area} className="zoom-area" style={{ "--zw": `${maxWidth}px`, ...(fit !== null && { width: `min(${maxWidth}px, 100%, ${fit}px)` }) } as React.CSSProperties}>
       <div ref={box} className={`zoom${scale > 1.001 ? " zoomed" : scale < 0.999 ? " shrunk" : ""}`}
         onPointerDownCapture={down} onPointerMoveCapture={move} onPointerUpCapture={up} onPointerCancelCapture={up}
         onClickCapture={click} onFocusCapture={focusIn}>

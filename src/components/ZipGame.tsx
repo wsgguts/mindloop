@@ -1,6 +1,7 @@
 "use client";
 import GameHeader from "./GameHeader";
 import ZoomBoard from "./ZoomBoard";
+import GameToolbar from "./GameToolbar";
 import { useLevelPlay } from "./useLevelPlay";
 import { useMemo, useRef, useState } from "react";
 import {
@@ -10,13 +11,13 @@ import {
 type Tone = "info" | "ok" | "warn" | "hint";
 const ICON: Record<Tone, string> = { info: "ℹ", ok: "✓", warn: "!", hint: "?" };
 
-interface Props { puzzle: ZipPuzzle; active: boolean; onMenu: () => void; onRules: () => void; onWin: (ms: number) => void; onCelebrated: () => void }
+interface Props { puzzle: ZipPuzzle; active: boolean; onMenu: () => void; onRules: () => void; onFeedback: () => void; onWin: (ms: number) => void; onCelebrated: () => void }
 
 // Animação de conclusão: um cometa percorre o caminho do 1 ao último número, acendendo as casas na ordem.
 const DRAW_MS = 1700;
 const FX_MS = 2900;
 
-export default function ZipGame({ puzzle, active, onMenu, onRules, onWin, onCelebrated }: Props) {
+export default function ZipGame({ puzzle, active, onMenu, onRules, onFeedback, onWin, onCelebrated }: Props) {
   const z = useMemo(() => parseZip(puzzle.rows), [puzzle]);
   const [path, setPath] = useState<Pos[]>([z.start]);
   const play = useLevelPlay({ active, onWin, onCelebrated, fxMs: FX_MS });
@@ -89,7 +90,7 @@ export default function ZipGame({ puzzle, active, onMenu, onRules, onWin, onCele
 
   return (
     <div className="wrap play">
-      <GameHeader kind="zip" title={puzzle.name} subtitle={`Zip · ${puzzle.level}`} ms={play.ms} done={won} onHelp={onRules}>
+      <GameHeader kind="zip" title={puzzle.name} subtitle={`Zip · ${puzzle.level}`} ms={play.ms} done={won} onHelp={onRules} onBack={onMenu}>
         <div className="progress" role="progressbar" aria-label="Casas no caminho" aria-valuemin={0} aria-valuemax={total} aria-valuenow={path.length}>
           <i style={{ width: `${(path.length / total) * 100}%` }} />
         </div>
@@ -150,13 +151,18 @@ export default function ZipGame({ puzzle, active, onMenu, onRules, onWin, onCele
       )}
 
       {!won && (
-        <div className="row">
-          <button className="btn sec" onClick={undo} disabled={path.length < 2}>Desfazer</button>
-          <button className="btn sec" onClick={hint}>Dica</button>
-          <button className="btn sec" onClick={() => (path.length > 1 ? setConfirm(true) : restart())}>Reiniciar</button>
-          <button className="btn sec" onClick={onRules}>Como jogar</button>
-          <button className="btn sec" onClick={onMenu}>Níveis</button>
-        </div>
+        <GameToolbar
+          main={[
+          { label: "Desfazer", icon: "undo", onClick: undo, disabled: path.length < 2 },
+          { label: "Dica", icon: "hint", onClick: hint },
+          { label: "Reiniciar", icon: "restart", onClick: () => (path.length > 1 ? setConfirm(true) : restart()) },
+          { label: "Ajuda", ariaLabel: "Como jogar", icon: "help", onClick: onRules },
+          ]}
+          more={[
+          { label: "Níveis", icon: "levels", onClick: onMenu },
+          { label: "Dar opinião", icon: "feedback", onClick: onFeedback },
+          ]}
+        />
       )}
       </div>
     </div>

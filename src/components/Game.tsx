@@ -1,6 +1,7 @@
 "use client";
 import GameHeader from "./GameHeader";
 import ZoomBoard from "./ZoomBoard";
+import GameToolbar from "./GameToolbar";
 import { useLevelPlay } from "./useLevelPlay";
 import { useMemo, useRef, useState } from "react";
 import type { Puzzle } from "../lib/puzzles";
@@ -25,7 +26,7 @@ interface Props {
   active: boolean;
   onSave: (grid: Grid | null, ms?: number) => void;
   onMenu: () => void;
-  onRules: () => void;
+  onRules: () => void; onFeedback: () => void;
   onWin: (ms: number) => void;
   onCelebrated: () => void;
 }
@@ -33,7 +34,7 @@ interface Props {
 // Duração da animação de conclusão: linhas → colunas → blocos → brilho geral.
 const FX_MS = 3100;
 
-export default function Game({ puzzle, initialGrid, initialMs = 0, active, onSave, onMenu, onRules, onWin, onCelebrated }: Props) {
+export default function Game({ puzzle, initialGrid, initialMs = 0, active, onSave, onMenu, onRules, onFeedback, onWin, onCelebrated }: Props) {
   const givens = useMemo(() => puzzleGrid(puzzle), [puzzle]);
   const N = givens.length;
   const [bh, bw] = boxDims(N);
@@ -124,7 +125,7 @@ export default function Game({ puzzle, initialGrid, initialMs = 0, active, onSav
 
   return (
     <div className="wrap play">
-      <GameHeader kind="sudoku" title={puzzle.name} subtitle={`Mini Sudoku · ${puzzle.level}`} ms={play.ms} done={won} onHelp={onRules}>
+      <GameHeader kind="sudoku" title={puzzle.name} subtitle={`Mini Sudoku · ${puzzle.level}`} ms={play.ms} done={won} onHelp={onRules} onBack={onMenu}>
         <div className="progress" role="progressbar" aria-label="Casas preenchidas" aria-valuemin={0} aria-valuemax={total} aria-valuenow={filled}>
           <i style={{ width: `${(filled / total) * 100}%` }} />
         </div>
@@ -188,15 +189,20 @@ export default function Game({ puzzle, initialGrid, initialMs = 0, active, onSav
       )}
 
       {!won && (
-        <div className="row">
-          <button className="btn sec" onClick={undo} disabled={!history.length || paused}>Desfazer</button>
-          <button className="btn sec" onClick={hint} disabled={paused}>Dica</button>
-          <button className="btn sec" onClick={() => setPaused((p) => !p)}>{paused ? "Retomar" : "Pausar"}</button>
-          <button className="btn sec" onClick={() => setConfirm("restart")}>Reiniciar</button>
-          <button className="btn sec" onClick={onRules}>Como jogar</button>
-          <button className="btn sec" onClick={onMenu}>Níveis (guardar)</button>
-          <button className="btn sec" onClick={() => setConfirm("end")}>Encerrar</button>
-        </div>
+        <GameToolbar
+          main={[
+          { label: "Desfazer", icon: "undo", onClick: undo, disabled: !history.length || paused },
+          { label: "Dica", icon: "hint", onClick: hint, disabled: paused },
+          { label: paused ? "Retomar" : "Pausar", icon: paused ? "play" : "pause", onClick: () => setPaused((p) => !p) },
+          { label: "Reiniciar", icon: "restart", onClick: () => setConfirm("restart") },
+          ]}
+          more={[
+          { label: "Como jogar", icon: "help", onClick: onRules },
+          { label: "Níveis (guardar)", icon: "levels", onClick: onMenu },
+          { label: "Dar opinião", icon: "feedback", onClick: onFeedback },
+          { label: "Encerrar", icon: "end", onClick: () => setConfirm("end") },
+          ]}
+        />
       )}
       </div>
     </div>

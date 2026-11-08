@@ -207,6 +207,7 @@ export default function App() {
     active: playing,
     onMenu: () => openJourney(game),
     onRules: () => openTutorial(game),
+    onFeedback: openFeedback,
     onWin: (ms: number) => winLevel(game, idx + 1, ms),
     onCelebrated: celebrated,
   });
@@ -220,14 +221,12 @@ export default function App() {
         </header>
       )}
 
-      <main id="main" className={view === "home" ? "home-main" : "page"}>
+      <main id="main" className={view === "home" ? "home-main" : view === "game" ? "page in-game" : "page"}>
         {!ready ? (
           <div className="wrap"><p role="status">Carregando…</p></div>
         ) : view === "home" ? (
           <>
             <section className="home" aria-label="Início">
-              {/* A própria arte, ampliada e desfocada, preenche a tela inteira; a arte nítida (com todos os cristais) fica por cima. */}
-              <div className="home-bg" aria-hidden="true" />
               <div className="fill sky" aria-hidden="true" />
               <div className="art">
                 <img src="/home-art.webp" width={1080} height={1244} decoding="async" alt="MindLoop — Desafie sua mente. Um cubo mágico de quebra-cabeça sobre ilhas flutuantes, com os cristais dos jogos Mini Sudoku, Zip, Tango e Patches." fetchPriority="high" />
@@ -275,7 +274,7 @@ export default function App() {
             focus={focusLevel(progress[journeyGame], lastPlayed[journeyGame])}
             justDone={arrival?.game === journeyGame ? arrival.justDone : undefined}
             justUnlocked={arrival?.game === journeyGame ? arrival.justUnlocked : undefined}
-            onBack={() => goHome(true)} onHelp={() => openTutorial(journeyGame, "Concluir")} onPlay={(n) => startGame(journeyGame, n - 1)} />
+            onBack={() => goHome(true)} onHelp={() => openTutorial(journeyGame, "Concluir")} onFeedback={openFeedback} onPlay={(n) => startGame(journeyGame, n - 1)} />
         ) : view === "rules" ? (
           <div className="wrap">
             <h1>Regras</h1>
@@ -403,11 +402,12 @@ export default function App() {
         </Modal>
       )}
 
-      {ready && view !== "feedback" && !tutorial && !nickModal && !showComplete && (
-        <FeedbackFab onOpen={openFeedback} compact={view === "game" || view === "journey"} />
+      {/* Botão flutuante só nas telas de conteúdo; na partida e na jornada a opinião fica na barra/no topo (nada flutua sobre o jogo). */}
+      {ready && (view === "home" || view === "rules" || view === "profile") && !tutorial && !nickModal && !showComplete && (
+        <FeedbackFab onOpen={openFeedback} />
       )}
 
-      <BottomNav active={TAB_OF[view]} onChange={onTab} />
+      <BottomNav active={TAB_OF[view]} onChange={onTab} inGame={view === "game"} />
     </>
   );
 }
