@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import Gem from "./Gem";
 import { CHAPTERS, LEVELS_PER_GAME, LEVELS_PER_CHAPTER, chapterDone, chapterOf, currentLevel, doneCount, isComplete, isDone, isUnlocked, type JourneyGame } from "../lib/journey";
 import { GAME_META } from "../lib/games";
@@ -16,9 +16,11 @@ interface Props {
   justUnlocked?: number;
   onPlay: (level: number) => void;
   onBack: () => void;
+  /** Abre o tutorial animado do jogo. */
+  onHelp: () => void;
 }
 
-export default function Journey({ game, done, focus, justDone, justUnlocked, onPlay, onBack }: Props) {
+export default function Journey({ game, done, focus, justDone, justUnlocked, onPlay, onBack, onHelp }: Props) {
   const { name, color, cur: curColor } = GAME_META[game];
   const next = currentLevel(done); // primeiro nível ainda não concluído
   const cur = focus; // nível destacado ("JOGAR")
@@ -31,11 +33,31 @@ export default function Journey({ game, done, focus, justDone, justUnlocked, onP
   const chipsRef = useRef<HTMLDivElement>(null);
   const scrollToCur = useRef<ScrollBehavior | null>("auto"); // ao abrir, leva a pessoa direto ao nível em que parou
   const [offscreen, setOffscreen] = useState(false);
+  // Espaço extra no fim da página, só o necessário para o nível destacado poder ficar no centro da tela
+  // (os primeiros níveis de cada capítulo ficam no pé da trilha, perto do fim da página).
+  const [room, setRoom] = useState(0);
+  const pendingCenter = useRef<ScrollBehavior | null>(null);
+
+  /** Rola a página até o nível destacado ficar no centro da área visível (acima da barra de navegação). */
+  const centerOnCur = useCallback((behavior: ScrollBehavior) => {
+    const el = curRef.current;
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    const nav = document.querySelector(".bnav")?.getBoundingClientRect();
+    const bottom = nav && nav.top > window.innerHeight / 2 ? nav.top : window.innerHeight; // no celular deitado o menu é lateral
+    const target = window.scrollY + r.top + r.height / 2 - bottom / 2;
+    const max = document.documentElement.scrollHeight - window.innerHeight;
+    if (target > max + 1) { pendingCenter.current = behavior; setRoom((x) => x + Math.ceil(target - max)); return; }
+    window.scrollTo({ top: Math.max(0, target), behavior });
+  }, []);
+  useLayoutEffect(() => {
+    if (pendingCenter.current) { const b = pendingCenter.current; pendingCenter.current = null; centerOnCur(b); }
+  }, [room, centerOnCur]);
   const [toast, setToast] = useState("");
 
   useEffect(() => {
     if (scrollToCur.current && curRef.current) {
-      curRef.current.scrollIntoView({ block: "center", behavior: scrollToCur.current });
+      centerOnCur(scrollToCur.current);
       scrollToCur.current = null;
     }
     // Centraliza o capítulo escolhido na faixa de capítulos (só na horizontal, sem mexer na página).
@@ -59,14 +81,17 @@ export default function Journey({ game, done, focus, justDone, justUnlocked, onP
     else setToast(`Conclua o nível ${n - 1} para desbloquear o nível ${n}.`);
   }
   function jump() {
-    if (chapterId === curChapter) curRef.current?.scrollIntoView({ block: "center", behavior: "smooth" });
+    if (chapterId === curChapter) centerOnCur("smooth");
     else { scrollToCur.current = "smooth"; setChapterId(curChapter); }
   }
 
   return (
     <div className={`journey${justDone !== undefined ? " enter" : ""}`} style={{ "--gc": color, ...(curColor && { "--cur": curColor }) } as React.CSSProperties}>
       <header className="jhead">
-        <button className="back" onClick={onBack}>‹ Início</button>
+        <div className="jtop">
+          <button className="back" onClick={onBack}>‹ Início</button>
+          <button className="back jhelp" onClick={onHelp}><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9.5" /><path d="M9.3 9.2a2.8 2.8 0 0 1 5.4 1c0 1.9-2.7 2.4-2.7 4" /><path d="M12 17.6h.01" /></svg>Como jogar</button>
+        </div>
         <div className="title">
           <Gem kind={game} size={52} />
           <div><h1>{name}</h1><p>{count} de {LEVELS_PER_GAME} níveis concluídos</p></div>
@@ -140,6 +165,7 @@ export default function Journey({ game, done, focus, justDone, justUnlocked, onP
       {(offscreen || chapterId !== curChapter) && (
         <button className="jump" onClick={jump}>Ir para o nível {cur}</button>
       )}
+      {room > 0 && <div aria-hidden="true" style={{ height: room }} />}
       {toast && <div className="toast note info" role="status"><b aria-hidden="true">ℹ</b><span>{toast}</span></div>}
     </div>
   );

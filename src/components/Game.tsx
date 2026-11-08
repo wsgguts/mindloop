@@ -124,7 +124,7 @@ export default function Game({ puzzle, initialGrid, initialMs = 0, active, onSav
 
   return (
     <div className="wrap play">
-      <GameHeader kind="sudoku" title={puzzle.name} subtitle={`Mini Sudoku · ${puzzle.level}`} ms={play.ms} done={won}>
+      <GameHeader kind="sudoku" title={puzzle.name} subtitle={`Mini Sudoku · ${puzzle.level}`} ms={play.ms} done={won} onHelp={onRules}>
         <div className="progress" role="progressbar" aria-label="Casas preenchidas" aria-valuemin={0} aria-valuemax={total} aria-valuenow={filled}>
           <i style={{ width: `${(filled / total) * 100}%` }} />
         </div>
@@ -193,7 +193,7 @@ export default function Game({ puzzle, initialGrid, initialMs = 0, active, onSav
           <button className="btn sec" onClick={hint} disabled={paused}>Dica</button>
           <button className="btn sec" onClick={() => setPaused((p) => !p)}>{paused ? "Retomar" : "Pausar"}</button>
           <button className="btn sec" onClick={() => setConfirm("restart")}>Reiniciar</button>
-          <button className="btn sec" onClick={onRules}>Regras</button>
+          <button className="btn sec" onClick={onRules}>Como jogar</button>
           <button className="btn sec" onClick={onMenu}>Níveis (guardar)</button>
           <button className="btn sec" onClick={() => setConfirm("end")}>Encerrar</button>
         </div>

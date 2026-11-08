@@ -620,3 +620,151 @@ label { font-weight: 600; display: block; margin-bottom: 4px; }
   .toast { right: 16px; }
 }
 @media (orientation: landscape) and (max-height: 360px) { .bnav ul { margin-top: -40px; } }
+/* ===================== Tutoriais animados ===================== */
+.tut-scrim { z-index: 65; padding: 12px; background: rgba(15,6,40,.82); }
+.tut { position: relative; width: min(100%, 560px); max-height: calc(100vh - 24px); max-height: calc(100svh - 24px); display: flex; flex-direction: column;
+  background: var(--cloud); border-radius: 24px; overflow: hidden; box-shadow: 0 24px 60px rgba(0,0,0,.55), 0 0 0 1px rgba(255,255,255,.25);
+  border-top: 4px solid transparent; border-image: var(--signature) 1; clip-path: inset(0 round 24px); animation: tut-in .35s cubic-bezier(.3,1.3,.5,1) both; }
+.tut:focus { outline: none; }
+@keyframes tut-in { from { transform: translateY(18px) scale(.97); opacity: 0; } }
+.tut-head { display: flex; align-items: center; gap: 10px; padding: 14px 16px 6px; }
+.tut-name { flex: 1; min-width: 0; }
+.tut-kicker { display: block; font: 700 12px var(--font-body); letter-spacing: .08em; text-transform: uppercase; color: var(--violet); }
+.tut-head h2 { font-size: 22px; }
+.tut-skip { min-height: 44px; padding: 0 14px; border-radius: 999px; border: 2px solid #CDB8F5; background: #fff; color: var(--violet); font: 600 14px var(--font-body); cursor: pointer; }
+.tut-skip:hover { background: #F3EBFD; }
+.tut-close { min-width: 44px; width: 44px; height: 44px; padding: 0; }
+
+/* Progresso: um segmento por passo (tocável para consultar qualquer passo) */
+.tut-prog { padding: 0 16px 8px; }
+.tut-dots { list-style: none; margin: 0; padding: 0; display: flex; gap: 5px; }
+.tut-dots li { flex: 1; }
+.tut-dots button { display: block; width: 100%; height: 44px; margin: -11px 0; padding: 0; border: 0; background: none; cursor: pointer; position: relative; }
+.tut-dots button::before { content: ""; position: absolute; left: 0; right: 0; top: 19px; height: 6px; border-radius: 3px; background: #E4D6F5; transition: background .25s; }
+.tut-dots button.done::before { background: color-mix(in srgb, var(--violet) 55%, #fff); }
+.tut-dots button.on::before { background: var(--signature); box-shadow: 0 0 8px rgba(18,207,224,.6); }
+.tut-count { font: 600 13px var(--font-body); color: var(--muted); }
+
+.tut-main { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: 4px 16px 10px; display: grid; gap: 12px; align-content: start; }
+.tut-stage { display: grid; justify-items: center; gap: 8px; padding: 14px 10px 10px; border-radius: 18px;
+  background: radial-gradient(circle at 50% 0%, color-mix(in srgb, var(--gc) 22%, transparent), transparent 70%), linear-gradient(180deg, #F6EEFF, #EFE4FC); border: 2px solid #E4D6F5; }
+.tut-demo { position: relative; width: min(100%, 256px); display: grid; justify-items: center; }
+.tut-board .cell { display: grid; place-items: center; cursor: default; } /* nas partidas a casa é um botão (já centralizado) */
+.tut-board .tcell, .tut-board .zcell { cursor: default; }
+.tut-say { min-height: 2.6em; display: grid; place-items: center; text-align: center; padding: 6px 12px; border-radius: 12px; background: var(--cosmic); color: #fff;
+  font: 600 14px/1.3 var(--font-body); width: min(100%, 340px); box-shadow: 0 4px 12px rgba(38,16,77,.25); }
+.tut-replay { display: inline-flex; align-items: center; gap: 6px; min-height: 44px; padding: 0 14px; border-radius: 999px; border: 2px solid #CDB8F5; background: #fff;
+  color: var(--violet); font: 600 13px var(--font-body); cursor: pointer; }
+.tut-replay:hover { background: #F3EBFD; }
+/* Repetir + velocidade, lado a lado */
+.tut-ctl { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 8px 10px; }
+.tut-speed { display: inline-flex; align-items: center; gap: 2px; padding: 2px; border-radius: 999px; background: #fff; border: 2px solid #CDB8F5; }
+.tut-speed-label { padding: 0 6px 0 10px; font: 600 12px var(--font-body); color: var(--muted); }
+.tut-speed button { min-width: 44px; min-height: 44px; padding: 0 6px; border: 0; border-radius: 999px; background: transparent; color: var(--violet);
+  font: 700 13px var(--font-title); font-variant-numeric: tabular-nums; cursor: pointer; }
+.tut-speed button:hover { background: #F3EBFD; }
+.tut-speed button.on { background: var(--violet); color: #fff; box-shadow: 0 2px 6px rgba(118,44,235,.35); }
+.tut-text { display: grid; gap: 8px; }
+.tut-text { gap: 4px; }
+.tut-text h3 { font-size: 20px; }
+.tut-expl { font-size: 16px; line-height: 1.5; }
+.tut-expl p { margin: 0; }
+.tut-look { display: flex; gap: 8px; align-items: flex-start; padding: 10px 12px; border-radius: 12px; background: #FFF7DB; border: 2px solid var(--star); font-size: 14px; line-height: 1.4; }
+.tut-look svg { flex: none; margin-top: 1px; color: #7A5A00; }
+.tut-nav { display: flex; align-items: center; gap: 8px; padding: 10px 16px calc(12px + env(safe-area-inset-bottom, 0px)); border-top: 1px solid #E4D6F5; background: #fff; }
+.tut-nav .btn { min-height: 48px; white-space: nowrap; padding: 0 16px; }
+.tut-nav .tut-go { margin-left: auto; flex: 0 1 200px; min-width: 0; font-weight: 700; }
+.tut-restart { flex: none; display: inline-flex; align-items: center; gap: 4px; min-height: 44px; min-width: 44px; justify-content: center; padding: 0 6px; white-space: nowrap; border: 0; background: none; color: var(--violet); font: 600 14px var(--font-body); text-decoration: underline; cursor: pointer; }
+
+/* Dedo que aponta e toca */
+.tut-finger { position: absolute; left: 0; top: 0; z-index: 20; margin: -7px 0 0 -11px; pointer-events: none; transition: transform calc(.65s * var(--tut-k, 1)) cubic-bezier(.45,0,.2,1), opacity .25s;
+  filter: drop-shadow(0 3px 4px rgba(38,16,77,.45)); }
+.tut-finger.off { opacity: 0; }
+.tut-finger svg { display: block; transition: transform .18s ease-out; transform-origin: 11px 7px; }
+.tut-finger.press svg { transform: scale(.84); }
+.tut-finger.press::after { content: ""; position: absolute; left: 11px; top: 7px; width: 34px; height: 34px; margin: -17px 0 0 -17px; border-radius: 50%;
+  border: 3px solid var(--cyan); animation: tut-ripple calc(.7s * var(--tut-k, 1)) ease-out both; }
+@keyframes tut-ripple { from { transform: scale(.3); opacity: 1; } to { transform: scale(1.4); opacity: 0; } }
+
+/* Destaques usados nas demonstrações */
+.tut-board { width: 100% !important; margin: 0; }
+.tut-col { display: grid; gap: 10px; width: 100%; justify-items: center; }
+.cell.tut-hl, .tcell.tut-hl { background: #DDF8FB; box-shadow: inset 0 0 0 3px var(--cyan); }
+.cell.given.tut-hl { background: #CDEFF6; }
+.cell.tut-ok, .tcell.tut-ok { background: #E9FAF4; box-shadow: inset 0 0 0 3px var(--ok); }
+.cell.tut-pop { animation: tut-pop .45s ease-out; }
+@keyframes tut-pop { 0% { transform: scale(.6); } 60% { transform: scale(1.12); } 100% { transform: none; } }
+.tut-pad { width: 100%; }
+.tut-pad .btn { display: flex; align-items: center; justify-content: center; min-height: 44px; font-size: 20px; cursor: default; transition: transform .15s, box-shadow .15s; }
+.tut-pad .btn.erase { font-size: 12px; }
+.tpad.tut-pad .btn { font-size: 14px; gap: 4px; padding: 0 6px; }
+.tut-pad .btn.tut-press { transform: scale(.92); box-shadow: 0 0 0 3px var(--cyan); }
+.tut-cands { display: flex; gap: 8px; }
+.tut-cands span { position: relative; display: grid; place-items: center; width: 40px; height: 40px; border-radius: 10px; background: #fff; border: 2px solid #CDB8F5; font: 700 20px var(--font-title); color: var(--cosmic); transition: opacity .3s, background .3s; }
+.tut-cands span.out { opacity: .4; }
+.tut-cands span.out::after { content: ""; position: absolute; left: 4px; right: 4px; top: 50%; height: 3px; border-radius: 2px; background: var(--err); transform: rotate(-35deg); }
+.tut-cands span.keep { background: var(--ok); border-color: #0F3D31; opacity: 1; box-shadow: 0 0 12px rgba(79,214,177,.8); }
+.tut-count-row { display: flex; gap: 14px; font: 600 14px var(--font-body); }
+.tut-count-row span { display: inline-flex; align-items: center; gap: 4px; padding: 2px 10px; border-radius: 999px; background: #fff; border: 2px solid #E4D6F5; }
+.tut-count-row span.full { border-color: var(--ok); }
+.tut-count-row span.over { border-color: var(--err); background: #FFEEF1; color: #B3243E; }
+.zcell.tut-no { animation: tut-no .5s ease-in-out 2; }
+@keyframes tut-no { 50% { background: #FFE3E8; box-shadow: inset 0 0 0 4px var(--err); } }
+.zcell.tut-left { background: #FFE3E8; box-shadow: inset 0 0 0 3px var(--err); }
+.zcell.tut-hl { box-shadow: inset 0 0 0 4px var(--star); background: #FFF7DB; }
+.tut-tag { display: inline-grid; place-items: center; width: 34px; height: 34px; container-type: size; position: relative; z-index: 0; flex: none; vertical-align: middle; }
+.tut-kinds { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.tut-kinds li { display: flex; align-items: center; gap: 8px; }
+
+/* Acesso ao tutorial: "?" no título da partida, "Como jogar" na jornada e destaque na aba Regras */
+/* botão de 44px (área de toque) com o círculo visível de 32px dentro */
+.ghelp { display: inline-grid; place-items: center; vertical-align: middle; width: 44px; height: 44px; margin: -6px -6px -6px 2px; padding: 0; border: 0; border-radius: 50%;
+  background: radial-gradient(circle, #fff 0 14px, #CDB8F5 14px 16px, transparent 16.5px); color: var(--violet); cursor: pointer; position: relative; top: -2px; }
+.ghelp:hover { background: radial-gradient(circle, #F3EBFD 0 14px, var(--violet) 14px 16px, transparent 16.5px); }
+.jtop { display: flex; justify-content: space-between; gap: 8px; }
+.jhelp { display: inline-flex; align-items: center; gap: 6px; border-color: var(--cyan); }
+.tut-cta { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: 16px; border: 2px solid transparent;
+  background: linear-gradient(#fff, #fff) padding-box, var(--signature) border-box; box-shadow: 0 6px 18px rgba(118,44,235,.15); }
+.tut-cta > div { flex: 1; display: grid; gap: 2px; min-width: 0; }
+.tut-cta span { font-size: 14px; color: var(--muted); }
+.tut-cta .btn { flex: none; }
+@media (max-width: 420px) { .tut-cta { flex-wrap: wrap; } .tut-cta .btn { width: 100%; } }
+@media (max-width: 380px) { .tut-head h2 { font-size: 20px; } .tut-nav .btn { padding: 0 12px; } .tut-restart span { display: none; } .tut-speed-label { display: none; } .tut-speed button { min-width: 40px; } }
+
+/* Celular deitado: demonstração à esquerda, explicação à direita */
+@media (orientation: landscape) and (max-height: 540px) {
+  .tut-scrim { padding: 6px; }
+  .tut { width: min(100%, 920px); max-height: calc(100vh - 12px); max-height: calc(100svh - 12px); }
+  .tut-head { padding: 6px 14px 0; } .tut-head img { width: 30px !important; height: 30px !important; } .tut-head h2 { font-size: 18px; } .tut-kicker { display: none; }
+  .tut-skip, .tut-close { min-height: 40px; height: 40px; }
+  .tut-prog { padding: 0 14px 2px; } .tut-dots button { height: 36px; margin: -10px 0; } .tut-dots button::before { top: 15px; }
+  /* a demonstração ocupa a coluna da esquerda inteira; narração, repetir e texto ficam à direita */
+  .tut-main { grid-template-columns: auto minmax(0, 1fr); grid-template-rows: auto auto auto 1fr; column-gap: 16px; row-gap: 6px; align-items: start; padding: 2px 14px 6px; }
+  .tut-stage { display: contents; }
+  .tut-demo { grid-column: 1; grid-row: 1 / span 4; width: min(calc(100vh - 196px), 250px); width: min(calc(100svh - 196px), 250px); padding: 8px; box-sizing: content-box; border-radius: 16px;
+    background: radial-gradient(circle at 50% 0%, color-mix(in srgb, var(--gc) 22%, transparent), transparent 70%), linear-gradient(180deg, #F6EEFF, #EFE4FC); border: 2px solid #E4D6F5; }
+  .tut-say { grid-column: 2; grid-row: 2; font-size: 13px; min-height: 0; padding: 6px 10px; width: auto; justify-self: stretch; }
+  .tut-ctl { grid-column: 2; grid-row: 3; justify-content: flex-start; }
+  .tut-speed button { min-height: 36px; }
+  .tut-text { grid-column: 2; grid-row: 1; }
+  .tut-look { grid-column: 2; grid-row: 4; }
+  .tut-replay { min-height: 34px; font-size: 12px; }
+  .tut-text h3 { font-size: 17px; } .tut-expl { font-size: 14px; } .tut-look { font-size: 13px; padding: 6px 10px; }
+  .tut-nav { padding: 6px 14px 8px; } .tut-nav .btn { min-height: 44px; }
+  .tut-pad .btn { min-height: 34px; font-size: 16px; }
+}
+
+/* ===== Início: a arte preenche a tela toda =====
+   A arte (proporção 0,87) é mais larga que um celular em pé (≈0,5): ampliá-la para cobrir a tela cortaria os
+   cristais dos jogos nas laterais. Então ela fica inteira e nítida, e uma cópia ampliada e desfocada preenche o
+   resto da tela; as bordas de cima e de baixo da arte nítida se dissolvem nesse fundo (sem faixas lisas). */
+.home { position: relative; isolation: isolate; }
+.home-bg { position: absolute; inset: -48px; z-index: -1; pointer-events: none;
+  background: url(/home-art.webp) center 42% / cover no-repeat; filter: blur(30px) saturate(1.25) brightness(.62); transform: translateZ(0); }
+/* véu: escurece as pontas de cima e de baixo, como céu e chão da cena */
+.home::before { content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none;
+  background: linear-gradient(180deg, rgba(11,5,36,.7) 0%, rgba(11,5,36,.25) 18%, transparent 30%, transparent 70%, rgba(26,10,52,.35) 84%, rgba(26,10,52,.75) 100%); }
+.home .fill.sky, .home .fill.ground { background: transparent; }
+@media (orientation: portrait) {
+  .home .art > img { -webkit-mask-image: linear-gradient(180deg, transparent 0, #000 9%, #000 91%, transparent 100%); mask-image: linear-gradient(180deg, transparent 0, #000 9%, #000 91%, transparent 100%); }
+}

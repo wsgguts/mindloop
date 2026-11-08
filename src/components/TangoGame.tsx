@@ -193,7 +193,7 @@ export default function TangoGame({ puzzle, active, onMenu, onRules, onWin, onCe
 
   return (
     <div className="wrap play">
-      <GameHeader kind="tango" title={puzzle.name} subtitle={`Tango · ${puzzle.level}`} ms={play.ms} done={won}>
+      <GameHeader kind="tango" title={puzzle.name} subtitle={`Tango · ${puzzle.level}`} ms={play.ms} done={won} onHelp={onRules}>
         <div className="progress" role="progressbar" aria-label="Casas preenchidas" aria-valuemin={0} aria-valuemax={total} aria-valuenow={filled}>
           <i style={{ width: `${(filled / total) * 100}%` }} />
         </div>
@@ -252,7 +252,7 @@ export default function TangoGame({ puzzle, active, onMenu, onRules, onWin, onCe
           <button className="btn sec" onClick={undo} disabled={!history.length}>Desfazer</button>
           <button className="btn sec" onClick={hint}>Dica</button>
           <button className="btn sec" onClick={() => (history.length ? setConfirm(true) : restart())}>Reiniciar</button>
-          <button className="btn sec" onClick={onRules}>Regras</button>
+          <button className="btn sec" onClick={onRules}>Como jogar</button>
           <button className="btn sec" onClick={onMenu}>Níveis</button>
         </div>
       )}

@@ -89,7 +89,7 @@ export default function ZipGame({ puzzle, active, onMenu, onRules, onWin, onCele
 
   return (
     <div className="wrap play">
-      <GameHeader kind="zip" title={puzzle.name} subtitle={`Zip · ${puzzle.level}`} ms={play.ms} done={won}>
+      <GameHeader kind="zip" title={puzzle.name} subtitle={`Zip · ${puzzle.level}`} ms={play.ms} done={won} onHelp={onRules}>
         <div className="progress" role="progressbar" aria-label="Casas no caminho" aria-valuemin={0} aria-valuemax={total} aria-valuenow={path.length}>
           <i style={{ width: `${(path.length / total) * 100}%` }} />
         </div>
@@ -154,7 +154,7 @@ export default function ZipGame({ puzzle, active, onMenu, onRules, onWin, onCele
           <button className="btn sec" onClick={undo} disabled={path.length < 2}>Desfazer</button>
           <button className="btn sec" onClick={hint}>Dica</button>
           <button className="btn sec" onClick={() => (path.length > 1 ? setConfirm(true) : restart())}>Reiniciar</button>
-          <button className="btn sec" onClick={onRules}>Regras</button>
+          <button className="btn sec" onClick={onRules}>Como jogar</button>
           <button className="btn sec" onClick={onMenu}>Níveis</button>
         </div>
       )}

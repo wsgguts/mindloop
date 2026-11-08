@@ -223,7 +223,7 @@ export default function PatchesGame({ puzzle, active, onMenu, onRules, onWin, on
 
   return (
     <div className="wrap play">
-      <GameHeader kind="patches" title={puzzle.name} subtitle={`Patches · ${puzzle.level}`} ms={play.ms} done={won}>
+      <GameHeader kind="patches" title={puzzle.name} subtitle={`Patches · ${puzzle.level}`} ms={play.ms} done={won} onHelp={onRules}>
         <div className="progress" role="progressbar" aria-label="Casas cobertas" aria-valuemin={0} aria-valuemax={total} aria-valuenow={covered}>
           <i style={{ width: `${(covered / total) * 100}%` }} />
         </div>
@@ -298,7 +298,7 @@ export default function PatchesGame({ puzzle, active, onMenu, onRules, onWin, on
             <button className="btn sec" onClick={undo} disabled={!history.length}>Desfazer</button>
             <button className="btn sec" onClick={hint}>Dica</button>
             <button className="btn sec" onClick={() => (pieces.length ? setConfirm(true) : restart())}>Reiniciar</button>
-            <button className="btn sec" onClick={onRules}>Regras</button>
+            <button className="btn sec" onClick={onRules}>Como jogar</button>
             <button className="btn sec" onClick={onMenu}>Níveis</button>
           </div>
         )}

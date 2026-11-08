@@ -8,6 +8,7 @@ import Journey from "./Journey";
 import LevelComplete, { type LevelResult } from "./LevelComplete";
 import Modal from "./Modal";
 import { RulesContent, type RulesGame } from "./Rules";
+import { TUTORIALS, Tutorial } from "./tutorial";
 import PatchesGame from "./PatchesGame";
 import TangoGame from "./TangoGame";
 import ZipGame from "./ZipGame";
@@ -36,7 +37,8 @@ const BACK_LABEL: Record<Exclude<View, "feedback">, string> = {
 };
 const TAB_OF: Record<View, Tab> = { home: "home", journey: "home", game: "home", rules: "rules", profile: "profile", feedback: "profile" };
 // Chave de "já viu as regras" de cada jogo (a do Sudoku é a original, mantida por compatibilidade).
-const RULES_KEY: PerGame<string> = { sudoku: KEYS.rules, zip: "mindloop:rules-zip", tango: "mindloop:rules-tango", patches: "mindloop:rules-patches" };
+// Tutorial de cada jogo: "done" (visto até o fim) ou "skipped" (pulado). Independente por jogo.
+const TUTORIAL_KEY = (g: RulesGame) => `mindloop:tutorial:${g}`;
 // Progresso salvo no aparelho, por jogo.
 const PROGRESS_KEY = (g: RulesGame) => `mindloop:progress:${g}`;
 const TIMES_KEY = (g: RulesGame) => `mindloop:times:${g}`; // melhor tempo de cada nível
@@ -58,8 +60,9 @@ export default function App() {
   const [nickModal, setNickModal] = useState<null | { then: () => void }>(null); // o que fazer depois de salvar
   const [draft, setDraft] = useState("");
   const [nickError, setNickError] = useState<string | null>(null);
-  const [seen, setSeen] = useState<PerGame<boolean>>(() => perGame(() => false));
-  const [rulesModal, setRulesModal] = useState<RulesGame | null>(null);
+  const [seen, setSeen] = useState<PerGame<boolean>>(() => perGame(() => false)); // tutorial já concluído ou pulado
+  /** Tutorial aberto: primeiro acesso (mostra "Pular") ou aberto pela pessoa (mostra "Fechar"). */
+  const [tutorial, setTutorial] = useState<null | { game: RulesGame; first: boolean; finish: string }>(null);
   const [rulesTab, setRulesTab] = useState<RulesGame>("sudoku");
   const [save, setSave] = useState<Save | null>(null);
   const [journeyGame, setJourneyGame] = useState<RulesGame>("sudoku");
@@ -83,7 +86,7 @@ export default function App() {
   useEffect(() => {
     const n = readStore(KEYS.nick) ?? "";
     if (n && !validateNick(n)) setNick(n);
-    setSeen(perGame((g) => readStore(RULES_KEY[g]) === "1"));
+    setSeen(perGame((g) => !!readStore(TUTORIAL_KEY(g))));
     setProgress(perGame((g) => parseProgress(readStore(PROGRESS_KEY(g)))));
     setTimes(perGame((g) => parseTimes(readStore(TIMES_KEY(g)))));
     setLastPlayed(perGame((g) => parseLevel(readStore(LAST_KEY(g)))));
@@ -130,7 +133,7 @@ export default function App() {
     writeStore(LAST_KEY(game), String(idx + 1));
     setResult(null); setShowComplete(false);
     setView("game");
-    if (!seen[game]) { openRules(game); }
+    if (!seen[game]) setTutorial({ game, first: true, finish: "Começar a jogar" }); // primeira vez neste jogo
   }
 
   /** Nível resolvido: salva na hora o progresso e o tempo (mesmo que a pessoa feche o app durante a animação). */
@@ -182,11 +185,15 @@ export default function App() {
     setView("feedback");
   }
 
-  function openRules(game: RulesGame) {
-    setRulesModal(game);
-    if (!seen[game]) {
-      setSeen((s) => ({ ...s, [game]: true }));
-      writeStore(RULES_KEY[game], "1");
+  /** Abre o tutorial a pedido da pessoa (botão "?", "Como jogar", jornada ou aba Regras). */
+  function openTutorial(game: RulesGame, finish = "Continuar jogando") { setTutorial({ game, first: false, finish }); }
+  /** Fim do tutorial: no primeiro acesso, registra se foi concluído ou pulado (só para este jogo). */
+  function closeTutorial(how: "done" | "skipped" | "closed") {
+    const t = tutorial;
+    setTutorial(null);
+    if (t && (t.first || !seen[t.game]) && how !== "closed") {
+      setSeen((s) => ({ ...s, [t.game]: true }));
+      writeStore(TUTORIAL_KEY(t.game), how);
     }
   }
 
@@ -194,12 +201,12 @@ export default function App() {
 
   const inGame = !!session && view === "game";
   // O cronômetro só corre com a partida na tela e nada por cima.
-  const playing = inGame && !rulesModal && !nickModal && !showComplete;
+  const playing = inGame && !tutorial && !nickModal && !showComplete;
   const activeSession = session;
   const sessionProps = (game: RulesGame, idx: number) => ({
     active: playing,
     onMenu: () => openJourney(game),
-    onRules: () => openRules(game),
+    onRules: () => openTutorial(game),
     onWin: (ms: number) => winLevel(game, idx + 1, ms),
     onCelebrated: celebrated,
   });
@@ -219,6 +226,8 @@ export default function App() {
         ) : view === "home" ? (
           <>
             <section className="home" aria-label="Início">
+              {/* A própria arte, ampliada e desfocada, preenche a tela inteira; a arte nítida (com todos os cristais) fica por cima. */}
+              <div className="home-bg" aria-hidden="true" />
               <div className="fill sky" aria-hidden="true" />
               <div className="art">
                 <img src="/home-art.webp" width={1080} height={1244} decoding="async" alt="MindLoop — Desafie sua mente. Um cubo mágico de quebra-cabeça sobre ilhas flutuantes, com os cristais dos jogos Mini Sudoku, Zip, Tango e Patches." fetchPriority="high" />
@@ -266,7 +275,7 @@ export default function App() {
             focus={focusLevel(progress[journeyGame], lastPlayed[journeyGame])}
             justDone={arrival?.game === journeyGame ? arrival.justDone : undefined}
             justUnlocked={arrival?.game === journeyGame ? arrival.justUnlocked : undefined}
-            onBack={() => goHome(true)} onPlay={(n) => startGame(journeyGame, n - 1)} />
+            onBack={() => goHome(true)} onHelp={() => openTutorial(journeyGame, "Concluir")} onPlay={(n) => startGame(journeyGame, n - 1)} />
         ) : view === "rules" ? (
           <div className="wrap">
             <h1>Regras</h1>
@@ -276,6 +285,11 @@ export default function App() {
                   <Gem kind={g} size={28} />{GAME_META[g].name}
                 </button>
               ))}
+            </div>
+            <div className="tut-cta">
+              <Gem kind={rulesTab} size={44} />
+              <div><b>Tutorial animado do {GAME_META[rulesTab].name}</b><span>Aprenda vendo as jogadas acontecerem, passo a passo.</span></div>
+              <button type="button" className="btn cta" onClick={() => openTutorial(rulesTab, "Concluir")}>Ver tutorial</button>
             </div>
             <h2>Como jogar o {GAME_META[rulesTab].name}</h2>
             <RulesContent game={rulesTab} />
@@ -368,11 +382,9 @@ export default function App() {
         <LevelComplete result={result} onSwitch={arriveAtJourney} onClose={() => { setShowComplete(false); setResult(null); }} />
       )}
 
-      {rulesModal && (
-        <Modal title={`Como jogar o ${GAME_META[rulesModal].name}`} onClose={() => setRulesModal(null)} closeLabel="Fechar regras">
-          <RulesContent game={rulesModal} />
-          <button className="btn cta" onClick={() => setRulesModal(null)} style={{ marginTop: 16 }}>Entendi, continuar jogando</button>
-        </Modal>
+      {tutorial && (
+        <Tutorial key={`${tutorial.game}-${tutorial.first}`} game={tutorial.game} steps={TUTORIALS[tutorial.game]} first={tutorial.first}
+          finishLabel={tutorial.finish} onDone={closeTutorial} />
       )}
 
       {nickModal && (
@@ -391,7 +403,7 @@ export default function App() {
         </Modal>
       )}
 
-      {ready && view !== "feedback" && !rulesModal && !nickModal && !showComplete && (
+      {ready && view !== "feedback" && !tutorial && !nickModal && !showComplete && (
         <FeedbackFab onOpen={openFeedback} compact={view === "game" || view === "journey"} />
       )}
 

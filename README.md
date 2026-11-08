@@ -21,7 +21,8 @@ O projeto fica no OneDrive; `scripts/link-next.mjs` (rodado antes do `dev` e do 
 - **Jornada:** trilha ilustrada com 10 capítulos de 10 níveis; o 10º é o desafio do capítulo. Os níveis abrem em sequência. Ao voltar de uma vitória, o próximo nível aparece destacado; com a jornada completa, todos ficam livres e a volta é para o nível repetido.
 - **Partida (todos os jogos):** cronômetro (pausa com a aba em segundo plano), desfazer, dica com explicação, reiniciar com confirmação, regras sem perder o progresso, zoom por pinça/botões (60% a 300%), animação de conclusão no tabuleiro e tela de parabéns com tempo, recorde e progresso da jornada.
 - **Celular deitado:** a navegação vira um trilho lateral e o tabuleiro fica ao lado dos controles, do tamanho da tela.
-- **Regras:** aba própria e painel dentro de cada jogo (abre sozinho na primeira partida).
+- **Tutoriais animados:** cada jogo tem o seu, com passos curtos (explicação, demonstração animada no tabuleiro real do jogo, “Observe”), barra de passos tocável, Voltar/Próximo, Repetir animação, Recomeçar e Pular. Abre sozinho na primeira partida de cada jogo e pode ser reaberto pelo “?” ao lado do título, pelo botão “Como jogar” da partida, pela jornada e pela aba Regras.
+- **Regras:** aba própria com o texto de referência de cada jogo.
 - **Opinião** (Perfil → Dar opinião): nota e comentário anônimos, enviados ao Netlify Forms (veja abaixo).
 
 ### Os jogos
@@ -41,15 +42,17 @@ Todos os níveis têm **solução única** e se resolvem **só com lógica** —
 | `mindloop:progress:<jogo>` | 100 caracteres “0”/“1” (níveis concluídos) |
 | `mindloop:times:<jogo>` | melhor tempo (ms) de cada nível |
 | `mindloop:last:<jogo>` | último nível jogado |
-| `mindloop:rules`, `mindloop:rules-<jogo>` | regras já vistas |
+| `mindloop:tutorial:<jogo>` | tutorial já visto: `done` (até o fim) ou `skipped` (pulado) |
 | `mindloop:save` | partida de Mini Sudoku em andamento |
 
 ## Estrutura
 ```
 src/app/            layout (fontes, metadados), página e estilos globais
 src/components/     App (telas e fluxo), Journey, LevelComplete, Celebration, ZoomBoard, GameHeader,
-                    useLevelPlay (cronômetro e vitória) e um componente por jogo
-src/lib/            regras e solucionadores de cada jogo, níveis (data/), jornada, recordes, armazenamento
+                    useLevelPlay (cronômetro e vitória), um componente por jogo e tutorial/ (sistema de
+                    tutoriais: Tutorial.tsx, mini tabuleiros e os passos de cada jogo)
+src/lib/            regras e solucionadores de cada jogo, níveis (data/), jornada, recordes, armazenamento,
+                    tutorialData.ts (exemplos dos tutoriais, conferidos pelos testes contra as regras reais)
 scripts/            geradores de níveis
 public/             artes (.webp servidas pelo app; .jpg/.png originais guardados como matriz)
 ```

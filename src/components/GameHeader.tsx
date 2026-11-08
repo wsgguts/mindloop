@@ -2,12 +2,12 @@
 import Gem, { type GemKind } from "./Gem";
 import { formatTime, spokenTime } from "../lib/records";
 
-interface Props { kind: GemKind; title: string; subtitle: string; ms: number; done: boolean; children?: React.ReactNode }
+interface Props { kind: GemKind; title: string; subtitle: string; ms: number; done: boolean; children?: React.ReactNode; /** Abre o tutorial ("Como jogar"). */ onHelp?: () => void }
 
 // Cabeçalho comum das partidas: cristal + nome do nível + cronômetro.
 // O cronômetro "gruda" no topo da tela ao rolar, então fica visível durante toda a partida.
 // `children` (barra de progresso) entra no mesmo bloco: no celular deitado ele vira a coluna ao lado do tabuleiro.
-export default function GameHeader({ kind, title, subtitle, ms, done, children }: Props) {
+export default function GameHeader({ kind, title, subtitle, ms, done, children, onHelp }: Props) {
   return (
     <>
       <div className="gtimer-slot">
@@ -23,7 +23,7 @@ export default function GameHeader({ kind, title, subtitle, ms, done, children }
       </div>
       <div className="ghead">
       <div className="title game-title"><Gem kind={kind} size={48} /><div>
-        <h1>{title}</h1>
+        <h1>{title}{onHelp && <button type="button" className="ghelp" onClick={onHelp} aria-label="Como jogar: abrir o tutorial" title="Como jogar"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9.5" /><path d="M9.3 9.2a2.8 2.8 0 0 1 5.4 1c0 1.9-2.7 2.4-2.7 4" /><path d="M12 17.6h.01" /></svg></button>}</h1>
         <p className="muted">{subtitle}</p>
       </div></div>
       {children && <div className="gprogress">{children}</div>}
