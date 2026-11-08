@@ -227,7 +227,7 @@ export default function App() {
         ) : view === "home" ? (
           <>
             <section className="home" aria-label="Início">
-              <div className="fill sky" aria-hidden="true" />
+              <img className="home-bg" src="/home-art.webp" alt="" aria-hidden="true" decoding="async" />
               <div className="art">
                 <img src="/home-art.webp" width={1080} height={1244} decoding="async" alt="MindLoop — Desafie sua mente. Um cubo mágico de quebra-cabeça sobre ilhas flutuantes, com os cristais dos jogos Mini Sudoku, Zip, Tango e Patches." fetchPriority="high" />
                 {ART_SPOTS.map((s) => (
@@ -239,7 +239,6 @@ export default function App() {
                   <span aria-hidden="true">Jogar agora</span>
                 </button>
               </div>
-              <div className="fill ground" aria-hidden="true" />
             </section>
 
             <section id="jogos" className="screen games-home" aria-labelledby="jogos-title">
