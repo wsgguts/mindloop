@@ -242,8 +242,8 @@ export default function App() {
             </section>
 
             <section id="jogos" className="screen games-home" aria-labelledby="jogos-title">
-              <h1 id="jogos-title">Escolha um jogo</h1>
-              <p className="lead">{nick ? `Boa, ${nick}! ` : ""}Toque em um jogo para abrir a jornada dele.</p>
+              <h1 id="jogos-title">Escolha sua aventura</h1>
+              <p className="lead">{nick ? `Bora, ${nick}! ` : ""}Cada jornada do MindLoop é um mundo de enigmas esperando por você. Use a lógica, desafie sua mente e prove que nenhum quebra-cabeça te para!</p>
               <div className="ggrid">
                 {CARDS.map((g) => {
                   const p = progress[g.id];
