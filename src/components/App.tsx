@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState } from "react";
 import BottomNav, { type Tab } from "./BottomNav";
 import Game from "./Game";
+import FeedbackFab from "./FeedbackFab";
 import Gem, { type GemKind } from "./Gem";
 import Journey from "./Journey";
 import LevelComplete, { type LevelResult } from "./LevelComplete";
@@ -29,6 +30,10 @@ type Session = { game: RulesGame; idx: number; round: number };
 type Arrival = { game: RulesGame; justDone: number; justUnlocked?: number };
 type PerGame<T> = Record<RulesGame, T>;
 
+// Para onde o "Voltar" da tela de opinião leva (ela pode ser aberta de qualquer tela pelo botão flutuante).
+const BACK_LABEL: Record<Exclude<View, "feedback">, string> = {
+  home: "Voltar ao início", journey: "Voltar à jornada", game: "Voltar ao jogo", rules: "Voltar às regras", profile: "Voltar ao perfil",
+};
 const TAB_OF: Record<View, Tab> = { home: "home", journey: "home", game: "home", rules: "rules", profile: "profile", feedback: "profile" };
 // Chave de "já viu as regras" de cada jogo (a do Sudoku é a original, mantida por compatibilidade).
 const RULES_KEY: PerGame<string> = { sudoku: KEYS.rules, zip: "mindloop:rules-zip", tango: "mindloop:rules-tango", patches: "mindloop:rules-patches" };
@@ -70,6 +75,7 @@ export default function App() {
   const [fbStatus, setFbStatus] = useState<"idle" | "sending" | "ok" | "error">("idle");
   const [fbError, setFbError] = useState<string | null>(null);
   const [bot, setBot] = useState(""); // campo-armadilha contra robôs
+  const [fbFrom, setFbFrom] = useState<Exclude<View, "feedback">>("profile"); // tela de onde a opinião foi aberta
   const viewRef = useRef(view);
   viewRef.current = view;
   const toCards = useRef(false); // ao voltar para o Início, rolar até os cards dos jogos
@@ -167,6 +173,13 @@ export default function App() {
       setFbStatus("error");
       setFbError("Não conseguimos enviar agora. Confira a internet e tente de novo — seu texto foi mantido.");
     }
+  }
+
+  /** Abre a tela de opinião (do Perfil ou do botão flutuante); a partida em andamento fica guardada e pausada. */
+  function openFeedback() {
+    if (view !== "feedback") setFbFrom(view);
+    setRating(null); setComment(""); setFbStatus("idle"); setFbError(null); setBot("");
+    setView("feedback");
   }
 
   function openRules(game: RulesGame) {
@@ -277,7 +290,7 @@ export default function App() {
               <div className="card"><p>Você ainda não escolheu um apelido.</p><button className="btn cta" onClick={() => openNick(() => setView("profile"))}>Escolher apelido</button></div>
             )}
             <p className="muted">O apelido fica salvo só neste aparelho. Não pedimos cadastro nem outros dados.</p>
-            <button className="btn sec" onClick={() => { setRating(null); setComment(""); setFbStatus("idle"); setFbError(null); setView("feedback"); }}>Dar opinião</button>
+            <button className="btn sec" onClick={openFeedback}>Dar opinião</button>
           </div>
         ) : view === "feedback" ? (
           <form className="wrap" onSubmit={sendFeedback} noValidate>
@@ -287,7 +300,7 @@ export default function App() {
                 <div className="note ok" role="status"><b aria-hidden="true">✓</b><span>Obrigado! Sua opinião foi enviada e vai ajudar a melhorar o MindLoop.</span></div>
                 <div className="row">
                   <button type="button" className="btn cta" onClick={() => setFbStatus("idle")}>Enviar outra opinião</button>
-                  <button type="button" className="btn sec" onClick={() => setView("profile")}>Voltar ao perfil</button>
+                  <button type="button" className="btn sec" onClick={() => setView(fbFrom)}>{BACK_LABEL[fbFrom]}</button>
                 </div>
               </>
             ) : (
@@ -314,7 +327,7 @@ export default function App() {
                 {fbError && <div className="note warn" role="alert"><b aria-hidden="true">!</b><span>{fbError}</span></div>}
                 <div className="row">
                   <button className="btn cta" type="submit" disabled={fbStatus === "sending"}>{fbStatus === "sending" ? "Enviando…" : "Enviar opinião"}</button>
-                  <button type="button" className="btn sec" onClick={() => setView("profile")}>Voltar ao perfil</button>
+                  <button type="button" className="btn sec" onClick={() => setView(fbFrom)}>{BACK_LABEL[fbFrom]}</button>
                 </div>
               </>
             )}
@@ -376,6 +389,10 @@ export default function App() {
             <button className="btn cta" type="submit">Continuar</button>
           </form>
         </Modal>
+      )}
+
+      {ready && view !== "feedback" && !rulesModal && !nickModal && !showComplete && (
+        <FeedbackFab onOpen={openFeedback} compact={view === "game" || view === "journey"} />
       )}
 
       <BottomNav active={TAB_OF[view]} onChange={onTab} />

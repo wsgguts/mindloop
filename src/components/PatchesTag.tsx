@@ -26,7 +26,7 @@ interface Props { v: number | string; kind: Kind; color: string }
 
 export default function PatchesTag({ v, kind, color }: Props) {
   return (
-    <span className={`ptag k-${kind}`} style={{ "--tc": color, "--tt": textOn(color) } as React.CSSProperties}>
+    <span className={`ptag k-${kind}`} data-ink={textOn(color) === INK ? "dark" : "light"} style={{ "--tc": color, "--tt": textOn(color) } as React.CSSProperties}>
       <b>{v}</b>
     </span>
   );
