@@ -60,13 +60,15 @@ interface LevelPlayOptions {
   fxMs: number;
   /** Tempo já jogado numa partida retomada. */
   initialMs?: number;
+  /** Efeito sonoro de vitória: tocado uma única vez, no mesmo instante em que a vitória é registrada. */
+  onWinFx?: () => void;
 }
 
 /**
  * Fluxo comum de uma partida: cronômetro → vitória (tempo congelado e salvo) →
  * animação no tabuleiro (que continua visível) → tela de parabéns.
  */
-export function useLevelPlay({ active, onWin, onCelebrated, fxMs, initialMs = 0 }: LevelPlayOptions) {
+export function useLevelPlay({ active, onWin, onCelebrated, fxMs, initialMs = 0, onWinFx }: LevelPlayOptions) {
   const [won, setWon] = useState(false);
   const [finalMs, setFinalMs] = useState<number | null>(null);
   const clock = useStopwatch(active && !won, initialMs);
@@ -80,6 +82,7 @@ export function useLevelPlay({ active, onWin, onCelebrated, fxMs, initialMs = 0 
     const ms = Math.round(clock.read()); // milissegundos inteiros (salvos no aparelho)
     setFinalMs(ms);
     setWon(true);
+    onWinFx?.();
     onWin(ms);
   }
 

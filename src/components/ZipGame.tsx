@@ -3,6 +3,7 @@ import GameHeader from "./GameHeader";
 import ZoomBoard from "./ZoomBoard";
 import GameToolbar from "./GameToolbar";
 import { useLevelPlay } from "./useLevelPlay";
+import { useSfx } from "./useSound";
 import { useMemo, useRef, useState } from "react";
 import {
   type Pos, type ZipPuzzle, canStep, indexInPath, isAdjacent, isZipSolved, nextTarget, parseZip, samePos, visitedNumbers,
@@ -11,16 +12,17 @@ import {
 type Tone = "info" | "ok" | "warn" | "hint";
 const ICON: Record<Tone, string> = { info: "ℹ", ok: "✓", warn: "!", hint: "?" };
 
-interface Props { puzzle: ZipPuzzle; active: boolean; onMenu: () => void; onRules: () => void; onFeedback: () => void; onWin: (ms: number) => void; onCelebrated: () => void }
+interface Props { puzzle: ZipPuzzle; active: boolean; onMenu: () => void; onRules: () => void; onFeedback: () => void; onWin: (ms: number) => void; onCelebrated: () => void; onHint?: () => void }
 
 // Animação de conclusão: um cometa percorre o caminho do 1 ao último número, acendendo as casas na ordem.
 const DRAW_MS = 1700;
 const FX_MS = 2900;
 
-export default function ZipGame({ puzzle, active, onMenu, onRules, onFeedback, onWin, onCelebrated }: Props) {
+export default function ZipGame({ puzzle, active, onMenu, onRules, onFeedback, onWin, onCelebrated, onHint }: Props) {
   const z = useMemo(() => parseZip(puzzle.rows), [puzzle]);
   const [path, setPath] = useState<Pos[]>([z.start]);
-  const play = useLevelPlay({ active, onWin, onCelebrated, fxMs: FX_MS });
+  const sfx = useSfx("zip");
+  const play = useLevelPlay({ active, onWin, onCelebrated, fxMs: FX_MS, onWinFx: () => sfx("win", { span: DRAW_MS }) });
   const won = play.won;
   const [tip, setTip] = useState<Pos | null>(null);
   const [confirm, setConfirm] = useState(false);
@@ -34,14 +36,16 @@ export default function ZipGame({ puzzle, active, onMenu, onRules, onFeedback, o
   function step(p: Pos, fromDrag: boolean) {
     if (won) return;
     const i = indexInPath(path, p);
+    const total = z.size * z.size;
     if (i >= 0) {
-      if (i === path.length - 1) return;
-      if (i === path.length - 2 || !fromDrag) { setPath(path.slice(0, i + 1)); setTip(null); say("info", "Voltamos um trecho. Experimente outra rota."); }
+      if (i === path.length - 1) { if (!fromDrag) sfx("select"); return; } // tocou na ponta: pronto para arrastar
+      if (i === path.length - 2 || !fromDrag) { sfx("undo", { pos: (i + 1) / total }); setPath(path.slice(0, i + 1)); setTip(null); say("info", "Voltamos um trecho. Experimente outra rota."); }
       return;
     }
     const res = canStep(path, z, p);
     if (!res.ok) {
       if (fromDrag && res.reason === "longe") return;
+      sfx(res.reason === "ordem" ? "error" : "block");
       if (res.reason === "ordem") say("warn", `Calma! Ainda falta passar pelo número ${res.expected} antes deste. Quer tentar outra rota?`);
       else if (res.reason === "longe") say("info", "Escolha uma casa vizinha à ponta do caminho (sem diagonais).");
       return;
@@ -49,6 +53,7 @@ export default function ZipGame({ puzzle, active, onMenu, onRules, onFeedback, o
     const next = [...path, p];
     setPath(next); setTip(null);
     const n = z.nums[p.r][p.c];
+    if (!isZipSolved(next, z)) sfx(next.length === total ? "error" : n > 0 ? "progress" : "place", { pos: next.length / total });
     if (isZipSolved(next, z)) { play.win(); say("ok", `Caminho completo! Do 1 ao ${z.max}, passando por todas as casas.`); return; }
     if (next.length === z.size * z.size) say("warn", "Todas as casas foram usadas, mas o caminho precisa terminar no maior número. Que tal voltar e tentar outra rota?");
     else if (n > 0) say("ok", `Boa! Você alcançou o ${n}.${n === z.max ? " Agora preencha as casas que faltam." : ""}`);
@@ -68,15 +73,20 @@ export default function ZipGame({ puzzle, active, onMenu, onRules, onFeedback, o
       e.preventDefault();
       const p = { r: head.r + d[e.key][0], c: head.c + d[e.key][1] };
       if (p.r >= 0 && p.c >= 0 && p.r < z.size && p.c < z.size) step(p, false);
+      else if (!won) sfx("block");
     } else if (e.key === "Backspace" || e.key === "Delete") { e.preventDefault(); undo(); }
   }
 
   function undo() {
-    if (path.length < 2 || won) return say("info", "Ainda não há nada para desfazer.");
+    if (path.length < 2 || won) { sfx("block"); return say("info", "Ainda não há nada para desfazer."); }
+    sfx("undo", { pos: (path.length - 1) / (z.size * z.size) });
     setPath(path.slice(0, -1)); setTip(null); say("info", "Último passo desfeito.");
   }
-  function restart() { setPath([z.start]); setTip(null); setConfirm(false); say("info", "Caminho reiniciado. Vamos de novo?"); }
+  function restart() { sfx("undo", { pos: 0 }); setPath([z.start]); setTip(null); setConfirm(false); say("info", "Caminho reiniciado. Vamos de novo?"); }
   function hint() {
+    if (won) return;
+    sfx("hint");
+    onHint?.();
     const t = nextTarget(path, z);
     if (!t) return say("hint", "Todos os números já foram alcançados. Falta preencher as casas restantes e terminar no maior número.");
     setTip(t.pos);
@@ -155,13 +165,14 @@ export default function ZipGame({ puzzle, active, onMenu, onRules, onFeedback, o
           main={[
           { label: "Desfazer", icon: "undo", onClick: undo, disabled: path.length < 2 },
           { label: "Dica", icon: "hint", onClick: hint },
-          { label: "Reiniciar", icon: "restart", onClick: () => (path.length > 1 ? setConfirm(true) : restart()) },
+          { label: "Reiniciar", icon: "restart", onClick: () => { if (path.length > 1) { sfx("ui"); setConfirm(true); } else restart(); } },
           { label: "Ajuda", ariaLabel: "Como jogar", icon: "help", onClick: onRules },
           ]}
           more={[
           { label: "Níveis", icon: "levels", onClick: onMenu },
           { label: "Dar opinião", icon: "feedback", onClick: onFeedback },
           ]}
+          game="zip"
         />
       )}
       </div>

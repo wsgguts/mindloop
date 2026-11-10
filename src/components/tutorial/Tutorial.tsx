@@ -1,6 +1,7 @@
 "use client";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import Gem from "../Gem";
+import { useSfx } from "../useSound";
 import { GAME_META } from "../../lib/games";
 import type { JourneyGame } from "../../lib/journey";
 
@@ -137,7 +138,8 @@ export default function Tutorial({ game, steps, first, finishLabel = "Concluir",
   done.current = onDone;
   const { name, color } = GAME_META[game];
 
-  const go = (k: number) => { setI(Math.max(0, Math.min(steps.length - 1, k))); setPlay((p) => p + 1); };
+  const sfx = useSfx(game);
+  const go = (k: number) => { if (k !== i) sfx("ui"); setI(Math.max(0, Math.min(steps.length - 1, k))); setPlay((p) => p + 1); };
   const finish = () => done.current("done");
   const leave = () => done.current(first ? "skipped" : "closed");
 
@@ -145,6 +147,7 @@ export default function Tutorial({ game, steps, first, finishLabel = "Concluir",
   useEffect(() => {
     const prev = document.activeElement as HTMLElement | null;
     box.current?.focus({ preventScroll: true });
+    sfx("ui"); // tutorial abriu
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") { e.preventDefault(); leave(); }
       if (e.key === "Tab" && box.current) {

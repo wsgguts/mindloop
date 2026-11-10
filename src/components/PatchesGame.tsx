@@ -3,6 +3,7 @@ import GameHeader from "./GameHeader";
 import ZoomBoard from "./ZoomBoard";
 import GameToolbar from "./GameToolbar";
 import { useLevelPlay } from "./useLevelPlay";
+import { useSfx } from "./useSound";
 import PatchesTag, { KIND_HELP, KIND_NAME } from "./PatchesTag";
 import { useMemo, useRef, useState } from "react";
 import {
@@ -14,7 +15,7 @@ import {
 type Tone = "info" | "ok" | "warn" | "hint";
 const ICON: Record<Tone, string> = { info: "ℹ", ok: "✓", warn: "!", hint: "?" };
 
-interface Props { puzzle: PatchesPuzzle; active: boolean; onMenu: () => void; onRules: () => void; onFeedback: () => void; onWin: (ms: number) => void; onCelebrated: () => void }
+interface Props { puzzle: PatchesPuzzle; active: boolean; onMenu: () => void; onRules: () => void; onFeedback: () => void; onWin: (ms: number) => void; onCelebrated: () => void; onHint?: () => void }
 
 // Animação de conclusão: as peças "encaixam" em onda, os números brilham e a moldura acende.
 const FX_MS = 3000;
@@ -58,7 +59,7 @@ function hintText(d: Deduction, clues: Clue[]): string {
   }
 }
 
-export default function PatchesGame({ puzzle, active, onMenu, onRules, onFeedback, onWin, onCelebrated }: Props) {
+export default function PatchesGame({ puzzle, active, onMenu, onRules, onFeedback, onWin, onCelebrated, onHint }: Props) {
   const board = useMemo(() => parsePatches(puzzle.raw), [puzzle]);
   const { n, clues } = board;
   const total = n * n;
@@ -69,7 +70,9 @@ export default function PatchesGame({ puzzle, active, onMenu, onRules, onFeedbac
   const [preview, setPreview] = useState<Rect | null>(null); // peça sendo arrastada
   const [cursor, setCursor] = useState<Cell | null>(null); // casa do teclado
   const [tip, setTip] = useState<{ rect?: Rect; cell?: Cell; clue?: number; wrong?: boolean } | null>(null);
-  const play = useLevelPlay({ active, onWin, onCelebrated, fxMs: FX_MS });
+  const sfx = useSfx("patches");
+  // Na vitória, um "clac" por peça acompanha a onda de encaixe da animação.
+  const play = useLevelPlay({ active, onWin, onCelebrated, fxMs: FX_MS, onWinFx: () => sfx("win", { count: clues.length, span: WAVE_MS }) });
   const won = play.won;
   const [confirm, setConfirm] = useState(false);
   const [msg, setMsg] = useState<{ tone: Tone; text: string }>({ tone: "info", text: "Arraste de um canto ao canto oposto para desenhar uma peça — ou toque num canto e depois no outro." });
@@ -100,6 +103,8 @@ export default function PatchesGame({ puzzle, active, onMenu, onRules, onFeedbac
     commit(next);
     if (isPatchesSolved(board, next)) { setAnchor(null); setCursor(null); play.win(); say("ok", "Grade completa! Cada peça tem um número, o tamanho e o formato certos."); return; }
     const prob = pieceProblem(board, q);
+    // Peça certa = região concluída ("clac" + confirmação); peça errada = encaixe abafado + aviso discreto.
+    sfx(prob ? "error" : coveredCount(next) === total ? "place" : "complete", { count: area(q) });
     const out = replaced ? ` (${replaced === 1 ? "a peça que estava ali saiu" : `${replaced} peças que estavam ali saíram`})` : "";
     if (prob) return say("warn", `${problemText(prob)} Toque na peça para tirá-la ou desenhe outra por cima.`);
     const c = coveredCount(next);
@@ -109,6 +114,7 @@ export default function PatchesGame({ puzzle, active, onMenu, onRules, onFeedbac
 
   function remove(q: Rect) {
     if (won) return;
+    sfx("undo");
     commit(pieces.filter((p) => p !== q));
     say("info", `Peça de ${area(q)} casas retirada. Desenhe outra no lugar.`);
   }
@@ -118,11 +124,12 @@ export default function PatchesGame({ puzzle, active, onMenu, onRules, onFeedbac
     if (won) return;
     if (anchor) {
       setAnchor(null);
-      if (sameCell(anchor, p)) return say("info", "Canto desmarcado.");
+      if (sameCell(anchor, p)) { sfx("erase"); return say("info", "Canto desmarcado."); }
       return place(rectFrom(anchor, p));
     }
     const q = pieceAt(pieces, p[0], p[1]);
     if (q) return remove(q);
+    sfx("select");
     setAnchor(p); setTip(null);
     say("info", `Canto marcado na ${at(p)}. Agora toque no canto oposto da peça (toque de novo no mesmo canto para desmarcar).`);
   }
@@ -165,17 +172,20 @@ export default function PatchesGame({ puzzle, active, onMenu, onRules, onFeedbac
     if (move[e.key]) {
       e.preventDefault();
       const [dr, dc] = move[e.key];
-      setCursor([Math.min(n - 1, Math.max(0, from[0] + dr)), Math.min(n - 1, Math.max(0, from[1] + dc))]);
+      const to: Cell = [Math.min(n - 1, Math.max(0, from[0] + dr)), Math.min(n - 1, Math.max(0, from[1] + dc))];
+      sfx(cursor && sameCell(to, from) ? "block" : "select");
+      setCursor(to);
     } else if (e.key === "Enter" || e.key === " ") { e.preventDefault(); tapCell(from); setCursor(from); }
     else if (e.key === "Backspace" || e.key === "Delete") {
       e.preventDefault();
       const q = pieceAt(pieces, from[0], from[1]);
-      if (q) remove(q); else say("info", "Não há peça nessa casa.");
-    } else if (e.key === "Escape" && anchor) { setAnchor(null); say("info", "Canto desmarcado."); }
+      if (q) remove(q); else { sfx("block"); say("info", "Não há peça nessa casa."); }
+    } else if (e.key === "Escape" && anchor) { sfx("erase"); setAnchor(null); say("info", "Canto desmarcado."); }
   }
 
   function undo() {
-    if (!history.length || won) return say("info", "Ainda não há nada para desfazer.");
+    if (!history.length || won) { sfx("block"); return say("info", "Ainda não há nada para desfazer."); }
+    sfx("undo");
     setPieces(history[history.length - 1]);
     setHistory(history.slice(0, -1));
     setTip(null); setAnchor(null);
@@ -183,12 +193,15 @@ export default function PatchesGame({ puzzle, active, onMenu, onRules, onFeedbac
   }
 
   function restart() {
+    sfx("undo");
     setPieces([]); setHistory([]); setAnchor(null); setTip(null); setConfirm(false);
     say("info", "Grade limpa. Vamos de novo?");
   }
 
   function hint() {
     if (won) return;
+    sfx("hint");
+    onHint?.();
     setAnchor(null);
     if (problems.length) {
       const p = problems[0];
@@ -299,13 +312,14 @@ export default function PatchesGame({ puzzle, active, onMenu, onRules, onFeedbac
             main={[
             { label: "Desfazer", icon: "undo", onClick: undo, disabled: !history.length },
             { label: "Dica", icon: "hint", onClick: hint },
-            { label: "Reiniciar", icon: "restart", onClick: () => (pieces.length ? setConfirm(true) : restart()) },
+            { label: "Reiniciar", icon: "restart", onClick: () => { if (pieces.length) { sfx("ui"); setConfirm(true); } else restart(); } },
             { label: "Ajuda", ariaLabel: "Como jogar", icon: "help", onClick: onRules },
             ]}
             more={[
             { label: "Níveis", icon: "levels", onClick: onMenu },
             { label: "Dar opinião", icon: "feedback", onClick: onFeedback },
             ]}
+            game="patches"
           />
         )}
       </div>

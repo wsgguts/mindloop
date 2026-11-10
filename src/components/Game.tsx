@@ -3,6 +3,8 @@ import GameHeader from "./GameHeader";
 import ZoomBoard from "./ZoomBoard";
 import GameToolbar from "./GameToolbar";
 import { useLevelPlay } from "./useLevelPlay";
+import { useSfx } from "./useSound";
+import { sudokuUnitsDone } from "../lib/sound/progress";
 import { useMemo, useRef, useState } from "react";
 import type { Puzzle } from "../lib/puzzles";
 import { puzzleGrid } from "../lib/puzzles";
@@ -29,12 +31,14 @@ interface Props {
   onRules: () => void; onFeedback: () => void;
   onWin: (ms: number) => void;
   onCelebrated: () => void;
+  /** Avisado a cada dica pedida (estatísticas e conquistas). */
+  onHint?: () => void;
 }
 
 // Duração da animação de conclusão: linhas → colunas → blocos → brilho geral.
 const FX_MS = 3100;
 
-export default function Game({ puzzle, initialGrid, initialMs = 0, active, onSave, onMenu, onRules, onFeedback, onWin, onCelebrated }: Props) {
+export default function Game({ puzzle, initialGrid, initialMs = 0, active, onSave, onMenu, onRules, onFeedback, onWin, onCelebrated, onHint }: Props) {
   const givens = useMemo(() => puzzleGrid(puzzle), [puzzle]);
   const N = givens.length;
   const [bh, bw] = boxDims(N);
@@ -47,7 +51,8 @@ export default function Game({ puzzle, initialGrid, initialMs = 0, active, onSav
   const [confirm, setConfirm] = useState<null | "restart" | "end">(null);
   const [msg, setMsg] = useState<{ tone: Tone; text: string }>({ tone: "info", text: "Vamos descobrir o próximo passo? Toque numa casa vazia." });
   const boardRef = useRef<HTMLDivElement>(null);
-  const play = useLevelPlay({ active: active && !paused, onWin, onCelebrated, fxMs: FX_MS, initialMs });
+  const sfx = useSfx("sudoku");
+  const play = useLevelPlay({ active: active && !paused, onWin, onCelebrated, fxMs: FX_MS, initialMs, onWinFx: () => sfx("win") });
   const won = play.won;
 
   const say = (tone: Tone, text: string) => setMsg({ tone, text });
@@ -60,6 +65,9 @@ export default function Game({ puzzle, initialGrid, initialMs = 0, active, onSav
     if (isSolved(next)) { onSave(null); play.win(); say("ok", "Grade completa! Todas as linhas, colunas e blocos fecharam."); return; }
     onSave(next, play.read());
     const kinds = conflictsAt(next, r, c);
+    // Um som por jogada: limpar, erro, região fechada ou número colocado.
+    const units = next[r][c] && !kinds.length ? sudokuUnitsDone(next, r, c) : 0;
+    sfx(next[r][c] === 0 ? "erase" : kinds.length || isFull(next) ? "error" : units ? "complete" : "place", { v: next[r][c], count: units });
     if (next[r][c] === 0) say("info", "Casa limpa. Observe as pistas e tente outra opção.");
     else if (kinds.length) say("warn", `Esse número já aparece ${WHERE[kinds[0]]}. Quer tentar outra opção?`);
     else if (isFull(next)) say("warn", "A grade está cheia, mas ainda há números repetidos. Observe as casas marcadas com “!”.");
@@ -68,16 +76,17 @@ export default function Game({ puzzle, initialGrid, initialMs = 0, active, onSav
 
   function enter(v: number) {
     if (paused || won) return;
-    if (!sel) return say("info", "Escolha uma casa primeiro. Toque numa casa vazia da grade.");
+    if (!sel) { sfx("block"); return say("info", "Escolha uma casa primeiro. Toque numa casa vazia da grade."); }
     const { r, c } = sel;
-    if (isGiven(r, c)) return say("info", "Essa é uma pista fixa e não pode ser alterada. Experimente uma casa vazia.");
+    if (isGiven(r, c)) { sfx("block"); return say("info", "Essa é uma pista fixa e não pode ser alterada. Experimente uma casa vazia."); }
     if (grid[r][c] === v) return;
     commit(setCell(grid, r, c, v), r, c, grid[r][c]);
   }
 
   function undo() {
-    if (!history.length || paused || won) return say("info", "Ainda não há nada para desfazer.");
+    if (!history.length || paused || won) { sfx("block"); return say("info", "Ainda não há nada para desfazer."); }
     const last = history[history.length - 1];
+    sfx("undo");
     const next = setCell(grid, last.r, last.c, last.prev);
     setHistory(history.slice(0, -1));
     setGrid(next); setTip(null); setSel({ r: last.r, c: last.c }); onSave(next, play.read());
@@ -86,6 +95,7 @@ export default function Game({ puzzle, initialGrid, initialMs = 0, active, onSav
 
   function restart() {
     const fresh = cloneGrid(givens);
+    sfx("undo");
     setGrid(fresh); setHistory([]); setSel(null); setTip(null); setConfirm(null); setPaused(false);
     onSave(fresh, play.read());
     say("info", "Puzzle restaurado ao início. Vamos de novo?");
@@ -95,6 +105,8 @@ export default function Game({ puzzle, initialGrid, initialMs = 0, active, onSav
     if (paused || won) return;
     const h = findHintCell(grid);
     if (!h) return;
+    sfx("hint");
+    onHint?.();
     for (let r = 0; r < N; r++) for (let c = 0; c < N; c++)
       if (conflictsAt(grid, r, c).length) { setTip(null); return say("hint", "Há números repetidos marcados com “!”. Que tal resolver isso primeiro?"); }
     setTip({ r: h.r, c: h.c }); setSel({ r: h.r, c: h.c });
@@ -112,6 +124,7 @@ export default function Game({ puzzle, initialGrid, initialMs = 0, active, onSav
       const [dr, dc] = move[e.key];
       const from = sel ?? { r: 0, c: 0 };
       const next = { r: Math.min(N - 1, Math.max(0, from.r + dr)), c: Math.min(N - 1, Math.max(0, from.c + dc)) };
+      sfx(next.r === from.r && next.c === from.c && sel ? "block" : "select");
       setSel(next);
       boardRef.current?.querySelector<HTMLButtonElement>(`[data-rc="${next.r}-${next.c}"]`)?.focus();
     } else if (/^[1-9]$/.test(e.key) && Number(e.key) <= N) enter(Number(e.key));
@@ -136,7 +149,7 @@ export default function Game({ puzzle, initialGrid, initialMs = 0, active, onSav
         <div className="paused">
           <h2>Jogo pausado</h2>
           <p className="muted">A grade fica escondida até você voltar.</p>
-          <button className="btn" onClick={() => setPaused(false)}>Retomar</button>
+          <button className="btn" onClick={() => { sfx("ui"); setPaused(false); }}>Retomar</button>
         </div>
       ) : (
         <>
@@ -154,7 +167,7 @@ export default function Game({ puzzle, initialGrid, initialMs = 0, active, onSav
                 <button key={`${r}-${c}`} data-rc={`${r}-${c}`} role="gridcell" className={cls} aria-label={label}
                   style={{ "--r": r, "--c": c, "--b": Math.floor(r / bh) * (N / bw) + Math.floor(c / bw) } as React.CSSProperties}
                   aria-pressed={isSel} tabIndex={isSel || (!sel && r === 0 && c === 0) ? 0 : -1}
-                  onClick={() => { setSel({ r, c }); if (g) say("info", "Essa é uma pista fixa. Use as pistas para descobrir as casas vazias."); }}>
+                  onClick={() => { if (!won) sfx("select"); setSel({ r, c }); if (g) say("info", "Essa é uma pista fixa. Use as pistas para descobrir as casas vazias."); }}>
                   {v || ""}
                 </button>
               );
@@ -193,8 +206,8 @@ export default function Game({ puzzle, initialGrid, initialMs = 0, active, onSav
           main={[
           { label: "Desfazer", icon: "undo", onClick: undo, disabled: !history.length || paused },
           { label: "Dica", icon: "hint", onClick: hint, disabled: paused },
-          { label: paused ? "Retomar" : "Pausar", icon: paused ? "play" : "pause", onClick: () => setPaused((p) => !p) },
-          { label: "Reiniciar", icon: "restart", onClick: () => setConfirm("restart") },
+          { label: paused ? "Retomar" : "Pausar", icon: paused ? "play" : "pause", onClick: () => { sfx("ui"); setPaused((p) => !p); } },
+          { label: "Reiniciar", icon: "restart", onClick: () => { sfx("ui"); setConfirm("restart"); } },
           ]}
           more={[
           { label: "Como jogar", icon: "help", onClick: onRules },
@@ -202,6 +215,7 @@ export default function Game({ puzzle, initialGrid, initialMs = 0, active, onSav
           { label: "Dar opinião", icon: "feedback", onClick: onFeedback },
           { label: "Encerrar", icon: "end", onClick: () => setConfirm("end") },
           ]}
+          game="sudoku"
         />
       )}
       </div>

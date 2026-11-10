@@ -1,9 +1,13 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import SoundControls from "./SoundControls";
+import { useSfx } from "./useSound";
+import type { SoundGame } from "../lib/sound/themes";
 
 // Barra de ferramentas única das partidas (os 4 jogos usam a mesma).
 // As ações principais ficam sempre à vista, com ícone + rótulo curto e área de toque grande;
 // as demais (como jogar, níveis, opinião, encerrar…) ficam no menu "Mais", que abre para cima.
+// O menu "Mais" também traz o controle de som (ligar/desligar + volume), sem sair da partida.
 // Assim nada flutua sobre o tabuleiro ou sobre os botões do jogo.
 
 export type ToolIcon = "undo" | "hint" | "restart" | "pause" | "play" | "help" | "levels" | "feedback" | "end" | "more";
@@ -25,9 +29,15 @@ export const Icon = ({ name, size = 22 }: { name: ToolIcon; size?: number }) => 
   <svg viewBox="0 0 24 24" width={size} height={size} aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">{PATHS[name]}</svg>
 );
 
-export default function GameToolbar({ main, more }: { main: ToolAction[]; more: ToolAction[] }) {
+export default function GameToolbar({ main, more, game }: { main: ToolAction[]; more: ToolAction[]; game?: SoundGame }) {
   const [open, setOpen] = useState(false);
+  const sfx = useSfx(game);
   const box = useRef<HTMLDivElement>(null);
+  // O menu abre para cima: limita a altura ao espaço que existe acima da barra (celular deitado), rolando se precisar.
+  useLayoutEffect(() => {
+    const menu = box.current?.querySelector<HTMLElement>(".gmenu");
+    if (open && menu && box.current) menu.style.maxHeight = `${Math.max(150, Math.floor(box.current.getBoundingClientRect().top) - 12)}px`;
+  }, [open]);
   useEffect(() => {
     if (!open) return;
     const close = (e: Event) => { if (!box.current?.contains(e.target as Node)) setOpen(false); };
@@ -45,16 +55,19 @@ export default function GameToolbar({ main, more }: { main: ToolAction[]; more: 
           <Icon name={a.icon} /><span>{a.label}</span>
         </button>
       ))}
-      <button type="button" className={`gtool${open ? " on" : ""}`} onClick={() => setOpen((o) => !o)} aria-expanded={open} aria-haspopup="menu" aria-label="Mais opções">
+      <button type="button" className={`gtool${open ? " on" : ""}`} onClick={() => { if (!open) sfx("ui"); setOpen((o) => !o); }} aria-expanded={open} aria-haspopup="menu" aria-label="Mais opções">
         <Icon name="more" /><span>Mais</span>
       </button>
       {open && (
-        <div className="gmenu" role="menu">
+        <div className="gmenu">
+          <SoundControls compact />
+          <div className="gmenu-items" role="menu" aria-label="Mais opções">
           {more.map((a) => (
             <button key={a.label} type="button" role="menuitem" disabled={a.disabled} onClick={() => { setOpen(false); a.onClick(); }}>
               <Icon name={a.icon} size={20} /><span>{a.label}</span>
             </button>
           ))}
+          </div>
         </div>
       )}
     </div>

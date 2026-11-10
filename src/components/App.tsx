@@ -5,11 +5,20 @@ import Game from "./Game";
 import FeedbackFab from "./FeedbackFab";
 import Gem, { type GemKind } from "./Gem";
 import Journey from "./Journey";
-import LevelComplete, { type LevelResult } from "./LevelComplete";
+import LevelComplete, { type LeaveTo, type LevelResult } from "./LevelComplete";
 import Modal from "./Modal";
+import AchievementToast from "./AchievementToast";
+import Achievements from "./Achievements";
+import Ranking from "./Ranking";
+import Stats from "./Stats";
+import { ACH_KEY, type Achievement, type Unlocked, evaluate, parseUnlocked } from "../lib/achievements";
+import { HISTORY_KEY, type PlayerLog, addMatch, emptyLog, importLegacy, matchId, parseLog, startMatch } from "../lib/history";
+import { RANK_KEY, type RankIdentity, parseIdentity, rankingConfig, syncGame } from "../lib/ranking";
 import { RulesContent, type RulesGame } from "./Rules";
 import { TUTORIALS, Tutorial } from "./tutorial";
 import PatchesGame from "./PatchesGame";
+import SoundControls from "./SoundControls";
+import { initSound } from "../lib/sound/engine";
 import TangoGame from "./TangoGame";
 import ZipGame from "./ZipGame";
 import { COMMENT_MAX, submitFeedback, validateFeedback } from "../lib/feedback";
@@ -24,7 +33,7 @@ import { PATCHES_PUZZLES } from "../lib/patches";
 import { TANGO_PUZZLES } from "../lib/tango";
 import { ZIP_PUZZLES } from "../lib/zip";
 
-type View = "home" | "journey" | "game" | "rules" | "profile" | "feedback";
+type View = "home" | "journey" | "game" | "rules" | "profile" | "feedback" | "ranking" | "achievements";
 type Save = { id: string; grid: Grid; ms?: number };
 type Session = { game: RulesGame; idx: number; round: number };
 /** Volta à trilha logo após uma vitória: qual nível animar como concluído e qual como recém-liberado. */
@@ -34,8 +43,9 @@ type PerGame<T> = Record<RulesGame, T>;
 // Para onde o "Voltar" da tela de opinião leva (ela pode ser aberta de qualquer tela pelo botão flutuante).
 const BACK_LABEL: Record<Exclude<View, "feedback">, string> = {
   home: "Voltar ao início", journey: "Voltar à jornada", game: "Voltar ao jogo", rules: "Voltar às regras", profile: "Voltar ao perfil",
+  ranking: "Voltar ao ranking", achievements: "Voltar às conquistas",
 };
-const TAB_OF: Record<View, Tab> = { home: "home", journey: "home", game: "home", rules: "rules", profile: "profile", feedback: "profile" };
+const TAB_OF: Record<View, Tab> = { home: "home", journey: "home", game: "home", rules: "rules", profile: "profile", feedback: "profile", ranking: "ranking", achievements: "achievements" };
 // Chave de "já viu as regras" de cada jogo (a do Sudoku é a original, mantida por compatibilidade).
 // Tutorial de cada jogo: "done" (visto até o fim) ou "skipped" (pulado). Independente por jogo.
 const TUTORIAL_KEY = (g: RulesGame) => `mindloop:tutorial:${g}`;
@@ -79,18 +89,43 @@ export default function App() {
   const [fbError, setFbError] = useState<string | null>(null);
   const [bot, setBot] = useState(""); // campo-armadilha contra robôs
   const [fbFrom, setFbFrom] = useState<Exclude<View, "feedback">>("profile"); // tela de onde a opinião foi aberta
+  // Histórico central de partidas, conquistas e ranking (todos alimentados pelo mesmo evento de vitória).
+  const [log, setLog] = useState<PlayerLog>(emptyLog);
+  const [unlocked, setUnlocked] = useState<Unlocked>({});
+  const [toasts, setToasts] = useState<Achievement[]>([]); // fila de medalhas novas (uma por vez, fora da partida)
+  const [winMedals, setWinMedals] = useState<Achievement[]>([]); // medalhas da vitória atual (tela de parabéns)
+  const [newMedals, setNewMedals] = useState(0); // selo na aba Conquistas
+  const [rankId, setRankId] = useState<RankIdentity | null>(null);
+  const logRef = useRef(log);
+  logRef.current = log;
+  const hintsRef = useRef(0); // dicas pedidas na partida atual
+  const sessionWon = useRef(false); // a partida atual já foi vencida (para "Sem Desistir")
   const viewRef = useRef(view);
   viewRef.current = view;
   const toCards = useRef(false); // ao voltar para o Início, rolar até os cards dos jogos
 
   useEffect(() => {
+    initSound(); // prepara o áudio; nada toca antes do primeiro toque/clique da pessoa
     const n = readStore(KEYS.nick) ?? "";
     if (n && !validateNick(n)) setNick(n);
     setSeen(perGame((g) => !!readStore(TUTORIAL_KEY(g))));
-    setProgress(perGame((g) => parseProgress(readStore(PROGRESS_KEY(g)))));
-    setTimes(perGame((g) => parseTimes(readStore(TIMES_KEY(g)))));
+    const prog = perGame((g) => parseProgress(readStore(PROGRESS_KEY(g))));
+    const tms = perGame((g) => parseTimes(readStore(TIMES_KEY(g))));
+    setProgress(prog);
+    setTimes(tms);
     setLastPlayed(perGame((g) => parseLevel(readStore(LAST_KEY(g)))));
     try { const s = readStore(KEYS.save); if (s) setSave(JSON.parse(s) as Save); } catch { /* ignora */ }
+    // Histórico: na primeira abertura desta versão, os recordes já salvos viram registros importados.
+    let lg = parseLog(readStore(HISTORY_KEY));
+    if (!lg) { lg = importLegacy(tms); writeStore(HISTORY_KEY, JSON.stringify(lg)); }
+    setLog(lg);
+    // Conquistas: se ainda não existiam, as já merecidas são registradas em silêncio (sem enxurrada de avisos).
+    const stored = parseUnlocked(readStore(ACH_KEY));
+    const ev = evaluate({ log: lg, progress: prog }, stored ?? {}, Date.now());
+    setUnlocked(ev.unlocked);
+    if (!stored || ev.fresh.length) writeStore(ACH_KEY, JSON.stringify(ev.unlocked));
+    if (stored && ev.fresh.length) setToasts(ev.fresh);
+    setRankId(parseIdentity(readStore(RANK_KEY)));
     setReady(true);
   }, []);
 
@@ -118,6 +153,8 @@ export default function App() {
     then?.();
   }
   function onTab(t: Tab) { setView(t); }
+  // Ver a aba Conquistas zera o selo de medalhas novas.
+  useEffect(() => { if (view === "achievements") setNewMedals(0); }, [view]);
   function goHome(cards = false) { toCards.current = cards; setView("home"); if (cards && view === "home") document.getElementById("jogos")?.scrollIntoView({ behavior: "smooth", block: "start" }); }
 
   /** Card, nome, arte ou "Jogar agora" de um jogo: abre a jornada dele (pedindo o apelido na primeira vez). */
@@ -127,16 +164,31 @@ export default function App() {
   }
   function openJourney(game: RulesGame) { setJourneyGame(game); setArrival(null); setView("journey"); }
 
-  function startGame(game: RulesGame, idx: number) {
+  const saveLog = (l: PlayerLog) => { logRef.current = l; setLog(l); writeStore(HISTORY_KEY, JSON.stringify(l)); };
+
+  /**
+   * Abre um nível. `fromCelebration`: chamado pelo "Continuar" da tela de parabéns, que ainda cobre a tela —
+   * ela continua montada e se desfaz sozinha por cima do novo nível (o cronômetro só começa depois).
+   */
+  function startGame(game: RulesGame, idx: number, fromCelebration = false) {
+    // Partida anterior deixada sem terminar (a do Mini Sudoku guardada para depois não conta como abandono).
+    const kept = session?.game === "sudoku" && save?.id === PUZZLES[session.idx].id;
+    saveLog(startMatch(logRef.current, game, !!session && !sessionWon.current && !kept));
+    hintsRef.current = 0;
+    sessionWon.current = false;
     setSession((s) => ({ game, idx, round: (s?.round ?? 0) + 1 }));
     setLastPlayed((l) => ({ ...l, [game]: idx + 1 }));
     writeStore(LAST_KEY(game), String(idx + 1));
-    setResult(null); setShowComplete(false);
+    if (!fromCelebration) { setResult(null); setShowComplete(false); }
     setView("game");
     if (!seen[game]) setTutorial({ game, first: true, finish: "Começar a jogar" }); // primeira vez neste jogo
   }
 
-  /** Nível resolvido: salva na hora o progresso e o tempo (mesmo que a pessoa feche o app durante a animação). */
+  /**
+   * Nível resolvido — o ÚNICO ponto de registro de uma vitória. Salva na hora (mesmo que a pessoa feche o app
+   * durante a animação) e, a partir do mesmo evento: progresso da jornada → recorde → histórico/médias →
+   * conquistas → ranking. useLevelPlay garante uma chamada por partida, então nada é contado duas vezes.
+   */
   function winLevel(game: RulesGame, level: number, ms: number) {
     const before = progress[game];
     const after = markDone(before, level); // repetir um nível não altera nada do histórico
@@ -148,16 +200,38 @@ export default function App() {
     setLastPlayed((l) => ({ ...l, [game]: level }));
     writeStore(LAST_KEY(game), String(level));
     setResult({ game, level, ms, best: t.best, previous: t.previous, isRecord: t.isRecord, before, after });
+
+    const at = Date.now();
+    sessionWon.current = true;
+    const lg = addMatch(logRef.current, { id: matchId(game, level, at), game, level, ms, at, hints: hintsRef.current, first: !isDone(before, level), record: t.isRecord });
+    saveLog(lg);
+    const ev = evaluate({ log: lg, progress: { ...progress, [game]: after } }, unlocked, at);
+    setWinMedals(ev.fresh);
+    if (ev.fresh.length) {
+      setUnlocked(ev.unlocked);
+      writeStore(ACH_KEY, JSON.stringify(ev.unlocked));
+      setNewMedals((n) => n + ev.fresh.length);
+    }
+    // Ranking online: reenvia os melhores tempos do jogo (o servidor guarda só o melhor de cada nível).
+    if (rankId && rankingConfig()) syncGame(rankId, game, t.times).catch(() => { /* tenta de novo ao abrir o ranking */ });
   }
+
+  function saveRankId(id: RankIdentity | null) { setRankId(id); writeStore(RANK_KEY, id ? JSON.stringify(id) : null); }
   /** A animação no tabuleiro terminou: mostra a tela de parabéns (se a pessoa ainda está na partida). */
   function celebrated() {
-    if (viewRef.current === "game") setShowComplete(true);
-    else setResult(null);
+    if (viewRef.current === "game") setShowComplete(true); // as medalhas novas aparecem na própria tela de parabéns
+    else { setResult(null); setToasts((q) => [...q, ...winMedals]); setWinMedals([]); } // saiu antes: avisa fora da partida
   }
-  /** Com a tela de parabéns cobrindo tudo, troca para a jornada do jogo, já no nível certo. */
-  function arriveAtJourney() {
+  /**
+   * Com a tela de parabéns cobrindo tudo, troca o que está por baixo:
+   * - "next" (tocou em Continuar): abre o próximo nível da jornada;
+   * - "journey" (temporizador terminou) ou último nível: volta para a jornada, já no nível certo.
+   */
+  function leaveCelebration(to: LeaveTo) {
     if (!result) return;
     const { game, level, before } = result;
+    if (to === "next" && level < LEVELS_PER_GAME) return startGame(game, level, true); // idx do próximo = level
+    if (to === "achievements") return openAchievements();
     const firstTime = !isDone(before, level);
     setJourneyGame(game);
     setView("journey");
@@ -210,7 +284,10 @@ export default function App() {
     onFeedback: openFeedback,
     onWin: (ms: number) => winLevel(game, idx + 1, ms),
     onCelebrated: celebrated,
+    onHint: () => { hintsRef.current += 1; },
   });
+  const achCtx = { log, progress };
+  function openAchievements() { setToasts([]); setView("achievements"); }
 
   return (
     <>
@@ -301,9 +378,19 @@ export default function App() {
             ) : (
               <div className="card"><p>Você ainda não escolheu um apelido.</p><button className="btn cta" onClick={() => openNick(() => setView("profile"))}>Escolher apelido</button></div>
             )}
-            <p className="muted">O apelido fica salvo só neste aparelho. Não pedimos cadastro nem outros dados.</p>
+            <p className="muted">O apelido fica salvo só neste aparelho. Não pedimos cadastro nem outros dados. Participar do ranking online é opcional (aba Ranking).</p>
+            <Stats log={log} progress={progress} />
+            <section className="card" aria-labelledby="snd-title">
+              <h2 id="snd-title">Sons</h2>
+              <SoundControls />
+              <p className="muted">Efeitos curtos que respondem às suas jogadas. A escolha fica salva neste aparelho e também pode ser mudada durante a partida, no menu “Mais”.</p>
+            </section>
             <button className="btn sec" onClick={openFeedback}>Dar opinião</button>
           </div>
+        ) : view === "ranking" ? (
+          <Ranking nick={nick} times={times} me={rankId} onIdentity={saveRankId} />
+        ) : view === "achievements" ? (
+          <Achievements ctx={achCtx} unlocked={unlocked} />
         ) : view === "feedback" ? (
           <form className="wrap" onSubmit={sendFeedback} noValidate>
             <h1>Sua opinião</h1>
@@ -377,7 +464,14 @@ export default function App() {
       </main>
 
       {result && showComplete && (
-        <LevelComplete result={result} onSwitch={arriveAtJourney} onClose={() => { setShowComplete(false); setResult(null); }} />
+        <LevelComplete key={`${result.game}-${result.level}-${result.ms}`} result={result} medals={winMedals} hasNext={result.level < LEVELS_PER_GAME}
+          onSwitch={leaveCelebration} onClose={() => { setShowComplete(false); setResult(null); setWinMedals([]); }} />
+      )}
+
+      {/* Medalhas novas fora da tela de parabéns: uma de cada vez e nunca por cima da partida ou de tutoriais. */}
+      {ready && toasts.length > 0 && view !== "game" && !showComplete && !tutorial && !nickModal && (
+        <AchievementToast key={toasts[0].id} a={toasts[0]} left={toasts.length - 1}
+          onDone={() => setToasts((q) => q.slice(1))} onOpen={openAchievements} />
       )}
 
       {tutorial && (
@@ -402,11 +496,11 @@ export default function App() {
       )}
 
       {/* Botão flutuante só nas telas de conteúdo; na partida e na jornada a opinião fica na barra/no topo (nada flutua sobre o jogo). */}
-      {ready && (view === "home" || view === "rules" || view === "profile") && !tutorial && !nickModal && !showComplete && (
+      {ready && (view === "home" || view === "rules" || view === "profile" || view === "ranking" || view === "achievements") && !tutorial && !nickModal && !showComplete && (
         <FeedbackFab onOpen={openFeedback} />
       )}
 
-      <BottomNav active={TAB_OF[view]} onChange={onTab} inGame={view === "game"} />
+      <BottomNav active={TAB_OF[view]} onChange={(t) => (t === "achievements" ? openAchievements() : onTab(t))} inGame={view === "game"} badges={{ achievements: newMedals }} />
     </>
   );
 }

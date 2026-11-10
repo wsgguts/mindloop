@@ -12,8 +12,11 @@ type Spark = { x: number; y: number; vx: number; vy: number; life: number; max: 
 type Rocket = { x: number; y: number; vx: number; vy: number; ty: number; color: string };
 type Confetto = { x: number; y: number; vx: number; vy: number; rot: number; vr: number; w: number; h: number; color: string; wob: number };
 
-export default function Celebration({ accent }: { accent?: string }) {
+/** onBurst: chamado a cada fogo que estoura (para o som acompanhar a imagem). */
+export default function Celebration({ accent, onBurst }: { accent?: string; onBurst?: () => void }) {
   const ref = useRef<HTMLCanvasElement>(null);
+  const burstRef = useRef(onBurst);
+  burstRef.current = onBurst;
 
   useEffect(() => {
     const canvas = ref.current;
@@ -33,6 +36,7 @@ export default function Celebration({ accent }: { accent?: string }) {
     const sparks: Spark[] = [], rockets: Rocket[] = [], confetti: Confetto[] = [];
     const small = w < 520;
     const burst = (x: number, y: number, color: string) => {
+      burstRef.current?.();
       const n = small ? 46 : 70;
       for (let i = 0; i < n; i++) {
         const a = (Math.PI * 2 * i) / n + Math.random() * 0.2, sp = 1.6 + Math.random() * (small ? 3.2 : 4.2);

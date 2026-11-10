@@ -3,6 +3,8 @@ import GameHeader from "./GameHeader";
 import ZoomBoard from "./ZoomBoard";
 import GameToolbar from "./GameToolbar";
 import { useLevelPlay } from "./useLevelPlay";
+import { useSfx } from "./useSound";
+import { tangoLinesDone } from "../lib/sound/progress";
 import TangoSymbol, { SYMBOL_NAME, SYMBOL_PLURAL } from "./TangoSymbol";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -14,7 +16,7 @@ type Tone = "info" | "ok" | "warn" | "hint";
 const ICON: Record<Tone, string> = { info: "ℹ", ok: "✓", warn: "!", hint: "?" };
 type Move = { r: number; c: number; prev: number };
 
-interface Props { puzzle: TangoPuzzle; active: boolean; onMenu: () => void; onRules: () => void; onFeedback: () => void; onWin: (ms: number) => void; onCelebrated: () => void }
+interface Props { puzzle: TangoPuzzle; active: boolean; onMenu: () => void; onRules: () => void; onFeedback: () => void; onWin: (ms: number) => void; onCelebrated: () => void; onHint?: () => void }
 
 // Tocar numa casa passa por vazia → Cristal → Orbe. Quem quer um Orbe passa pelo Cristal no caminho,
 // então o erro causado por um toque só aparece se a casa ficar assim por um instante.
@@ -45,7 +47,7 @@ function hintText(d: Deduction, half: number): string {
   }
 }
 
-export default function TangoGame({ puzzle, active, onMenu, onRules, onFeedback, onWin, onCelebrated }: Props) {
+export default function TangoGame({ puzzle, active, onMenu, onRules, onFeedback, onWin, onCelebrated, onHint }: Props) {
   const board = useMemo(() => parseTango(puzzle.raw), [puzzle]);
   const { n, givens, signs } = board;
   const half = n / 2;
@@ -54,7 +56,8 @@ export default function TangoGame({ puzzle, active, onMenu, onRules, onFeedback,
   const [history, setHistory] = useState<Move[]>([]);
   const [sel, setSel] = useState<Cell | null>(null);
   const [tip, setTip] = useState<{ cell: Cell; from: Cell[] } | null>(null);
-  const play = useLevelPlay({ active, onWin, onCelebrated, fxMs: FX_MS });
+  const sfx = useSfx("tango");
+  const play = useLevelPlay({ active, onWin, onCelebrated, fxMs: FX_MS, onWinFx: () => sfx("win") });
   const won = play.won;
   const [confirm, setConfirm] = useState(false);
   const [msg, setMsg] = useState<{ tone: Tone; text: string }>({ tone: "info", text: "Toque numa casa vazia para colocar um Cristal; toque de novo para trocar por um Orbe." });
@@ -90,7 +93,7 @@ export default function TangoGame({ puzzle, active, onMenu, onRules, onFeedback,
   /** delayErrors: jogada feita tocando na casa (ciclo de símbolos) — o erro espera um instante antes de aparecer. */
   function put(r: number, c: number, v: number, delayErrors = false) {
     if (won) return;
-    if (isGiven(r, c)) return say("info", "Essa é uma pista fixa. Use-a para descobrir as casas vizinhas.");
+    if (isGiven(r, c)) { sfx("block"); return say("info", "Essa é uma pista fixa. Use-a para descobrir as casas vizinhas."); }
     if (grid[r][c] === v) return;
     clearPending();
     const next = cloneT(grid);
@@ -100,6 +103,9 @@ export default function TangoGame({ puzzle, active, onMenu, onRules, onFeedback,
     if (isTangoSolved(next, signs)) { setSel(null); play.win(); say("ok", "Grade equilibrada! Todas as linhas, colunas e sinais estão certos."); return; }
     const probs = findProblems(next, signs);
     const mine = probs.find((p) => p.cells.some(([pr, pc]) => pr === r && pc === c));
+    // Um som por jogada. Tocando na casa (ciclo de símbolos), o erro só soa se a casa ficar errada por um instante.
+    const lines = v && !probs.length ? tangoLinesDone(next, signs, r, c) : 0;
+    sfx(!v ? "erase" : mine && !delayErrors ? "error" : !mine && filledT(next) === n * n ? "error" : lines ? "complete" : "place", { v, count: lines });
     if (mine && delayErrors) {
       const key = `${r}-${c}`;
       setPending(key);
@@ -107,7 +113,7 @@ export default function TangoGame({ puzzle, active, onMenu, onRules, onFeedback,
       pendingTimer.current = window.setTimeout(() => {
         setPending(null);
         const now = findProblems(gridRef.current, signs).find((p) => touches(p, key));
-        if (now) say("warn", `${problemText(now, half)} Quer tentar outro símbolo?`);
+        if (now) { sfx("error"); say("warn", `${problemText(now, half)} Quer tentar outro símbolo?`); }
       }, ERROR_DELAY_MS);
       return;
     }
@@ -121,20 +127,21 @@ export default function TangoGame({ puzzle, active, onMenu, onRules, onFeedback,
   function tap(r: number, c: number) {
     if (won) return;
     setSel([r, c]);
-    if (isGiven(r, c)) return say("info", "Essa é uma pista fixa. Use-a para descobrir as casas vizinhas.");
+    if (isGiven(r, c)) { sfx("block"); return say("info", "Essa é uma pista fixa. Use-a para descobrir as casas vizinhas."); }
     const v = grid[r][c];
     put(r, c, v === 0 ? CRISTAL : v === CRISTAL ? ORBE : 0, true); // vazia → Cristal → Orbe → vazia
   }
 
   function enter(v: number) {
     if (won) return;
-    if (!sel) return say("info", "Escolha uma casa primeiro: toque numa casa vazia da grade.");
+    if (!sel) { sfx("block"); return say("info", "Escolha uma casa primeiro: toque numa casa vazia da grade."); }
     put(sel[0], sel[1], v);
   }
 
   function undo() {
-    if (!history.length || won) return say("info", "Ainda não há nada para desfazer.");
+    if (!history.length || won) { sfx("block"); return say("info", "Ainda não há nada para desfazer."); }
     const last = history[history.length - 1];
+    sfx("undo");
     const next = cloneT(grid);
     next[last.r][last.c] = last.prev;
     clearPending();
@@ -144,12 +151,15 @@ export default function TangoGame({ puzzle, active, onMenu, onRules, onFeedback,
 
   function restart() {
     clearPending();
+    sfx("undo");
     setGrid(cloneT(givens)); setHistory([]); setSel(null); setTip(null); setConfirm(false);
     say("info", "Grade restaurada ao início. Vamos de novo?");
   }
 
   function hint() {
     if (won) return;
+    sfx("hint");
+    onHint?.();
     clearPending(); // pediu ajuda: mostra tudo o que está errado agora
     if (problems.length) {
       const p = problems[0];
@@ -180,6 +190,7 @@ export default function TangoGame({ puzzle, active, onMenu, onRules, onFeedback,
       e.preventDefault();
       const [dr, dc] = move[e.key];
       const next: Cell = [Math.min(n - 1, Math.max(0, from[0] + dr)), Math.min(n - 1, Math.max(0, from[1] + dc))];
+      sfx(sel && next[0] === from[0] && next[1] === from[1] ? "block" : "select");
       setSel(next);
       boardRef.current?.querySelector<HTMLButtonElement>(`[data-rc="${next[0]}-${next[1]}"]`)?.focus();
     } else if (e.key === "1") enter(CRISTAL);
@@ -253,13 +264,14 @@ export default function TangoGame({ puzzle, active, onMenu, onRules, onFeedback,
           main={[
           { label: "Desfazer", icon: "undo", onClick: undo, disabled: !history.length },
           { label: "Dica", icon: "hint", onClick: hint },
-          { label: "Reiniciar", icon: "restart", onClick: () => (history.length ? setConfirm(true) : restart()) },
+          { label: "Reiniciar", icon: "restart", onClick: () => { if (history.length) { sfx("ui"); setConfirm(true); } else restart(); } },
           { label: "Ajuda", ariaLabel: "Como jogar", icon: "help", onClick: onRules },
           ]}
           more={[
           { label: "Níveis", icon: "levels", onClick: onMenu },
           { label: "Dar opinião", icon: "feedback", onClick: onFeedback },
           ]}
+          game="tango"
         />
       )}
       </div>

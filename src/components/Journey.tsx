@@ -1,5 +1,6 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useSfx } from "./useSound";
 import Gem from "./Gem";
 import { CHAPTERS, LEVELS_PER_GAME, LEVELS_PER_CHAPTER, chapterDone, chapterOf, currentLevel, doneCount, isComplete, isDone, isUnlocked, type JourneyGame } from "../lib/journey";
 import { GAME_META } from "../lib/games";
@@ -89,10 +90,18 @@ export default function Journey({ game, done, focus, justDone, justUnlocked, onP
 
   // Ao voltar de uma vitória, o nível seguinte "abre" com uma animação (só quando ele acabou de ser liberado).
   const unlockedNow = justUnlocked !== undefined && !isDone(done, justUnlocked) ? justUnlocked : undefined;
+  const sfx = useSfx(game);
+  // Som de progressão junto com a animação do nível recém-liberado (que começa 1 s depois de chegar).
+  useEffect(() => {
+    if (unlockedNow === undefined) return;
+    const t = window.setTimeout(() => sfx("advance"), 1000);
+    return () => window.clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   function tap(n: number) {
-    if (isUnlocked(done, n)) onPlay(n);
-    else setToast(`Conclua o nível ${n - 1} para desbloquear o nível ${n}.`);
+    if (isUnlocked(done, n)) { sfx("ui"); onPlay(n); }
+    else { sfx("block"); setToast(`Conclua o nível ${n - 1} para desbloquear o nível ${n}.`); }
   }
   function jump() {
     if (chapterId === curChapter) centerOnCur("smooth");

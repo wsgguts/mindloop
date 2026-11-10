@@ -8,6 +8,13 @@ describe("apelido", () => {
     expect(validateNick("a".repeat(21))).not.toBeNull();
     expect(validateNick("lia<3*")).not.toBeNull();
   });
+  it("recusa palavrões, inclusive disfarçados", () => {
+    expect(validateNick("porra")).not.toBeNull();
+    expect(validateNick("C4R4LH0")).not.toBeNull();
+    expect(validateNick("a puta")).not.toBeNull();
+    expect(validateNick("Cunha")).toBeNull(); // "cu" só como palavra inteira
+    expect(validateNick("Escudo")).toBeNull();
+  });
   it("aceita apelidos válidos, inclusive com acento", () => {
     expect(validateNick("Lia")).toBeNull();
     expect(validateNick("João_10")).toBeNull();
