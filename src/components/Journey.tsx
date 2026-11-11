@@ -4,7 +4,8 @@ import { useSfx } from "./useSound";
 import Gem from "./Gem";
 import { CHAPTERS, LEVELS_PER_GAME, LEVELS_PER_CHAPTER, chapterDone, chapterOf, currentLevel, doneCount, isComplete, isDone, isUnlocked, type JourneyGame } from "../lib/journey";
 import { GAME_META } from "../lib/games";
-import { TRAIL, TRAIL_IMAGE } from "../lib/trail";
+import JourneyScene from "./JourneyScene";
+import { sceneOf, scenePoints } from "../lib/scenes";
 
 interface Props {
   game: JourneyGame;
@@ -32,6 +33,8 @@ export default function Journey({ game, done, focus, justDone, justUnlocked, onP
   const curChapter = chapterOf(game, cur).id;
   const [chapterId, setChapterId] = useState(curChapter);
   const ch = CHAPTERS[game][chapterId - 1];
+  const world = sceneOf(ch.id); // o capítulo N acontece no mundo N, em qualquer um dos 4 jogos
+  const points = scenePoints(world);
   const curRef = useRef<HTMLLIElement>(null);
   const chipsRef = useRef<HTMLDivElement>(null);
   const scrollToCur = useRef<ScrollBehavior | null>("auto"); // ao abrir, leva a pessoa direto ao nível em que parou
@@ -134,7 +137,8 @@ export default function Journey({ game, done, focus, justDone, justUnlocked, onP
           const open = isUnlocked(done, c.from);
           return (
             <button key={c.id} className={`jchip${complete ? " full" : ""}${open ? "" : " shut"}${c.id === curChapter ? " here" : ""}`}
-              aria-pressed={c.id === chapterId} aria-label={`Capítulo ${c.id}: ${c.title}${complete ? ", concluído" : open ? "" : ", bloqueado"}`}
+              aria-pressed={c.id === chapterId} aria-label={`Capítulo ${c.id}: ${sceneOf(c.id).name} — ${c.title}${complete ? ", concluído" : open ? "" : ", bloqueado"}`}
+              title={`${sceneOf(c.id).name} · níveis ${c.from}–${c.to}`}
               onClick={() => setChapterId(c.id)}>
               {complete ? "✓" : c.id}
             </button>
@@ -146,19 +150,20 @@ export default function Journey({ game, done, focus, justDone, justUnlocked, onP
         <div className="jbanner">
           <img src={ch.id % 2 ? "/avatar-cat.webp" : "/avatar-kid.webp"} alt="" width={64} height={64} decoding="async" />
           <div>
-            <span className="cap">CAPÍTULO {ch.id}</span>
-            <h2 id={`ch-${game}-${ch.id}`}>{ch.title}</h2>
-            <p>{ch.text}</p>
+            <span className="cap">CAPÍTULO {ch.id} · NÍVEIS {ch.from}–{ch.to}</span>
+            <h2 id={`ch-${game}-${ch.id}`}>{world.name}</h2>
+            <p>{world.tagline}</p>
+            <p className="jsub"><b>{ch.title}:</b> {ch.text}</p>
             <span className="cnt">{chapterDone(done, ch)} de {LEVELS_PER_CHAPTER} concluídos</span>
           </div>
         </div>
 
-        {/* A arte e os níveis formam um único bloco: os pontos usam % da imagem e rolam junto com ela. */}
+        {/* O mundo e os níveis formam um único bloco: os pontos usam % da arte e rolam junto com ela.
+            O mundo (cenário) é o mesmo nos 4 jogos; o jogo só muda a luz, os cristais e as partículas. */}
         <div className="trail">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={TRAIL_IMAGE.src} width={TRAIL_IMAGE.width} height={TRAIL_IMAGE.height} alt="" decoding="async" draggable={false} />
+          <JourneyScene key={world.id} scene={world} game={game} />
           <ol className="tlevels">
-            {TRAIL.map((p, j) => {
+            {points.map((p, j) => {
               const n = ch.from + j;
               const boss = j === LEVELS_PER_CHAPTER - 1;
               const state = isDone(done, n) ? "done" : n === next ? "current" : "locked";

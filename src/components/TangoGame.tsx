@@ -2,7 +2,7 @@
 import GameHeader from "./GameHeader";
 import ZoomBoard from "./ZoomBoard";
 import GameToolbar from "./GameToolbar";
-import { useLevelPlay } from "./useLevelPlay";
+import { useHintNudge, useLevelPlay } from "./useLevelPlay";
 import { useSfx } from "./useSound";
 import { tangoLinesDone } from "../lib/sound/progress";
 import TangoSymbol, { SYMBOL_NAME, SYMBOL_PLURAL } from "./TangoSymbol";
@@ -56,7 +56,8 @@ export default function TangoGame({ puzzle, active, onMenu, onRules, onFeedback,
   const [history, setHistory] = useState<Move[]>([]);
   const [sel, setSel] = useState<Cell | null>(null);
   const [tip, setTip] = useState<{ cell: Cell; from: Cell[] } | null>(null);
-  const sfx = useSfx("tango");
+  const nudge = useHintNudge(); // convite à dica: erros repetidos ou tempo demais
+  const sfx = useSfx("tango", nudge.miss);
   const play = useLevelPlay({ active, onWin, onCelebrated, fxMs: FX_MS, onWinFx: () => sfx("win") });
   const won = play.won;
   const [confirm, setConfirm] = useState(false);
@@ -159,6 +160,7 @@ export default function TangoGame({ puzzle, active, onMenu, onRules, onFeedback,
   function hint() {
     if (won) return;
     sfx("hint");
+    nudge.used(play.read());
     onHint?.();
     clearPending(); // pediu ajuda: mostra tudo o que está errado agora
     if (problems.length) {
@@ -263,7 +265,7 @@ export default function TangoGame({ puzzle, active, onMenu, onRules, onFeedback,
         <GameToolbar
           main={[
           { label: "Desfazer", icon: "undo", onClick: undo, disabled: !history.length },
-          { label: "Dica", icon: "hint", onClick: hint },
+          { label: "Dica", icon: "hint", onClick: hint, nudge: !won && nudge.show(play.ms) ? "Precisa de ajuda?" : undefined },
           { label: "Reiniciar", icon: "restart", onClick: () => { if (history.length) { sfx("ui"); setConfirm(true); } else restart(); } },
           { label: "Ajuda", ariaLabel: "Como jogar", icon: "help", onClick: onRules },
           ]}

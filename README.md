@@ -55,6 +55,16 @@ Todos os níveis têm **solução única** e se resolvem **só com lógica** —
 **Um evento, todos os sistemas.** Cada vitória passa por um único ponto (`winLevel` em `App.tsx`), chamado uma vez por partida: progresso da jornada → recorde → histórico (`lib/history.ts`) → conquistas (`lib/achievements.ts`) → ranking (`lib/ranking.ts`). Estatísticas (`lib/stats.ts`) são calculadas desse histórico. Cada registro tem id próprio, então recarregar a página não duplica partidas, conquistas ou pontos.
 Na primeira abertura desta versão, os melhores tempos já salvos viram registros “importados” (sem data): ninguém perde o que já jogou. Eles contam para médias, recordes e quantidades, mas não para dias jogados nem sessões.
 
+## Mundos das jornadas
+Os 10 capítulos de cada jogo acontecem em **10 mundos compartilhados pelos 4 jogos** (capítulo N = mundo N): Reino Celestial, Floresta dos Cristais, Vale das Águas, Templo das Estrelas, Deserto dos Segredos, Montanhas do Dragão, Reino das Auroras, Cidade Perdida, Dimensão do Tempo e Trono do Infinito.
+- **Pinturas:** cada mundo tem a sua, em `public/journeys/` (WebP 900 × 1600; o mundo 1 usa `public/journey-trail.webp`). Os originais em PNG ficam em `art/journeys/` (não são publicados no site).
+- **Cadastro central:** `src/lib/scenes.ts`, com a pintura, as 10 posições das fases medidas sobre o caminho de cada pintura (`points`), os cristais pintados (`crystals`), as partículas de cada mundo e a identidade de cada jogo (`GAME_LOOK`).
+- **Montagem:** `src/components/JourneyScene.tsx` monta, em camadas, a pintura do mundo, depois a identidade do jogo e por cima os botões das fases (`Journey.tsx`, sem mudanças na lógica).
+- **Identidade de cada jogo:** a pintura é a mesma nos 4 jogos. Cada jogo muda só a cor dos cristais pintados, a luz do céu e do castelo e as partículas, usando cores que ele já usa no tabuleiro.
+- **Testes** (`scenes.test.ts`): conferem que cada pintura existe, que as 10 fases ficam dentro da arte e sobem pela trilha, e que não se sobrepõem nem em celulares de 320 px.
+- **Trocar ou adicionar uma pintura:** gere a arte em 9:16, converta para WebP 900 × 1600 em `public/journeys/` e aponte `art` no mundo. Se o caminho tiver outro traçado, meça as 10 posições (de baixo para cima, em px da arte) e informe em `points` (há o atalho `tweak` para mudar só algumas).
+- **Mundo sem pintura (recurso de reserva):** sem `art`, o mundo usa a trilha original com gradação de cor (`grade`) e um cenário vetorial (`decor`).
+
 ## Médias e estatísticas
 - Só vitórias entram no histórico: partidas abandonadas nunca contam como concluídas.
 - Tempos de jogos diferentes **não são misturados**: tempo médio e melhor tempo são sempre por jogo.

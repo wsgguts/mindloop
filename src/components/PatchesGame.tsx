@@ -2,7 +2,7 @@
 import GameHeader from "./GameHeader";
 import ZoomBoard from "./ZoomBoard";
 import GameToolbar from "./GameToolbar";
-import { useLevelPlay } from "./useLevelPlay";
+import { useHintNudge, useLevelPlay } from "./useLevelPlay";
 import { useSfx } from "./useSound";
 import PatchesTag, { KIND_HELP, KIND_NAME } from "./PatchesTag";
 import { useMemo, useRef, useState } from "react";
@@ -70,7 +70,8 @@ export default function PatchesGame({ puzzle, active, onMenu, onRules, onFeedbac
   const [preview, setPreview] = useState<Rect | null>(null); // peça sendo arrastada
   const [cursor, setCursor] = useState<Cell | null>(null); // casa do teclado
   const [tip, setTip] = useState<{ rect?: Rect; cell?: Cell; clue?: number; wrong?: boolean } | null>(null);
-  const sfx = useSfx("patches");
+  const nudge = useHintNudge(); // convite à dica: erros repetidos ou tempo demais
+  const sfx = useSfx("patches", nudge.miss);
   // Na vitória, um "clac" por peça acompanha a onda de encaixe da animação.
   const play = useLevelPlay({ active, onWin, onCelebrated, fxMs: FX_MS, onWinFx: () => sfx("win", { count: clues.length, span: WAVE_MS }) });
   const won = play.won;
@@ -201,6 +202,7 @@ export default function PatchesGame({ puzzle, active, onMenu, onRules, onFeedbac
   function hint() {
     if (won) return;
     sfx("hint");
+    nudge.used(play.read());
     onHint?.();
     setAnchor(null);
     if (problems.length) {
@@ -311,7 +313,7 @@ export default function PatchesGame({ puzzle, active, onMenu, onRules, onFeedbac
           <GameToolbar
             main={[
             { label: "Desfazer", icon: "undo", onClick: undo, disabled: !history.length },
-            { label: "Dica", icon: "hint", onClick: hint },
+            { label: "Dica", icon: "hint", onClick: hint, nudge: !won && nudge.show(play.ms) ? "Precisa de ajuda?" : undefined },
             { label: "Reiniciar", icon: "restart", onClick: () => { if (pieces.length) { sfx("ui"); setConfirm(true); } else restart(); } },
             { label: "Ajuda", ariaLabel: "Como jogar", icon: "help", onClick: onRules },
             ]}

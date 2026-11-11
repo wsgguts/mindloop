@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { PUZZLES, puzzleGrid } from "./puzzles";
 import {
-  boxDims, candidates, conflictsAt, countSolutions, findHintCell, isFull, isSolved, parsePuzzle, setCell,
+  boxDims, candidates, conflictsAt, countSolutions, findHintCell, isFull, isSolved, parsePuzzle, setCell, usedUpDigits,
 } from "./sudoku";
 
 
@@ -65,5 +65,19 @@ describe("grade 6×6 (blocos 2×3)", () => {
     const sol = parsePuzzle(["256413", "413625", "532146", "641532", "364251", "125364"]);
     expect(isSolved(sol)).toBe(true);
     expect(isSolved(setCell(sol, 0, 0, 3))).toBe(false);
+  });
+});
+
+describe("números esgotados no teclado", () => {
+  it("um número fica esgotado quando já aparece N vezes numa grade N×N", () => {
+    const g = parsePuzzle(["1...", "..1.", ".1..", "...."]);
+    expect(usedUpDigits(g).has(1)).toBe(false);
+    const full = setCell(g, 3, 3, 1);
+    expect([...usedUpDigits(full)]).toEqual([1]);
+    expect(usedUpDigits(setCell(full, 3, 3, 0)).size).toBe(0); // apagar devolve o número
+  });
+  it("numa grade resolvida, todos os números estão esgotados", () => {
+    const g = parsePuzzle(["1234", "3412", "2143", "4321"]);
+    expect([...usedUpDigits(g)].sort()).toEqual([1, 2, 3, 4]);
   });
 });

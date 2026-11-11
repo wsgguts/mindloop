@@ -57,10 +57,10 @@ const perGame = <T,>(f: (g: RulesGame) => T): PerGame<T> => ({ sudoku: f("sudoku
 
 // Áreas clicáveis sobre os cristais da arte do Início (em % da imagem home-art.webp; original em home-art.jpg).
 const ART_SPOTS: { id: RulesGame; left: number; top: number; width: number; height: number }[] = [
-  { id: "sudoku", left: 3, top: 38, width: 23, height: 19 },
-  { id: "zip", left: 74, top: 38, width: 24, height: 19 },
-  { id: "tango", left: 7, top: 57.5, width: 22, height: 19 },
-  { id: "patches", left: 66, top: 58.5, width: 27, height: 19 },
+  { id: "sudoku", left: 2, top: 33.5, width: 28, height: 13 },
+  { id: "zip", left: 72.5, top: 34, width: 26.5, height: 13 },
+  { id: "tango", left: 3, top: 53.5, width: 27, height: 14.5 },
+  { id: "patches", left: 68.5, top: 55, width: 29, height: 13 },
 ];
 
 export default function App() {
@@ -232,6 +232,7 @@ export default function App() {
     const { game, level, before } = result;
     if (to === "next" && level < LEVELS_PER_GAME) return startGame(game, level, true); // idx do próximo = level
     if (to === "achievements") return openAchievements();
+    if (to === "home") return goHome();
     const firstTime = !isDone(before, level);
     setJourneyGame(game);
     setView("journey");
@@ -306,7 +307,7 @@ export default function App() {
             <section className="home" aria-label="Início">
               <img className="home-bg" src="/home-art.webp" alt="" aria-hidden="true" decoding="async" />
               <div className="art">
-                <img src="/home-art.webp" width={1080} height={1244} decoding="async" alt="MindLoop — Desafie sua mente. Um cubo mágico de quebra-cabeça sobre ilhas flutuantes, com os cristais dos jogos Mini Sudoku, Zip, Tango e Patches." fetchPriority="high" />
+                <img src="/home-art.webp" width={944} height={1680} decoding="async" alt="MindLoop — Desafie sua mente. Um cubo mágico de quebra-cabeça sobre ilhas flutuantes, com os cristais dos jogos Mini Sudoku, Zip, Tango e Patches." fetchPriority="high" />
                 {ART_SPOTS.map((s) => (
                   <button key={s.id} className="gspot" onClick={() => openGame(s.id)}
                     style={{ left: `${s.left}%`, top: `${s.top}%`, width: `${s.width}%`, height: `${s.height}%` }}
@@ -476,7 +477,7 @@ export default function App() {
 
       {tutorial && (
         <Tutorial key={`${tutorial.game}-${tutorial.first}`} game={tutorial.game} steps={TUTORIALS[tutorial.game]} first={tutorial.first}
-          finishLabel={tutorial.finish} onDone={closeTutorial} />
+          finishLabel={tutorial.finish} onDone={closeTutorial} onHome={() => { closeTutorial("closed"); goHome(); }} />
       )}
 
       {nickModal && (

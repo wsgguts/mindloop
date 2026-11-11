@@ -94,3 +94,23 @@ export function useLevelPlay({ active, onWin, onCelebrated, fxMs, initialMs = 0,
 
   return { won, win, ms: finalMs ?? clock.ms, read: clock.read };
 }
+
+/** Erros seguidos (sem pedir dica) que acendem o botão Dica. */
+export const NUDGE_MISSES = 3;
+/** Tempo jogado no nível (sem pedir dica) que acende o botão Dica. */
+export const NUDGE_MS = 2 * 60_000;
+
+/**
+ * Convite à dica: o botão Dica passa a brilhar quando a pessoa erra algumas vezes ou passa tempo demais no nível.
+ * Pedir uma dica apaga o convite e zera as duas contagens (erros e tempo voltam a contar a partir dali).
+ * `miss` é estável — pode ir direto para useSfx(jogo, miss). O tempo é o do cronômetro da partida
+ * (não conta com o jogo pausado, coberto ou em segundo plano).
+ */
+export function useHintNudge(initialMs = 0) {
+  const [misses, setMisses] = useState(0);
+  const [since, setSince] = useState(initialMs);
+  const miss = useCallback(() => setMisses((m) => m + 1), []);
+  const used = useCallback((ms: number) => { setMisses(0); setSince(ms); }, []);
+  const show = (ms: number) => misses >= NUDGE_MISSES || ms - since >= NUDGE_MS;
+  return { miss, used, show };
+}

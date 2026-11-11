@@ -33,22 +33,19 @@ p { margin: 0; }
 
 /* Home: arte original, sem filtros */
 .home-main { padding: 0 0 calc(var(--nav-h) + 16px + var(--fab-room)); }
-/* A arte (proporção 0,868) aparece sempre inteira — nenhum cristal cortado — e centralizada. O espaço que sobra
-   (celular em pé é bem mais alto que a arte) é preenchido pela própria arte ampliada e desfocada, então qualquer
-   proporção de tela fica coberta com as mesmas cores; as bordas de cima e de baixo da arte se dissolvem nesse fundo. */
+/* A arte é um retrato de celular (944×1680, proporção 0,562) e preenche a tela do Início inteira, ancorada embaixo
+   (o personagem fica sobre a barra de navegação). Para cobrir celulares mais finos, ela pode passar até 4% da largura
+   da tela (corta só um fio das laterais, sem tocar nas etiquetas dos cristais); se ainda sobrar altura, a sobra fica no
+   céu, em cima, preenchida pela própria arte ampliada e desfocada. As áreas clicáveis são em % da arte, então
+   acompanham qualquer tamanho. */
 .home { position: relative; isolation: isolate; height: calc(100vh - var(--nav-h)); height: calc(100svh - var(--nav-h));
-  display: flex; flex-direction: column; align-items: center; justify-content: center; background: rgb(11,8,49); overflow: hidden; }
-.home-bg { position: absolute; inset: -6%; z-index: -1; width: 112%; height: 112%; object-fit: cover; pointer-events: none;
-  filter: blur(26px) saturate(1.3) brightness(.5); }
-.home::after { content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none;
-  background-image: linear-gradient(180deg, rgba(11,8,49,.75), rgba(11,8,49,.15) 30%, rgba(11,8,49,.15) 70%, rgba(11,8,49,.7)), radial-gradient(1.5px 1.5px at 18% 32%, rgba(255,255,255,.75), transparent), radial-gradient(1px 1px at 62% 18%, rgba(255,255,255,.6), transparent),
-    radial-gradient(2px 2px at 84% 66%, rgba(180,220,255,.65), transparent), radial-gradient(1px 1px at 38% 78%, rgba(255,255,255,.55), transparent),
-    radial-gradient(1.5px 1.5px at 9% 85%, rgba(255,190,240,.6), transparent);
-  background-size: 100% 100%, 260px 190px, 260px 190px, 260px 190px, 260px 190px, 260px 190px; }
-.home .art { position: relative; flex: none; width: min(100%, calc((100vh - var(--nav-h)) * .868)); width: min(100%, calc((100svh - var(--nav-h)) * .868)); }
+  display: flex; flex-direction: column; align-items: center; justify-content: flex-end; background: rgb(18,14,72); overflow: hidden; }
+.home-bg { position: absolute; inset: -6%; z-index: -1; width: 112%; height: 112%; object-fit: cover; object-position: top; pointer-events: none;
+  filter: blur(26px) saturate(1.3) brightness(.6); }
+.home .art { position: relative; flex: none; width: min(104vw, calc((100vh - var(--nav-h)) * .5619)); width: min(104vw, calc((100svh - var(--nav-h)) * .5619)); }
 .home .art img { display: block; width: 100%; height: auto;
-  -webkit-mask-image: linear-gradient(180deg, transparent 0, #000 11%, #000 89%, transparent 100%); mask-image: linear-gradient(180deg, transparent 0, #000 11%, #000 89%, transparent 100%); }
-.hotspot { position: absolute; left: 50%; top: 62.5%; width: max(30%, 150px); height: max(6.2%, 48px); transform: translate(-50%, -50%);
+  -webkit-mask-image: linear-gradient(180deg, transparent 0, #000 5%); mask-image: linear-gradient(180deg, transparent 0, #000 5%); }
+.hotspot { position: absolute; left: 50%; top: 55.9%; width: 38%; height: max(5.4%, 44px); transform: translate(-50%, -50%);
   background: transparent; border: 0; border-radius: 6px; cursor: pointer; color: transparent; -webkit-tap-highlight-color: transparent; }
 .hotspot span { opacity: 0; }
 .hotspot:hover { box-shadow: 0 0 0 3px var(--cyan), 0 0 22px rgba(255,210,63,.7); }
@@ -115,6 +112,9 @@ label { font-weight: 600; display: block; margin-bottom: 4px; }
 .cell:focus-visible { outline-offset: -4px; }
 .pad { width: min(100%, 360px); margin: 0 auto; display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; }
 .pad .btn { padding: 0; min-height: 56px; font: 700 24px var(--font-title); } .pad .btn.erase { font-size: 14px; font-family: var(--font-body); }
+/* Número esgotado (já está N vezes na grade): inativo, apagado e com um ✓ — volta ao normal quando um deles é apagado. */
+.pad .btn.used { position: relative; opacity: .55; background: #ECE5F6; color: #9486AE; border-color: #D6C8EC; box-shadow: none; transition: opacity .25s, background .25s; }
+.pad .btn.used::after { content: "✓"; position: absolute; top: 3px; right: 6px; font: 700 11px var(--font-body); color: #4FB896; }
 .paused { width: min(100%, 360px); margin: 0 auto; aspect-ratio: 1; display: grid; place-content: center; text-align: center; gap: 12px; border: 3px dashed var(--violet); border-radius: 12px; background: #fff; padding: 16px; }
 .rating { display: flex; gap: 8px; border: 0; padding: 0; margin: 0; } .rating label { position: relative; margin: 0; }
 .rating input { position: absolute; opacity: 0; width: 1px; min-height: 0; }
@@ -451,7 +451,7 @@ label { font-weight: 600; display: block; margin-bottom: 4px; }
 
   /* Início: arte fixa à esquerda (altura da tela), jogos ao lado */
   .home-main { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: start; padding-bottom: 0; }
-  .home { position: sticky; top: 0; height: 100vh; height: 100svh; width: calc(100vh * .868); width: calc(100svh * .868); }
+  .home { position: sticky; top: 0; height: 100vh; height: 100svh; width: calc(100vh * .5619); width: calc(100svh * .5619); }
   .home .art { width: 100%; }
   .games-home { width: 100%; padding: 16px 16px 20px; }
   .games-home h1 { font-size: 22px; }
@@ -639,6 +639,8 @@ label { font-weight: 600; display: block; margin-bottom: 4px; }
 .tut-skip { min-height: 44px; padding: 0 14px; border-radius: 999px; border: 2px solid #CDB8F5; background: #fff; color: var(--violet); font: 600 14px var(--font-body); cursor: pointer; }
 .tut-skip:hover { background: #F3EBFD; }
 .tut-close { min-width: 44px; width: 44px; height: 44px; padding: 0; }
+.tut-home { display: grid; place-items: center; margin-left: auto; } /* casinha: à esquerda de Pular/Fechar */
+.tut-home + .tut-skip, .tut-home + .tut-close { margin-left: 0; }
 
 /* Progresso: um segmento por passo (tocável para consultar qualquer passo) */
 .tut-prog { padding: 0 16px 8px; }
@@ -768,6 +770,19 @@ label { font-weight: 600; display: block; margin-bottom: 4px; }
 .gtool:active:not(:disabled) { transform: scale(.96); }
 .gtool:disabled { opacity: .4; cursor: default; }
 .gtool.on { background: var(--violet); border-color: var(--violet); color: #fff; }
+/* Convite à dica (muitos erros ou tempo demais no nível): o botão Dica acende em dourado, a lâmpada balança
+   e um balão "Precisa de ajuda?" aparece por alguns segundos. Some ao pedir a dica. */
+.gtool.nudge { position: relative; border-color: var(--star); background: #FFF6D6; color: #7A4A00; box-shadow: 0 0 14px rgba(255,210,63,.75);
+  animation: gnudge 1.6s ease-in-out infinite; }
+.gtool.nudge svg { color: #E08A00; animation: gnudge-bulb 1.6s ease-in-out infinite; }
+.gtool.nudge:hover:not(:disabled) { background: #FFEFB8; }
+.gtool .gnudge-tip { position: absolute; bottom: calc(100% + 8px); left: 50%; z-index: 5; padding: 4px 10px; border-radius: 999px; border: 2px solid #26104D;
+  background: var(--star); color: var(--ink); font: 700 12px/1.2 var(--font-body); font-style: normal; white-space: nowrap; pointer-events: none;
+  transform: translateX(-50%); box-shadow: 0 6px 14px rgba(38,16,77,.3); animation: gnudge-tip 6s ease forwards; }
+.gtool .gnudge-tip::after { content: ""; position: absolute; top: 100%; left: 50%; margin-left: -6px; border: 6px solid transparent; border-top-color: #26104D; }
+@keyframes gnudge { 0%, 100% { box-shadow: 0 0 0 0 rgba(255,210,63,.8), 0 0 10px rgba(255,210,63,.5); } 50% { box-shadow: 0 0 0 7px rgba(255,210,63,0), 0 0 22px rgba(255,210,63,.95); } }
+@keyframes gnudge-bulb { 0%, 60%, 100% { transform: rotate(0) scale(1); } 15% { transform: rotate(-14deg) scale(1.15); } 30% { transform: rotate(12deg) scale(1.15); } 45% { transform: rotate(-6deg) scale(1.05); } }
+@keyframes gnudge-tip { 0% { opacity: 0; transform: translate(-50%, 6px); } 8%, 85% { opacity: 1; transform: translate(-50%, 0); } 100% { opacity: 0; transform: translate(-50%, 0); visibility: hidden; } }
 .gmenu { position: absolute; right: 0; bottom: calc(100% + 8px); z-index: 30; min-width: 230px; display: grid; gap: 2px; padding: 6px; border-radius: 16px;
   background: #fff; border: 2px solid #E4D6F5; box-shadow: 0 14px 34px rgba(38,16,77,.3); animation: gmenu-in .16s ease-out; }
 @keyframes gmenu-in { from { transform: translateY(6px); opacity: 0; } }

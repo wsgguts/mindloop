@@ -11,7 +11,11 @@ import type { SoundGame } from "../lib/sound/themes";
 // Assim nada flutua sobre o tabuleiro ou sobre os botões do jogo.
 
 export type ToolIcon = "undo" | "hint" | "restart" | "pause" | "play" | "help" | "levels" | "feedback" | "end" | "more";
-export interface ToolAction { label: string; icon: ToolIcon; onClick: () => void; disabled?: boolean; ariaLabel?: string }
+export interface ToolAction {
+  label: string; icon: ToolIcon; onClick: () => void; disabled?: boolean; ariaLabel?: string;
+  /** Convite: o botão brilha e mostra um balão (usado na Dica quando a pessoa está com dificuldade). */
+  nudge?: string;
+}
 
 const PATHS: Record<ToolIcon, React.ReactNode> = {
   undo: <><path d="M9 14 4 9l5-5" /><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11" /></>,
@@ -51,8 +55,10 @@ export default function GameToolbar({ main, more, game }: { main: ToolAction[]; 
   return (
     <div className="gtools" role="toolbar" aria-label="Ações da partida" ref={box}>
       {main.map((a) => (
-        <button key={a.label} type="button" className="gtool" onClick={a.onClick} disabled={a.disabled} aria-label={a.ariaLabel}>
+        <button key={a.label} type="button" className={`gtool${a.nudge && !a.disabled ? " nudge" : ""}`} onClick={a.onClick} disabled={a.disabled}
+          aria-label={a.nudge && !a.disabled ? `${a.ariaLabel ?? a.label} — ${a.nudge}` : a.ariaLabel}>
           <Icon name={a.icon} /><span>{a.label}</span>
+          {a.nudge && !a.disabled && <i className="gnudge-tip" aria-hidden="true">{a.nudge}</i>}
         </button>
       ))}
       <button type="button" className={`gtool${open ? " on" : ""}`} onClick={() => { if (!open) sfx("ui"); setOpen((o) => !o); }} aria-expanded={open} aria-haspopup="menu" aria-label="Mais opções">

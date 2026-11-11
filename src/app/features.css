@@ -2,6 +2,10 @@
    Usa os mesmos tokens de globals.css (--violet, --cosmic, --star, --cyan...) e os mesmos padrões de painel. */
 
 /* ===== Tela de parabéns: próximo nível ===== */
+.lc-home { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 40px; padding: 0 14px; border-radius: 999px; border: 2px solid #CDB8F5;
+  background: #fff; color: var(--violet); font: 700 14px var(--font-body); cursor: pointer; }
+.lc-home:hover { background: #F3EBFD; }
+.lc-home:focus-visible { outline: 3px solid var(--cyan); outline-offset: 2px; }
 .lc-next { font: 600 13px var(--font-body); color: var(--muted); margin-top: -4px; }
 .lc-medals { width: 100%; padding: 8px 10px; border-radius: 14px; background: #FFF7DB; border: 2px solid var(--star); display: grid; gap: 6px; animation: lc-up .5s ease-out .85s both; }
 .lc-medals-t { font: 700 14px var(--font-title); color: #6B4F00; }

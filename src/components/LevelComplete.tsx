@@ -22,7 +22,7 @@ export interface LevelResult {
 }
 
 /** Para onde a tela de parabéns leva: o próximo nível (Continuar), a jornada (tempo esgotado) ou as conquistas. */
-export type LeaveTo = "next" | "journey" | "achievements";
+export type LeaveTo = "next" | "journey" | "achievements" | "home";
 
 interface Props {
   result: LevelResult;
@@ -158,6 +158,10 @@ export default function LevelComplete({ result, medals = [], hasNext, onSwitch, 
           <button ref={btn} className="btn cta lc-go" onClick={() => leave(hasNext ? "next" : "journey")}
             aria-describedby="lc-next">{hasNext ? "Continuar" : "Ver jornada"}</button>
           <p className="lc-next" id="lc-next">{hasNext ? `Próximo: Nível ${r.level + 1}` : "Este é o último nível da jornada."}</p>
+          <button type="button" className="lc-home" onClick={() => leave("home")}>
+            <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 11 12 4l9 7" /><path d="M5.5 9.5V20h4.5v-6h4v6h4.5V9.5" /></svg>
+            <span>Voltar para a tela inicial</span>
+          </button>
           <div className="lc-auto" aria-hidden="true"><i style={{ animationDuration: `${AUTO_CONTINUE_MS}ms` }} /></div>
           <p className="lc-hint">Sem tocar, voltando para a jornada…</p>
           </div>

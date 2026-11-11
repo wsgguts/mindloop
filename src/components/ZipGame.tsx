@@ -2,7 +2,7 @@
 import GameHeader from "./GameHeader";
 import ZoomBoard from "./ZoomBoard";
 import GameToolbar from "./GameToolbar";
-import { useLevelPlay } from "./useLevelPlay";
+import { useHintNudge, useLevelPlay } from "./useLevelPlay";
 import { useSfx } from "./useSound";
 import { useMemo, useRef, useState } from "react";
 import {
@@ -21,7 +21,8 @@ const FX_MS = 2900;
 export default function ZipGame({ puzzle, active, onMenu, onRules, onFeedback, onWin, onCelebrated, onHint }: Props) {
   const z = useMemo(() => parseZip(puzzle.rows), [puzzle]);
   const [path, setPath] = useState<Pos[]>([z.start]);
-  const sfx = useSfx("zip");
+  const nudge = useHintNudge(); // convite à dica: erros repetidos ou tempo demais
+  const sfx = useSfx("zip", nudge.miss);
   const play = useLevelPlay({ active, onWin, onCelebrated, fxMs: FX_MS, onWinFx: () => sfx("win", { span: DRAW_MS }) });
   const won = play.won;
   const [tip, setTip] = useState<Pos | null>(null);
@@ -86,6 +87,7 @@ export default function ZipGame({ puzzle, active, onMenu, onRules, onFeedback, o
   function hint() {
     if (won) return;
     sfx("hint");
+    nudge.used(play.read());
     onHint?.();
     const t = nextTarget(path, z);
     if (!t) return say("hint", "Todos os números já foram alcançados. Falta preencher as casas restantes e terminar no maior número.");
@@ -164,7 +166,7 @@ export default function ZipGame({ puzzle, active, onMenu, onRules, onFeedback, o
         <GameToolbar
           main={[
           { label: "Desfazer", icon: "undo", onClick: undo, disabled: path.length < 2 },
-          { label: "Dica", icon: "hint", onClick: hint },
+          { label: "Dica", icon: "hint", onClick: hint, nudge: !won && nudge.show(play.ms) ? "Precisa de ajuda?" : undefined },
           { label: "Reiniciar", icon: "restart", onClick: () => { if (path.length > 1) { sfx("ui"); setConfirm(true); } else restart(); } },
           { label: "Ajuda", ariaLabel: "Como jogar", icon: "help", onClick: onRules },
           ]}

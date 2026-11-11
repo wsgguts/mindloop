@@ -101,9 +101,11 @@ interface Props {
   finishLabel?: string;
   /** done = chegou ao fim; skipped = pulou; closed = fechou (aberto manualmente). */
   onDone: (how: "done" | "skipped" | "closed") => void;
+  /** Sai do tutorial direto para a tela inicial (sem marcar o tutorial como visto). */
+  onHome?: () => void;
 }
 
-export default function Tutorial({ game, steps, first, finishLabel = "Concluir", onDone }: Props) {
+export default function Tutorial({ game, steps, first, finishLabel = "Concluir", onDone, onHome }: Props) {
   const [i, setI] = useState(0);
   const [play, setPlay] = useState(0); // "Repetir animação" recomeça a demonstração
   const [speed, setSpeed] = useState(readSpeed);
@@ -189,6 +191,11 @@ export default function Tutorial({ game, steps, first, finishLabel = "Concluir",
             <span className="tut-kicker">{first ? "Antes de começar" : "Como jogar"}</span>
             <h2 id="tut-title">{name}</h2>
           </div>
+          {onHome && (
+            <button type="button" className="btn sec close tut-close tut-home" onClick={onHome} aria-label="Voltar para a tela inicial" title="Tela inicial">
+              <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 11 12 4l9 7" /><path d="M5.5 9.5V20h4.5v-6h4v6h4.5V9.5" /></svg>
+            </button>
+          )}
           {first ? (
             <button type="button" className="tut-skip" onClick={leave}>Pular tutorial</button>
           ) : (

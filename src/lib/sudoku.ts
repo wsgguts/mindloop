@@ -53,6 +53,20 @@ export function hasAnyConflict(grid: Grid): boolean {
 export const filledCount = (grid: Grid): number =>
   grid.reduce((n, row) => n + row.filter(Boolean).length, 0);
 
+/** Quantas vezes cada número aparece na grade (índice = número). */
+export function digitUses(grid: Grid): number[] {
+  const n = Array(grid.length + 1).fill(0);
+  for (const row of grid) for (const v of row) if (v) n[v]++;
+  return n;
+}
+
+/**
+ * Números que já não podem entrar em mais nenhuma casa: cada um cabe exatamente N vezes numa grade N×N
+ * (uma por linha), então com N cópias na grade não há onde colocar outra.
+ */
+export const usedUpDigits = (grid: Grid): Set<number> =>
+  new Set(digitUses(grid).flatMap((k, d) => (d && k >= grid.length ? [d] : [])));
+
 export const isFull = (grid: Grid): boolean => filledCount(grid) === grid.length * grid.length;
 
 /** Solução correta = grade cheia e sem nenhum conflito. */

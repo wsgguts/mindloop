@@ -2,7 +2,7 @@
 import GameHeader from "./GameHeader";
 import ZoomBoard from "./ZoomBoard";
 import GameToolbar from "./GameToolbar";
-import { useLevelPlay } from "./useLevelPlay";
+import { useHintNudge, useLevelPlay } from "./useLevelPlay";
 import { useSfx } from "./useSound";
 import { sudokuUnitsDone } from "../lib/sound/progress";
 import { useMemo, useRef, useState } from "react";
@@ -10,7 +10,7 @@ import type { Puzzle } from "../lib/puzzles";
 import { puzzleGrid } from "../lib/puzzles";
 import {
   boxDims, digitsFor, type ConflictKind, type Grid,
-  cloneGrid, conflictsAt, filledCount, findHintCell, isFull, isSolved, setCell,
+  cloneGrid, conflictsAt, filledCount, findHintCell, isFull, isSolved, setCell, usedUpDigits,
 } from "../lib/sudoku";
 
 type Tone = "info" | "ok" | "warn" | "hint";
@@ -51,7 +51,8 @@ export default function Game({ puzzle, initialGrid, initialMs = 0, active, onSav
   const [confirm, setConfirm] = useState<null | "restart" | "end">(null);
   const [msg, setMsg] = useState<{ tone: Tone; text: string }>({ tone: "info", text: "Vamos descobrir o próximo passo? Toque numa casa vazia." });
   const boardRef = useRef<HTMLDivElement>(null);
-  const sfx = useSfx("sudoku");
+  const nudge = useHintNudge(initialMs); // convite à dica: erros repetidos ou tempo demais
+  const sfx = useSfx("sudoku", nudge.miss);
   const play = useLevelPlay({ active: active && !paused, onWin, onCelebrated, fxMs: FX_MS, initialMs, onWinFx: () => sfx("win") });
   const won = play.won;
 
@@ -80,6 +81,7 @@ export default function Game({ puzzle, initialGrid, initialMs = 0, active, onSav
     const { r, c } = sel;
     if (isGiven(r, c)) { sfx("block"); return say("info", "Essa é uma pista fixa e não pode ser alterada. Experimente uma casa vazia."); }
     if (grid[r][c] === v) return;
+    if (v && usedUp.has(v)) { sfx("block"); return say("info", `O ${v} já aparece ${N} vezes na grade (uma por linha). Para usá-lo aqui, apague um deles primeiro.`); }
     commit(setCell(grid, r, c, v), r, c, grid[r][c]);
   }
 
@@ -106,6 +108,7 @@ export default function Game({ puzzle, initialGrid, initialMs = 0, active, onSav
     const h = findHintCell(grid);
     if (!h) return;
     sfx("hint");
+    nudge.used(play.read());
     onHint?.();
     for (let r = 0; r < N; r++) for (let c = 0; c < N; c++)
       if (conflictsAt(grid, r, c).length) { setTip(null); return say("hint", "Há números repetidos marcados com “!”. Que tal resolver isso primeiro?"); }
@@ -132,6 +135,8 @@ export default function Game({ puzzle, initialGrid, initialMs = 0, active, onSav
   }
 
   const total = N * N;
+  // Números que já aparecem N vezes não cabem em mais nenhuma casa: ficam inativos no teclado (voltam ao apagar um).
+  const usedUp = useMemo(() => usedUpDigits(grid), [grid]);
   const filled = filledCount(grid);
   const related = (r: number, c: number) =>
     !!sel && (sel.r === r || sel.c === c || (Math.floor(sel.r / bh) === Math.floor(r / bh) && Math.floor(sel.c / bw) === Math.floor(c / bw)));
@@ -180,7 +185,8 @@ export default function Game({ puzzle, initialGrid, initialMs = 0, active, onSav
       <div className="gctrl">
       {!paused && (
           <div className={`pad n${N}${won ? " off" : ""}`} style={{ gridTemplateColumns: `repeat(${N + 1}, 1fr)` }} role="group" aria-label="Escolher número">
-            {digits.map((d) => <button key={d} className="btn" onClick={() => enter(d)} disabled={won} aria-label={`Número ${d}`}>{d}</button>)}
+            {digits.map((d) => <button key={d} className={`btn${usedUp.has(d) ? " used" : ""}`} onClick={() => enter(d)} disabled={won || usedUp.has(d)}
+              aria-label={`Número ${d}${usedUp.has(d) ? " — todos já estão na grade" : ""}`}>{d}</button>)}
             <button className="btn sec erase" onClick={() => enter(0)} disabled={won} aria-label="Apagar número">{N > 4 ? "⌫" : "Apagar"}</button>
           </div>
       )}
@@ -205,7 +211,7 @@ export default function Game({ puzzle, initialGrid, initialMs = 0, active, onSav
         <GameToolbar
           main={[
           { label: "Desfazer", icon: "undo", onClick: undo, disabled: !history.length || paused },
-          { label: "Dica", icon: "hint", onClick: hint, disabled: paused },
+          { label: "Dica", icon: "hint", onClick: hint, disabled: paused, nudge: !won && nudge.show(play.ms) ? "Precisa de ajuda?" : undefined },
           { label: paused ? "Retomar" : "Pausar", icon: paused ? "play" : "pause", onClick: () => { sfx("ui"); setPaused((p) => !p); } },
           { label: "Reiniciar", icon: "restart", onClick: () => { sfx("ui"); setConfirm("restart"); } },
           ]}

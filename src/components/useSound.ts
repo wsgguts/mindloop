@@ -6,9 +6,16 @@ import { BASE, type SoundGame, themeFor } from "../lib/sound/themes";
 
 export type { SfxEvent, SfxOpts };
 
-/** Toca os efeitos com a identidade do jogo (sem jogo: sons neutros de interface). */
-export function useSfx(game?: SoundGame) {
-  return useCallback((ev: SfxEvent, opts?: SfxOpts) => playWith(themeFor(game), BASE, ev, opts, game ?? "ui"), [game]);
+/**
+ * Toca os efeitos com a identidade do jogo (sem jogo: sons neutros de interface).
+ * `onError` (estável): avisado a cada som de erro — todo erro de jogada nas partidas toca "error", então é
+ * daqui que sai a contagem de erros que acende o botão Dica (useHintNudge).
+ */
+export function useSfx(game?: SoundGame, onError?: () => void) {
+  return useCallback((ev: SfxEvent, opts?: SfxOpts) => {
+    if (ev === "error") onError?.();
+    playWith(themeFor(game), BASE, ev, opts, game ?? "ui");
+  }, [game, onError]);
 }
 
 /** Preferências de som atuais (ligado + volume) e como mudá-las. Atualiza todos os controles juntos. */
