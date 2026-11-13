@@ -3,6 +3,7 @@ import { Inter, Space_Grotesk } from "next/font/google";
 import "./globals.css";
 import "./features.css";
 import "./journeys.css";
+import "./cases.css";
 
 // Fontes servidas pelo próprio site (next/font): baixadas no build, pré-carregadas e sem pedidos ao Google
 // a cada visita — mais rápido e sem enviar dados dos jovens a terceiros. As variáveis alimentam

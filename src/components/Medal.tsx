@@ -17,6 +17,7 @@ const GLYPH: Record<Achievement["category"], string> = {
   jornada: "M4 18c3-6 6 2 9-4s4-6 7-8M4 18h0M20 6h0",
   jogo: "",
   constancia: "M7 3v3M17 3v3M4 8h16M5 5h14v15H5zM9 13l2 2 4-4",
+  investigacao: "M10 4a6 6 0 1 0 0 12 6 6 0 1 0 0-12zM14.5 14.5 20 20",
   especial: "M12 3l2.6 5.6 6 .7-4.5 4.1 1.3 6L12 16.4 6.6 19.4l1.3-6L3.4 9.3l6-.7z",
 };
 

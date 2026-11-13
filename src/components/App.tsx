@@ -32,8 +32,18 @@ import { KEYS, readStore, writeStore } from "../lib/storage";
 import { PATCHES_PUZZLES } from "../lib/patches";
 import { TANGO_PUZZLES } from "../lib/tango";
 import { ZIP_PUZZLES } from "../lib/zip";
+import CaseOffer from "./cases/CaseOffer";
+import CaseScreen, { type SolveResult } from "./cases/CaseScreen";
+import CaseBook, { CaseSummary } from "./cases/CaseBook";
+import { afterContinue, caseById, casesOf } from "../lib/cases/catalog";
+import { CASES_KEY, type CaseLog, type Draft, emptyCaseLog, parseCaseLog, recordOf, recordSkip, recordSolve, saveDraft, shouldOffer, solvedCount } from "../lib/cases/progress";
 
-type View = "home" | "journey" | "game" | "rules" | "profile" | "feedback" | "ranking" | "achievements";
+type View = "home" | "journey" | "game" | "rules" | "profile" | "feedback" | "ranking" | "achievements" | "case" | "casebook";
+/**
+ * Investigação aberta. "offer" = convite depois do Continuar; "play" = investigando.
+ * next: a fase tradicional que vem depois (convite da jornada); sem next, veio do caderno de investigações.
+ */
+type CaseRun = { id: string; mode: "offer" | "play"; next?: { game: RulesGame; idx: number } };
 type Save = { id: string; grid: Grid; ms?: number };
 type Session = { game: RulesGame; idx: number; round: number };
 /** Volta à trilha logo após uma vitória: qual nível animar como concluído e qual como recém-liberado. */
@@ -43,9 +53,9 @@ type PerGame<T> = Record<RulesGame, T>;
 // Para onde o "Voltar" da tela de opinião leva (ela pode ser aberta de qualquer tela pelo botão flutuante).
 const BACK_LABEL: Record<Exclude<View, "feedback">, string> = {
   home: "Voltar ao início", journey: "Voltar à jornada", game: "Voltar ao jogo", rules: "Voltar às regras", profile: "Voltar ao perfil",
-  ranking: "Voltar ao ranking", achievements: "Voltar às conquistas",
+  ranking: "Voltar ao ranking", achievements: "Voltar às conquistas", case: "Voltar à investigação", casebook: "Voltar às investigações",
 };
-const TAB_OF: Record<View, Tab> = { home: "home", journey: "home", game: "home", rules: "rules", profile: "profile", feedback: "profile", ranking: "ranking", achievements: "achievements" };
+const TAB_OF: Record<View, Tab> = { home: "home", journey: "home", game: "home", rules: "rules", profile: "profile", feedback: "profile", ranking: "ranking", achievements: "achievements", case: "home", casebook: "home" };
 // Chave de "já viu as regras" de cada jogo (a do Sudoku é a original, mantida por compatibilidade).
 // Tutorial de cada jogo: "done" (visto até o fim) ou "skipped" (pulado). Independente por jogo.
 const TUTORIAL_KEY = (g: RulesGame) => `mindloop:tutorial:${g}`;
@@ -96,6 +106,12 @@ export default function App() {
   const [winMedals, setWinMedals] = useState<Achievement[]>([]); // medalhas da vitória atual (tela de parabéns)
   const [newMedals, setNewMedals] = useState(0); // selo na aba Conquistas
   const [rankId, setRankId] = useState<RankIdentity | null>(null);
+  // Mindloop Investigação: progresso próprio (nunca altera fases, ranking ou desbloqueios).
+  const [caseLog, setCaseLog] = useState<CaseLog>(emptyCaseLog);
+  const caseLogRef = useRef(caseLog);
+  caseLogRef.current = caseLog;
+  const [caseRun, setCaseRun] = useState<CaseRun | null>(null);
+  const [bookGame, setBookGame] = useState<RulesGame>("sudoku");
   const logRef = useRef(log);
   logRef.current = log;
   const hintsRef = useRef(0); // dicas pedidas na partida atual
@@ -120,8 +136,10 @@ export default function App() {
     if (!lg) { lg = importLegacy(tms); writeStore(HISTORY_KEY, JSON.stringify(lg)); }
     setLog(lg);
     // Conquistas: se ainda não existiam, as já merecidas são registradas em silêncio (sem enxurrada de avisos).
+    const cl = parseCaseLog(readStore(CASES_KEY));
+    setCaseLog(cl);
     const stored = parseUnlocked(readStore(ACH_KEY));
-    const ev = evaluate({ log: lg, progress: prog }, stored ?? {}, Date.now());
+    const ev = evaluate({ log: lg, progress: prog, cases: cl }, stored ?? {}, Date.now());
     setUnlocked(ev.unlocked);
     if (!stored || ev.fresh.length) writeStore(ACH_KEY, JSON.stringify(ev.unlocked));
     if (stored && ev.fresh.length) setToasts(ev.fresh);
@@ -205,7 +223,7 @@ export default function App() {
     sessionWon.current = true;
     const lg = addMatch(logRef.current, { id: matchId(game, level, at), game, level, ms, at, hints: hintsRef.current, first: !isDone(before, level), record: t.isRecord });
     saveLog(lg);
-    const ev = evaluate({ log: lg, progress: { ...progress, [game]: after } }, unlocked, at);
+    const ev = evaluate({ log: lg, progress: { ...progress, [game]: after }, cases: caseLogRef.current }, unlocked, at);
     setWinMedals(ev.fresh);
     if (ev.fresh.length) {
       setUnlocked(ev.unlocked);
@@ -214,6 +232,37 @@ export default function App() {
     }
     // Ranking online: reenvia os melhores tempos do jogo (o servidor guarda só o melhor de cada nível).
     if (rankId && rankingConfig()) syncGame(rankId, game, t.times).catch(() => { /* tenta de novo ao abrir o ranking */ });
+  }
+
+  // ---- Mindloop Investigação ----
+  const saveCases = (l: CaseLog) => { caseLogRef.current = l; setCaseLog(l); writeStore(CASES_KEY, JSON.stringify(l)); };
+  /** Sai da investigação: segue para a próxima fase (convite da jornada) ou volta ao caderno. */
+  function leaveCase(run: CaseRun | null = caseRun) {
+    setCaseRun(null);
+    if (run?.next) startGame(run.next.game, run.next.idx);
+    else setView("casebook");
+  }
+  function skipCase() {
+    if (!caseRun) return;
+    saveCases(recordSkip(caseLogRef.current, caseRun.id, Date.now())); // pular nunca tira pontos nem bloqueia nada
+    leaveCase();
+  }
+  function openCasebook(game: RulesGame) { setBookGame(game); setCaseRun(null); setView("casebook"); }
+  function openCaseFromBook(id: string) { setCaseRun({ id, mode: "play" }); setView("case"); }
+  function caseDraft(id: string, d: Draft | null) { saveCases(saveDraft(caseLogRef.current, id, d)); }
+  /** Mistério resolvido — ponto único de registro: progresso da investigação → XP → conquistas. */
+  function solveCase(id: string, ms: number, hints: number): SolveResult {
+    const c = caseById(id)!;
+    const at = Date.now();
+    const r = recordSolve(saveDraft(caseLogRef.current, id, null), c, ms, hints, at);
+    saveCases(r.log);
+    const ev = evaluate({ log: logRef.current, progress, cases: r.log }, unlocked, at);
+    if (ev.fresh.length) {
+      setUnlocked(ev.unlocked);
+      writeStore(ACH_KEY, JSON.stringify(ev.unlocked));
+      setNewMedals((n) => n + ev.fresh.length);
+    }
+    return { solve: r.solve, medals: ev.fresh, bestMs: r.log.records[id].bestMs ?? ms };
   }
 
   function saveRankId(id: RankIdentity | null) { setRankId(id); writeStore(RANK_KEY, id ? JSON.stringify(id) : null); }
@@ -230,7 +279,13 @@ export default function App() {
   function leaveCelebration(to: LeaveTo) {
     if (!result) return;
     const { game, level, before } = result;
-    if (to === "next" && level < LEVELS_PER_GAME) return startGame(game, level, true); // idx do próximo = level
+    if (to === "next" && level < LEVELS_PER_GAME) {
+      // Investigação opcional entre as fases: só no "Continuar", só nas fases agendadas e só se o mistério
+      // ainda não foi resolvido nem pulado (nada se repete sozinho).
+      const go = afterContinue(game, level, (id) => shouldOffer(caseLogRef.current, id));
+      if (go.case) { setCaseRun({ id: go.case.id, mode: "offer", next: { game, idx: go.nextIdx } }); setView("case"); return; }
+      return startGame(game, go.nextIdx, true); // idx do próximo = level
+    }
     if (to === "achievements") return openAchievements();
     if (to === "home") return goHome();
     const firstTime = !isDone(before, level);
@@ -287,7 +342,8 @@ export default function App() {
     onCelebrated: celebrated,
     onHint: () => { hintsRef.current += 1; },
   });
-  const achCtx = { log, progress };
+  const achCtx = { log, progress, cases: caseLog };
+  const runCase = caseRun ? caseById(caseRun.id) : undefined;
   function openAchievements() { setToasts([]); setView("achievements"); }
 
   return (
@@ -351,7 +407,23 @@ export default function App() {
             focus={focusLevel(progress[journeyGame], lastPlayed[journeyGame])}
             justDone={arrival?.game === journeyGame ? arrival.justDone : undefined}
             justUnlocked={arrival?.game === journeyGame ? arrival.justUnlocked : undefined}
-            onBack={() => goHome(true)} onHelp={() => openTutorial(journeyGame, "Concluir")} onFeedback={openFeedback} onPlay={(n) => startGame(journeyGame, n - 1)} />
+            onBack={() => goHome(true)} onHelp={() => openTutorial(journeyGame, "Concluir")} onFeedback={openFeedback} onPlay={(n) => startGame(journeyGame, n - 1)}
+            cases={{ solved: solvedCount(caseLog, journeyGame), total: casesOf(journeyGame).length }} onCases={() => openCasebook(journeyGame)} />
+        ) : view === "case" && caseRun && runCase ? (
+          caseRun.mode === "offer" ? (
+            <CaseOffer key={runCase.id} c={runCase} nextLevel={(caseRun.next?.idx ?? 0) + 1}
+              onInvestigate={() => setCaseRun({ ...caseRun, mode: "play" })} onSkip={skipCase} />
+          ) : (
+            <CaseScreen key={runCase.id} c={runCase} record={recordOf(caseLog, runCase.id)}
+              active={view === "case" && !tutorial && !nickModal && !showComplete}
+              continueLabel={caseRun.next ? `Continuar para o nível ${caseRun.next.idx + 1}` : "Voltar às investigações"}
+              onContinue={() => leaveCase()}
+              exitLabel={caseRun.next ? "Ir para a jornada" : "Voltar às investigações"}
+              onExit={() => { const run = caseRun; setCaseRun(null); if (run.next) { setJourneyGame(run.next.game); setView("journey"); } else setView("casebook"); }}
+              onDraft={(d) => caseDraft(runCase.id, d)} onSolve={(ms, h) => solveCase(runCase.id, ms, h)} />
+          )
+        ) : view === "casebook" ? (
+          <CaseBook game={bookGame} log={caseLog} progress={progress} onGame={setBookGame} onOpen={openCaseFromBook} onBack={() => openJourney(bookGame)} />
         ) : view === "rules" ? (
           <div className="wrap">
             <h1>Regras</h1>
@@ -381,6 +453,7 @@ export default function App() {
             )}
             <p className="muted">O apelido fica salvo só neste aparelho. Não pedimos cadastro nem outros dados. Participar do ranking online é opcional (aba Ranking).</p>
             <Stats log={log} progress={progress} />
+            <CaseSummary log={caseLog} onOpen={() => openCasebook(journeyGame)} />
             <section className="card" aria-labelledby="snd-title">
               <h2 id="snd-title">Sons</h2>
               <SoundControls />
@@ -470,7 +543,7 @@ export default function App() {
       )}
 
       {/* Medalhas novas fora da tela de parabéns: uma de cada vez e nunca por cima da partida ou de tutoriais. */}
-      {ready && toasts.length > 0 && view !== "game" && !showComplete && !tutorial && !nickModal && (
+      {ready && toasts.length > 0 && view !== "game" && view !== "case" && !showComplete && !tutorial && !nickModal && (
         <AchievementToast key={toasts[0].id} a={toasts[0]} left={toasts.length - 1}
           onDone={() => setToasts((q) => q.slice(1))} onOpen={openAchievements} />
       )}

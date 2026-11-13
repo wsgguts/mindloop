@@ -22,9 +22,12 @@ interface Props {
   onHelp: () => void;
   /** Abre a tela de opinião. */
   onFeedback: () => void;
+  /** Mindloop Investigação: mistérios resolvidos deste jogo e acesso ao caderno. */
+  cases?: { solved: number; total: number };
+  onCases?: () => void;
 }
 
-export default function Journey({ game, done, focus, justDone, justUnlocked, onPlay, onBack, onHelp, onFeedback }: Props) {
+export default function Journey({ game, done, focus, justDone, justUnlocked, onPlay, onBack, onHelp, onFeedback, cases, onCases }: Props) {
   const { name, color, cur: curColor } = GAME_META[game];
   const next = currentLevel(done); // primeiro nível ainda não concluído
   const cur = focus; // nível destacado ("JOGAR")
@@ -129,6 +132,11 @@ export default function Journey({ game, done, focus, justDone, justUnlocked, onP
         <div className="progress" role="progressbar" aria-label="Progresso na jornada" aria-valuemin={0} aria-valuemax={LEVELS_PER_GAME} aria-valuenow={count}>
           <i style={{ width: `${count}%` }} />
         </div>
+        {cases && onCases && (
+          <button className="jcases" onClick={() => { sfx("ui"); onCases(); }} aria-label={`Investigações: ${cases.solved} de ${cases.total} mistérios resolvidos. Abrir caderno.`}>
+            <span aria-hidden="true">🔍</span><b>Investigações</b><small>{cases.solved}/{cases.total} mistérios</small><span aria-hidden="true">›</span>
+          </button>
+        )}
       </header>
 
       <nav className="jchips" ref={chipsRef} aria-label="Capítulos da jornada">

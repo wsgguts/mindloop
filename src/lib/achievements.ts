@@ -7,19 +7,22 @@ import { ALL_GAMES, GAME_META } from "./games";
 import { type Match, type PlayerLog, bestSession, distinctDays } from "./history";
 import { LEVELS_PER_CHAPTER, LEVELS_PER_GAME, doneCount, type JourneyGame } from "./journey";
 import { refMs } from "./scoring";
+import { type CaseLog, goldCount, solvedCount } from "./cases/progress";
 
 export type Rarity = "bronze" | "prata" | "ouro" | "diamante";
-export type Category = "tempo" | "jornada" | "jogo" | "constancia" | "especial";
+export type Category = "tempo" | "jornada" | "jogo" | "constancia" | "investigacao" | "especial";
 
 export const RARITY_LABEL: Record<Rarity, string> = { bronze: "Bronze", prata: "Prata", ouro: "Ouro", diamante: "Diamante" };
 export const CATEGORY_LABEL: Record<Category, string> = {
-  tempo: "Tempo", jornada: "Jornadas", jogo: "Por jogo", constancia: "Constância", especial: "Especiais",
+  tempo: "Tempo", jornada: "Jornadas", jogo: "Por jogo", constancia: "Constância", investigacao: "Investigação", especial: "Especiais",
 };
-export const CATEGORIES: Category[] = ["tempo", "jornada", "jogo", "constancia", "especial"];
+export const CATEGORIES: Category[] = ["tempo", "jornada", "jogo", "constancia", "investigacao", "especial"];
 
 export interface AchCtx {
   log: PlayerLog;
   progress: Record<JourneyGame, string>;
+  /** Mistérios do Mindloop Investigação (opcional: sem ele, as conquistas de investigação ficam em 0). */
+  cases?: CaseLog;
   /** Medalhas já obtidas, sem contar as de "colecionar medalhas" (evita contagem circular). */
   medals: number;
 }
@@ -52,6 +55,10 @@ const any = (c: AchCtx, f: (m: Match) => boolean) => (c.log.matches.some(f) ? 1 
 const records = (c: AchCtx) => c.log.matches.filter((m) => m.record).length;
 /** Níveis diferentes (jogo + nível) concluídos dentro do tempo de referência. */
 const underRef = (c: AchCtx) => new Set(c.log.matches.filter((m) => m.ms <= refMs(m.game, m.level)).map((m) => `${m.game}-${m.level}`)).size;
+const cases = (c: AchCtx, g?: JourneyGame) => (c.cases ? solvedCount(c.cases, g) : 0);
+const golds = (c: AchCtx) => (c.cases ? goldCount(c.cases) : 0);
+const quickCase = (c: AchCtx) => (c.cases?.history.some((s) => s.ms <= QUICK_CASE_MS) ? 1 : 0);
+export const QUICK_CASE_MS = 60_000;
 const maxDone = (c: AchCtx) => Math.max(...ALL_GAMES.map((g) => doneCount(c.progress[g])));
 
 const perGame: Achievement[] = ALL_GAMES.flatMap((g): Achievement[] => {
@@ -86,7 +93,16 @@ export const ACHIEVEMENTS: Achievement[] = [
   { id: "comprometimento", title: "Comprometimento", desc: "Jogue em 15 dias diferentes.", category: "constancia", rarity: "ouro", target: 15, unit: "dias", value: (c) => distinctDays(c.log.matches) },
   { id: "sem-desistir", title: "Sem Desistir", desc: "Conclua 5 partidas seguidas, sem abandonar nenhuma no meio.", category: "constancia", rarity: "prata", target: 5, unit: "seguidas", value: (c) => c.log.bestStreak },
   { id: "maratona-mental", title: "Maratona Mental", desc: "Conclua 10 fases numa mesma sessão (até 30 min entre uma vitória e outra).", category: "constancia", rarity: "ouro", target: 10, unit: "fases", value: (c) => bestSession(c.log.matches) },
-  // E) Especiais
+  // E) Investigação (mistérios opcionais entre as fases)
+  { id: "inv-primeira-pista", title: "Primeira Pista", desc: "Resolva seu primeiro mistério do Mindloop Investigação.", category: "investigacao", rarity: "bronze", target: 1, unit: "mistério", value: (c) => cases(c) },
+  { id: "inv-olho-rapido", title: "Olho Rápido", desc: "Resolva um mistério em até 1 minuto.", category: "investigacao", rarity: "bronze", target: 1, unit: "mistério", value: quickCase },
+  { id: "inv-detetive", title: "Detetive", desc: "Resolva 10 mistérios.", category: "investigacao", rarity: "prata", target: 10, unit: "mistérios", value: (c) => cases(c) },
+  { id: "inv-deducao-pura", title: "Dedução Pura", desc: "Resolva 5 mistérios diferentes sem pedir nenhuma dica.", category: "investigacao", rarity: "prata", target: 5, unit: "mistérios", value: golds },
+  { id: "inv-detetive-experiente", title: "Detetive Experiente", desc: "Resolva 30 mistérios.", category: "investigacao", rarity: "ouro", target: 30, unit: "mistérios", value: (c) => cases(c) },
+  { id: "inv-lupa-de-ouro", title: "Coleção de Lupas", desc: "Resolva 20 mistérios diferentes sem pedir nenhuma dica.", category: "investigacao", rarity: "ouro", target: 20, unit: "mistérios", value: golds },
+  { id: "inv-mestre", title: "Mestre Investigador", desc: "Resolva 80 mistérios.", category: "investigacao", rarity: "diamante", target: 80, unit: "mistérios", value: (c) => cases(c) },
+  ...ALL_GAMES.map((g): Achievement => ({ id: `inv-${g}`, title: "Caso Encerrado", desc: `Resolva 5 mistérios de ${GAME_META[g].name}.`, category: "investigacao", rarity: "prata", game: g, target: 5, unit: "mistérios", value: (c) => cases(c, g) })),
+  // F) Especiais
   { id: "sem-dicas", title: "Por Conta Própria", desc: "Conclua uma fase sem pedir nenhuma dica.", category: "especial", rarity: "bronze", target: 1, unit: "fase", value: (c) => any(c, (m) => m.hints === 0 && m.level >= NO_HINT_FROM_LEVEL) },
   { id: "todos-os-jogos", title: "Mente Versátil", desc: "Conclua pelo menos uma partida de cada um dos 4 jogos.", category: "especial", rarity: "prata", target: ALL_GAMES.length, unit: "jogos", value: (c) => ALL_GAMES.filter((g) => wins(c, g) > 0).length },
   { id: "cacador-recordes", title: "Caçador de Recordes", desc: "Bata 10 recordes pessoais.", category: "especial", rarity: "ouro", target: 10, unit: "recordes", value: records },

@@ -24,7 +24,7 @@ O projeto fica no OneDrive; `scripts/link-next.mjs` (rodado antes do `dev` e do 
 - **Tutoriais animados:** cada jogo tem o seu, com passos curtos (explicação, demonstração animada no tabuleiro real do jogo, “Observe”), barra de passos tocável, Voltar/Próximo, Repetir animação, Recomeçar e Pular. Abre sozinho na primeira partida de cada jogo e pode ser reaberto pelo “?” ao lado do título, pelo botão “Como jogar” da partida, pela jornada e pela aba Regras.
 - **Tela de parabéns:** **Continuar** abre o **próximo nível** da jornada; se a pessoa não tocar em nada, ao fim do temporizador (6,5 s) ela volta para a **jornada**. As duas ações são independentes: o primeiro evento vence e os demais são ignorados (sem navegação dupla). No nível 100 o botão vira “Ver jornada”. Medalhas ganhas na vitória aparecem ali mesmo, com “Ver todas as conquistas”.
 - **Ranking** (aba própria): ranking geral e por jogo (com filtro de dificuldade), pódio, lista, posição e destaque da própria pessoa. Sem login. Veja “Ranking online”.
-- **Conquistas** (aba própria): 38 medalhas em 5 categorias e 4 raridades, com progresso, data de obtenção e o que falta.
+- **Conquistas** (aba própria): 49 medalhas em 6 categorias (incluindo Investigação) e 4 raridades, com progresso, data de obtenção e o que falta.
 - **Meu desempenho** (Perfil): partidas, fases, aproveitamento, jornadas, ritmo, recordes, atividade dos últimos 14 dias, comparação entre jogos e, por jogo, tempo médio, melhor tempo, tentativas por vitória, evolução e histórico.
 - **Regras:** aba própria com o texto de referência de cada jogo.
 - **Opinião** (Perfil → Dar opinião): nota e comentário anônimos, enviados ao Netlify Forms (veja abaixo).
@@ -51,9 +51,26 @@ Todos os níveis têm **solução única** e se resolvem **só com lógica** —
 | `mindloop:history` | histórico central de vitórias (jogo, nível, tempo, data, dicas, 1ª vez, recorde), sequência de vitórias e partidas iniciadas por jogo |
 | `mindloop:achievements` | conquistas obtidas: id → data |
 | `mindloop:rank` | identidade anônima do ranking (id, token, apelido) — só existe se a pessoa entrou no ranking |
+| `mindloop:cases` | Mindloop Investigação: por mistério, 1ª solução, melhor tempo, menor nº de dicas, XP, se foi pulado e o andamento salvo; histórico de soluções |
 
 **Um evento, todos os sistemas.** Cada vitória passa por um único ponto (`winLevel` em `App.tsx`), chamado uma vez por partida: progresso da jornada → recorde → histórico (`lib/history.ts`) → conquistas (`lib/achievements.ts`) → ranking (`lib/ranking.ts`). Estatísticas (`lib/stats.ts`) são calculadas desse histórico. Cada registro tem id próprio, então recarregar a página não duplica partidas, conquistas ou pontos.
 Na primeira abertura desta versão, os melhores tempos já salvos viram registros “importados” (sem data): ninguém perde o que já jogou. Eles contam para médias, recordes e quantidades, mas não para dias jogados nem sessões.
+
+## Mindloop Investigação
+Mistérios curtos (2 a 6 minutos) e **opcionais** entre as fases das jornadas, com um tipo para cada jogo:
+
+| Jogo | Tipo de mistério | Como se joga |
+|---|---|---|
+| Mini Sudoku | numérico (cofres, cadeados, painéis) | descobrir o número de cada posição; nenhum número se repete |
+| Tango | padrões (filas de Cristais e Orbes) | metade de cada símbolo e nunca três iguais seguidos |
+| Zip | caminhos (mapas com estradas) | a ordem das paradas, passando uma vez por lugar e só pelas estradas |
+| Patches | espacial (vitrines, estantes, mosaicos) | a casa de cada objeto na grade |
+
+- **Quando aparece:** só ao tocar em **Continuar** na tela de parabéns, depois das fases agendadas em `src/lib/cases/config.ts` (`CASE_PATTERNS`: 3 ou 4 por capítulo, com padrões que se alternam entre capítulos e jogos; nunca duas seguidas e nunca no meio de uma partida). O temporizador da tela de parabéns continua levando à jornada, sem convite.
+- **Investigar ou pular:** pular segue direto para a próxima fase — nunca tira pontos nem bloqueia nada. Mistérios resolvidos ou pulados não são oferecidos de novo; ficam no **caderno de investigações** (botão “Investigações” na jornada e card no Perfil), onde dá para resolver um caso pulado, continuar um começado ou rever um resolvido.
+- **Dicas progressivas:** até 3 por mistério (como pensar → relação entre pistas → uma dedução explicada). Cada dica reduz 20% do XP.
+- **Recompensas:** XP na primeira solução (50 a 150, pela dificuldade), Lupa de Ouro/Prata/Bronze por mistério (0, 1 ou 2–3 dicas), melhor tempo, histórico e 11 conquistas na categoria Investigação. Nada disso entra no ranking nem na progressão das jornadas.
+- **Banco de mistérios:** `src/lib/cases/data.ts` (135 mistérios), gerado por `npx vite-node scripts/gen_cases.ts` — não edite à mão. O motor (`src/lib/cases/model.ts`) guarda as pistas como dados estruturados: o mesmo objeto confere a resposta, prova a solução única, simula a dedução sem chute e escreve os textos, as dicas e a explicação. Os testes (`src/lib/cases/*.test.ts`) conferem, para todos os mistérios: solução única, resolução só por dedução, nenhuma pista sobrando, agenda, textos e o fluxo completo nas 4 jornadas. Para acrescentar mistérios ou mudar a frequência: ajuste `config.ts`/`themes.ts` e gere o banco de novo.
 
 ## Mundos das jornadas
 Os 10 capítulos de cada jogo acontecem em **10 mundos compartilhados pelos 4 jogos** (capítulo N = mundo N): Reino Celestial, Floresta dos Cristais, Vale das Águas, Templo das Estrelas, Deserto dos Segredos, Montanhas do Dragão, Reino das Auroras, Cidade Perdida, Dimensão do Tempo e Trono do Infinito.
