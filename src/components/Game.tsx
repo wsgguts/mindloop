@@ -4,6 +4,7 @@ import ZoomBoard from "./ZoomBoard";
 import GameToolbar from "./GameToolbar";
 import { useHintNudge, useLevelPlay } from "./useLevelPlay";
 import { useSfx } from "./useSound";
+import { useRevealedErrors } from "./useRevealedErrors";
 import { sudokuUnitsDone } from "../lib/sound/progress";
 import { useMemo, useRef, useState } from "react";
 import type { Puzzle } from "../lib/puzzles";
@@ -49,7 +50,7 @@ export default function Game({ puzzle, initialGrid, initialMs = 0, active, onSav
   const [tip, setTip] = useState<Cell | null>(null);
   const [paused, setPaused] = useState(false);
   const [confirm, setConfirm] = useState<null | "restart" | "end">(null);
-  const [msg, setMsg] = useState<{ tone: Tone; text: string }>({ tone: "info", text: "Vamos descobrir o próximo passo? Toque numa casa vazia." });
+  const [msg, setMsg] = useState<{ tone: Tone; text: string }>({ tone: "info", text: "Toque numa casa vazia e escolha um número." });
   const boardRef = useRef<HTMLDivElement>(null);
   const nudge = useHintNudge(initialMs); // convite à dica: erros repetidos ou tempo demais
   const sfx = useSfx("sudoku", nudge.miss);
@@ -57,6 +58,19 @@ export default function Game({ puzzle, initialGrid, initialMs = 0, active, onSav
   const won = play.won;
 
   const say = (tone: Tone, text: string) => setMsg({ tone, text });
+  // Conflitos (número repetido) só aparecem depois que a pessoa para de jogar por um instante (useRevealedErrors).
+  const conflictKeys = useMemo(() => {
+    const out: string[] = [];
+    for (let r = 0; r < N; r++) for (let c = 0; c < N; c++) if (conflictsAt(grid, r, c).length) out.push(`${r}-${c}:${grid[r][c]}`); // o valor faz parte da chave: trocar o número reinicia a espera
+    return out;
+  }, [grid, N]);
+  const errs = useRevealedErrors(conflictKeys, grid, (fresh) => {
+    if (won) return;
+    sfx("error");
+    const [r, c] = fresh[0].split(":")[0].split("-").map(Number);
+    const kinds = conflictsAt(grid, r, c);
+    say("warn", isFull(grid) ? "A grade está cheia, mas há números repetidos (marcados com “!”)." : `Número repetido ${WHERE[kinds[0]] ?? "na grade"} (marcado com “!”).`);
+  });
   const isGiven = (r: number, c: number) => givens[r][c] !== 0;
 
   function commit(next: Grid, r: number, c: number, prev: number) {
@@ -66,13 +80,10 @@ export default function Game({ puzzle, initialGrid, initialMs = 0, active, onSav
     if (isSolved(next)) { onSave(null); play.win(); say("ok", "Grade completa! Todas as linhas, colunas e blocos fecharam."); return; }
     onSave(next, play.read());
     const kinds = conflictsAt(next, r, c);
-    // Um som por jogada: limpar, erro, região fechada ou número colocado.
+    // Um som por jogada (limpar, região fechada ou número colocado). Erros não soam aqui: só quando revelados.
     const units = next[r][c] && !kinds.length ? sudokuUnitsDone(next, r, c) : 0;
-    sfx(next[r][c] === 0 ? "erase" : kinds.length || isFull(next) ? "error" : units ? "complete" : "place", { v: next[r][c], count: units });
-    if (next[r][c] === 0) say("info", "Casa limpa. Observe as pistas e tente outra opção.");
-    else if (kinds.length) say("warn", `Esse número já aparece ${WHERE[kinds[0]]}. Quer tentar outra opção?`);
-    else if (isFull(next)) say("warn", "A grade está cheia, mas ainda há números repetidos. Observe as casas marcadas com “!”.");
-    else say("ok", "Boa! Esse número cabe aqui por enquanto.");
+    sfx(next[r][c] === 0 ? "erase" : units ? "complete" : "place", { v: next[r][c], count: units });
+    say("info", next[r][c] === 0 ? "Casa limpa." : `${filledCount(next)} de ${N * N} casas preenchidas.`);
   }
 
   function enter(v: number) {
@@ -110,8 +121,7 @@ export default function Game({ puzzle, initialGrid, initialMs = 0, active, onSav
     sfx("hint");
     nudge.used(play.read());
     onHint?.();
-    for (let r = 0; r < N; r++) for (let c = 0; c < N; c++)
-      if (conflictsAt(grid, r, c).length) { setTip(null); return say("hint", "Há números repetidos marcados com “!”. Que tal resolver isso primeiro?"); }
+    if (conflictKeys.length) { errs.revealNow(); setTip(null); return say("hint", "Há números repetidos, marcados com “!”. Resolva isso primeiro."); }
     setTip({ r: h.r, c: h.c }); setSel({ r: h.r, c: h.c });
     say("hint", h.options === 0
       ? `Linha ${h.r + 1}, coluna ${h.c + 1}: nenhum número cabe aqui. Revise as casas ao redor.`
@@ -162,7 +172,7 @@ export default function Game({ puzzle, initialGrid, initialMs = 0, active, onSav
           <div ref={boardRef} className={`board n${N}${won ? " win" : ""}`} style={{ gridTemplateColumns: `repeat(${N}, 1fr)` }} role="grid"
             aria-label={`Grade do Mini Sudoku ${N} por ${N}${won ? ", resolvida" : ""}`} onKeyDown={onKey}>
             {grid.map((row, r) => row.map((v, c) => {
-              const bad = conflictsAt(grid, r, c).length > 0;
+              const bad = errs.visible.has(`${r}-${c}:${v}`);
               const g = isGiven(r, c);
               const isSel = !won && sel?.r === r && sel?.c === c;
               const cls = ["cell", g && "given", related(r, c) && "rel", isSel && "sel", bad && "bad",

@@ -246,7 +246,7 @@ export default function ZoomBoard({ children, maxWidth = 360, panWithOneFinger =
         <div ref={layer} className="zoom-layer">{children}</div>
       </div>
       <div className="zoom-bar" role="group" aria-label={`Zoom do ${label}`}>
-        <span className="zoom-hint" aria-hidden="true">{scale > 1.001 ? (panWithOneFinger ? "Arraste para mover" : "Dois dedos para mover") : "Pinça para ampliar ou reduzir"}</span>
+        <span className="zoom-hint" aria-hidden="true">{scale > 1.001 ? (panWithOneFinger ? "Arraste para mover" : "Dois dedos para mover") : ""}</span>
         <button type="button" onClick={() => zoomAt(prevLevel(t.current.s), center(), true)} disabled={locked || scale <= MIN_ZOOM + 0.001} aria-label="Diminuir zoom">−</button>
         <button type="button" className="zoom-pct" onClick={reset} disabled={locked || isNormal(scale)} aria-label={`Zoom em ${pct}%. Voltar ao tamanho normal`}>{pct}%</button>
         <button type="button" onClick={() => zoomAt(nextLevel(t.current.s), center(), true)} disabled={locked || scale >= MAX_ZOOM - 0.001} aria-label="Aumentar zoom">+</button>

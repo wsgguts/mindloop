@@ -4,6 +4,7 @@ import ZoomBoard from "./ZoomBoard";
 import GameToolbar from "./GameToolbar";
 import { useHintNudge, useLevelPlay } from "./useLevelPlay";
 import { useSfx } from "./useSound";
+import { useRevealedErrors } from "./useRevealedErrors";
 import { useMemo, useRef, useState } from "react";
 import {
   type Pos, type ZipPuzzle, canStep, indexInPath, isAdjacent, isZipSolved, nextTarget, parseZip, samePos, visitedNumbers,
@@ -27,12 +28,19 @@ export default function ZipGame({ puzzle, active, onMenu, onRules, onFeedback, o
   const won = play.won;
   const [tip, setTip] = useState<Pos | null>(null);
   const [confirm, setConfirm] = useState(false);
-  const [msg, setMsg] = useState<{ tone: Tone; text: string }>({ tone: "info", text: "Vamos descobrir o próximo caminho? Arraste a partir do 1 ou toque nas casas vizinhas." });
+  const [msg, setMsg] = useState<{ tone: Tone; text: string }>({ tone: "info", text: "Arraste a partir do 1 ou toque nas casas vizinhas." });
   const drag = useRef(false);
   const dragFrom = useRef<Pos[] | null>(null); // caminho antes do arrasto (para desfazer se virar pinça)
   const last = useRef<string>("");
   const say = (tone: Tone, text: string) => setMsg({ tone, text });
   const head = path[path.length - 1];
+  // Caminho que cobre todas as casas sem terminar no maior número: o aviso espera a pessoa parar por um instante.
+  const deadEnd = path.length === z.size * z.size && !isZipSolved(path, z);
+  useRevealedErrors(useMemo(() => (deadEnd ? ["fim"] : []), [deadEnd]), path, () => {
+    if (won) return;
+    sfx("error");
+    say("warn", `Todas as casas foram usadas, mas o caminho precisa terminar no ${z.max}. Volte um trecho e tente outra rota.`);
+  });
 
   function step(p: Pos, fromDrag: boolean) {
     if (won) return;
@@ -47,17 +55,16 @@ export default function ZipGame({ puzzle, active, onMenu, onRules, onFeedback, o
     if (!res.ok) {
       if (fromDrag && res.reason === "longe") return;
       sfx(res.reason === "ordem" ? "error" : "block");
-      if (res.reason === "ordem") say("warn", `Calma! Ainda falta passar pelo número ${res.expected} antes deste. Quer tentar outra rota?`);
+      if (res.reason === "ordem") say("warn", `Passe pelo ${res.expected} antes deste número.`);
       else if (res.reason === "longe") say("info", "Escolha uma casa vizinha à ponta do caminho (sem diagonais).");
       return;
     }
     const next = [...path, p];
     setPath(next); setTip(null);
     const n = z.nums[p.r][p.c];
-    if (!isZipSolved(next, z)) sfx(next.length === total ? "error" : n > 0 ? "progress" : "place", { pos: next.length / total });
+    if (!isZipSolved(next, z)) sfx(n > 0 ? "progress" : "place", { pos: next.length / total });
     if (isZipSolved(next, z)) { play.win(); say("ok", `Caminho completo! Do 1 ao ${z.max}, passando por todas as casas.`); return; }
-    if (next.length === z.size * z.size) say("warn", "Todas as casas foram usadas, mas o caminho precisa terminar no maior número. Que tal voltar e tentar outra rota?");
-    else if (n > 0) say("ok", `Boa! Você alcançou o ${n}.${n === z.max ? " Agora preencha as casas que faltam." : ""}`);
+    if (n > 0) say("ok", `Boa! Você alcançou o ${n}.${n === z.max ? " Agora preencha as casas que faltam." : ""}`);
     else say("info", `${next.length} de ${z.size * z.size} casas no caminho.`);
   }
 

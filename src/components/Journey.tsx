@@ -120,7 +120,6 @@ export default function Journey({ game, done, focus, justDone, justUnlocked, onP
         <div className="jtop">
           <button className="back" onClick={onBack}>‹ Início</button>
           <button className="back jhelp" onClick={onHelp}><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9.5" /><path d="M9.3 9.2a2.8 2.8 0 0 1 5.4 1c0 1.9-2.7 2.4-2.7 4" /><path d="M12 17.6h.01" /></svg>Como jogar</button>
-          <button className="back jfb" onClick={onFeedback} aria-label="Dar opinião sobre o MindLoop" title="Dar opinião"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M4.5 5.5h15A1.5 1.5 0 0 1 21 7v8.5a1.5 1.5 0 0 1-1.5 1.5H10l-4.5 3.5V17h-1A1.5 1.5 0 0 1 3 15.5V7a1.5 1.5 0 0 1 1.5-1.5z" /></svg></button>
         </div>
         <div className="title">
           <Gem kind={game} size={52} />

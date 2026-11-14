@@ -4,9 +4,10 @@ import ZoomBoard from "./ZoomBoard";
 import GameToolbar from "./GameToolbar";
 import { useHintNudge, useLevelPlay } from "./useLevelPlay";
 import { useSfx } from "./useSound";
+import { useRevealedErrors } from "./useRevealedErrors";
 import { tangoLinesDone } from "../lib/sound/progress";
 import TangoSymbol, { SYMBOL_NAME, SYMBOL_PLURAL } from "./TangoSymbol";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import {
   CRISTAL, ORBE, type Cell, type Deduction, type Problem, type TGrid, type TangoPuzzle,
   cloneT, filledT, findProblems, isTangoSolved, nextDeduction, other, parseTango, signCells, solveLogically,
@@ -17,10 +18,6 @@ const ICON: Record<Tone, string> = { info: "ℹ", ok: "✓", warn: "!", hint: "?
 type Move = { r: number; c: number; prev: number };
 
 interface Props { puzzle: TangoPuzzle; active: boolean; onMenu: () => void; onRules: () => void; onFeedback: () => void; onWin: (ms: number) => void; onCelebrated: () => void; onHint?: () => void }
-
-// Tocar numa casa passa por vazia → Cristal → Orbe. Quem quer um Orbe passa pelo Cristal no caminho,
-// então o erro causado por um toque só aparece se a casa ficar assim por um instante.
-export const ERROR_DELAY_MS = 900;
 
 // Animação de conclusão: os símbolos "dançam" em onda, cada sinal = / × se confirma e as linhas equilibradas acendem.
 const FX_MS = 3200;
@@ -67,16 +64,16 @@ export default function TangoGame({ puzzle, active, onMenu, onRules, onFeedback,
   const isGiven = (r: number, c: number) => givens[r][c] !== 0;
 
   const problems = useMemo(() => findProblems(grid, signs), [grid, signs]);
-  // Casa recém-tocada cujo erro ainda está "em espera" (a pessoa pode tocar de novo para trocar o símbolo).
-  const [pending, setPending] = useState<string | null>(null);
-  const pendingTimer = useRef<number | undefined>(undefined);
-  const gridRef = useRef(grid);
-  gridRef.current = grid;
-  useEffect(() => () => window.clearTimeout(pendingTimer.current), []);
-  const touches = (p: Problem, key: string) => p.cells.some(([r, c]) => `${r}-${c}` === key);
-  const shown = useMemo(() => (pending ? problems.filter((p) => !touches(p, pending)) : problems), [problems, pending]);
-  const bad = useMemo(() => new Set(shown.flatMap((p) => p.cells.map(([r, c]) => `${r}-${c}`))), [shown]);
-  function clearPending() { window.clearTimeout(pendingTimer.current); setPending(null); }
+  // Erros só aparecem depois que a pessoa para de jogar por um instante (inclui o toque em ciclo vazio → Cristal → Orbe).
+  // O símbolo faz parte da chave: trocar o símbolo de uma casa reinicia a espera dela.
+  const problemKeys = useMemo(() => [...new Set(problems.flatMap((p) => p.cells.map(([r, c]) => `${r}-${c}:${grid[r][c]}`)))], [problems, grid]);
+  const errs = useRevealedErrors(problemKeys, grid, (fresh) => {
+    if (won) return;
+    sfx("error");
+    const p = problems.find((x) => x.cells.some(([r, c]) => fresh.includes(`${r}-${c}:${grid[r][c]}`))) ?? problems[0];
+    say("warn", `${problemText(p, half)} Toque na casa para trocar o símbolo.`);
+  });
+  const bad = useMemo(() => new Set([...errs.visible].map((k) => k.split(":")[0])), [errs.visible]);
 
   // Sinais tocando cada casa, para descrever a grade a leitores de tela.
   const signNotes = useMemo(() => {
@@ -91,38 +88,22 @@ export default function TangoGame({ puzzle, active, onMenu, onRules, onFeedback,
     return m;
   }, [signs]);
 
-  /** delayErrors: jogada feita tocando na casa (ciclo de símbolos) — o erro espera um instante antes de aparecer. */
-  function put(r: number, c: number, v: number, delayErrors = false) {
+  function put(r: number, c: number, v: number) {
     if (won) return;
     if (isGiven(r, c)) { sfx("block"); return say("info", "Essa é uma pista fixa. Use-a para descobrir as casas vizinhas."); }
     if (grid[r][c] === v) return;
-    clearPending();
     const next = cloneT(grid);
     next[r][c] = v;
     setHistory((h) => [...h, { r, c, prev: grid[r][c] }]);
     setGrid(next); setTip(null);
     if (isTangoSolved(next, signs)) { setSel(null); play.win(); say("ok", "Grade equilibrada! Todas as linhas, colunas e sinais estão certos."); return; }
     const probs = findProblems(next, signs);
-    const mine = probs.find((p) => p.cells.some(([pr, pc]) => pr === r && pc === c));
-    // Um som por jogada. Tocando na casa (ciclo de símbolos), o erro só soa se a casa ficar errada por um instante.
+    // Um som por jogada; o som de erro só toca quando o erro é revelado (useRevealedErrors).
     const lines = v && !probs.length ? tangoLinesDone(next, signs, r, c) : 0;
-    sfx(!v ? "erase" : mine && !delayErrors ? "error" : !mine && filledT(next) === n * n ? "error" : lines ? "complete" : "place", { v, count: lines });
-    if (mine && delayErrors) {
-      const key = `${r}-${c}`;
-      setPending(key);
-      say("info", v === CRISTAL ? "Cristal colocado. Toque de novo para trocar por um Orbe." : "Orbe colocado. Toque de novo para deixar a casa vazia.");
-      pendingTimer.current = window.setTimeout(() => {
-        setPending(null);
-        const now = findProblems(gridRef.current, signs).find((p) => touches(p, key));
-        if (now) { sfx("error"); say("warn", `${problemText(now, half)} Quer tentar outro símbolo?`); }
-      }, ERROR_DELAY_MS);
-      return;
-    }
-    if (mine) say("warn", `${problemText(mine, half)} Quer tentar outro símbolo?`);
-    else if (probs.length) say("warn", "Ainda há casas marcadas com “!”. Toque nelas para ver o que corrigir.");
-    else if (!v) say("info", "Casa limpa.");
-    else if (filledT(next) === n * n) say("warn", "A grade está cheia, mas algo não fecha. Peça uma dica para encontrar a casa a trocar.");
-    else say("ok", `Boa! ${filledT(next)} de ${n * n} casas preenchidas.`);
+    sfx(!v ? "erase" : lines ? "complete" : "place", { v, count: lines });
+    if (!v) say("info", "Casa limpa.");
+    else if (filledT(next) === n * n && !probs.length) say("warn", "A grade está cheia, mas algo não fecha. Peça uma dica para encontrar a casa a trocar.");
+    else say("info", `${filledT(next)} de ${n * n} casas preenchidas.`);
   }
 
   function tap(r: number, c: number) {
@@ -130,7 +111,7 @@ export default function TangoGame({ puzzle, active, onMenu, onRules, onFeedback,
     setSel([r, c]);
     if (isGiven(r, c)) { sfx("block"); return say("info", "Essa é uma pista fixa. Use-a para descobrir as casas vizinhas."); }
     const v = grid[r][c];
-    put(r, c, v === 0 ? CRISTAL : v === CRISTAL ? ORBE : 0, true); // vazia → Cristal → Orbe → vazia
+    put(r, c, v === 0 ? CRISTAL : v === CRISTAL ? ORBE : 0); // vazia → Cristal → Orbe → vazia
   }
 
   function enter(v: number) {
@@ -145,13 +126,11 @@ export default function TangoGame({ puzzle, active, onMenu, onRules, onFeedback,
     sfx("undo");
     const next = cloneT(grid);
     next[last.r][last.c] = last.prev;
-    clearPending();
     setHistory(history.slice(0, -1)); setGrid(next); setTip(null); setSel([last.r, last.c]);
     say("info", "Última jogada desfeita.");
   }
 
   function restart() {
-    clearPending();
     sfx("undo");
     setGrid(cloneT(givens)); setHistory([]); setSel(null); setTip(null); setConfirm(false);
     say("info", "Grade restaurada ao início. Vamos de novo?");
@@ -162,7 +141,7 @@ export default function TangoGame({ puzzle, active, onMenu, onRules, onFeedback,
     sfx("hint");
     nudge.used(play.read());
     onHint?.();
-    clearPending(); // pediu ajuda: mostra tudo o que está errado agora
+    errs.revealNow(); // pediu ajuda: mostra tudo o que está errado agora
     if (problems.length) {
       const p = problems[0];
       setTip({ cell: p.cells[0], from: p.cells.slice(1) });
@@ -211,7 +190,7 @@ export default function TangoGame({ puzzle, active, onMenu, onRules, onFeedback,
         <div className="progress" role="progressbar" aria-label="Casas preenchidas" aria-valuemin={0} aria-valuemax={total} aria-valuenow={filled}>
           <i style={{ width: `${(filled / total) * 100}%` }} />
         </div>
-        <p className="muted" style={{ marginTop: 4 }}>{filled}/{total} casas · {half} de cada símbolo por linha e coluna</p>
+        <p className="muted" style={{ marginTop: 4 }}>{filled}/{total} casas</p>
       </GameHeader>
 
       <>

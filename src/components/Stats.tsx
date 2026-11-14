@@ -45,9 +45,10 @@ export default function Stats({ log, progress }: { log: PlayerLog; progress: Rec
           <dt>Ritmo médio</dt><dd>{o.avgSpeed === null ? "—" : pct(o.avgSpeed)}</dd></div>
         <div className={o.records ? "hl" : ""}><dt>Recordes pessoais</dt><dd>{o.records}</dd></div>
       </dl>
-      <p className="muted small">
-        <b>Ritmo</b> compara jogos diferentes de forma justa: cada nível tem um tempo de referência (pelo tamanho da grade e pela dificuldade). 100% = terminou exatamente nele; 150% = 1,5× mais rápido.
-      </p>
+      <details className="muted small">
+        <summary>O que é ritmo?</summary>
+        Ritmo compara jogos diferentes de forma justa: cada nível tem um tempo de referência (pelo tamanho da grade e pela dificuldade). 100% = terminou exatamente nele; 150% = 1,5× mais rápido.
+      </details>
       <Trend v={o.trend} />
 
       <div className="chart-panel">

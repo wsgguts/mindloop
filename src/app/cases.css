@@ -105,17 +105,6 @@
 .cx-pattern { display: grid; gap: 8px; }
 .cx-dir { text-align: center; font: 600 11px var(--font-body); color: var(--muted); letter-spacing: .05em; }
 .cx-line { margin: 0; padding: 0; list-style: none; display: grid; grid-template-columns: repeat(var(--n), minmax(0, 1fr)); gap: 6px; }
-.cx-pos { display: none; }
-.cx-dir .v { display: none; }
-/* Filas longas no celular em pé: a fila vira uma coluna numerada (a ordem continua inequívoca para a regra dos três seguidos). */
-@media (max-width: 520px) {
-  .cx-line.long { grid-template-columns: 1fr; gap: 4px; }
-  .cx-line.long .cx-person { grid-template-columns: 26px 1fr auto; justify-items: start; align-items: center; padding: 4px 10px; gap: 10px; }
-  .cx-line.long .cx-pos { display: grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; background: #EFE4FF; color: var(--cosmic); font: 700 12px var(--font-title); }
-  .cx-line.long .cx-sym { order: 3; width: 34px; height: 34px; }
-  .cx-line.long .cx-name { font-size: 15px; }
-  .cx-pattern:has(.long) .cx-dir .h { display: none; } .cx-pattern:has(.long) .cx-dir .v { display: inline; }
-}
 .cx-person { width: 100%; display: grid; justify-items: center; gap: 4px; padding: 8px 2px; border-radius: 14px; border: 2px solid #E4D6F5; background: #fff; cursor: pointer; transition: border-color .15s, transform .15s; }
 .cx-person:hover { border-color: #CDB8F5; } .cx-person:active { transform: scale(.96); }
 .cx-person.set { border-color: color-mix(in srgb, var(--gc) 60%, #E4D6F5); }

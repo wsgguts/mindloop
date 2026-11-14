@@ -2,22 +2,21 @@
 import { useEffect, useRef, useState } from "react";
 import BottomNav, { type Tab } from "./BottomNav";
 import Game from "./Game";
-import FeedbackFab from "./FeedbackFab";
 import Gem, { type GemKind } from "./Gem";
 import Journey from "./Journey";
 import LevelComplete, { type LeaveTo, type LevelResult } from "./LevelComplete";
-import Modal from "./Modal";
 import AchievementToast from "./AchievementToast";
 import Achievements from "./Achievements";
 import Ranking from "./Ranking";
 import Stats from "./Stats";
 import { ACH_KEY, type Achievement, type Unlocked, evaluate, parseUnlocked } from "../lib/achievements";
 import { HISTORY_KEY, type PlayerLog, addMatch, emptyLog, importLegacy, matchId, parseLog, startMatch } from "../lib/history";
-import { RANK_KEY, type RankIdentity, parseIdentity, rankingConfig, syncGame } from "../lib/ranking";
+import { RANK_KEY, RankError, rankingConfig, renamePlayer, syncGame } from "../lib/ranking";
+import { type Identity, STORE_PREFIX, createPlayer, emptySnapshot, hasProgress, issueRecovery, loadRemote, parseIdentityFull, readSnapshot, recoverPlayer, resetPlayer, sameSnapshot, setListed, syncSnapshot, writeSnapshot } from "../lib/cloud";
+import { CodeModal, NickModal, Settings } from "./account/Account";
 import { RulesContent, type RulesGame } from "./Rules";
 import { TUTORIALS, Tutorial } from "./tutorial";
 import PatchesGame from "./PatchesGame";
-import SoundControls from "./SoundControls";
 import { initSound } from "../lib/sound/engine";
 import TangoGame from "./TangoGame";
 import ZipGame from "./ZipGame";
@@ -28,7 +27,7 @@ import { PUZZLES, puzzleGrid } from "../lib/puzzles";
 import { type Times, parseTimes, recordTime } from "../lib/records";
 import type { Grid } from "../lib/sudoku";
 import { validateNick } from "../lib/nick";
-import { KEYS, readStore, writeStore } from "../lib/storage";
+import { KEYS, clearStore, onStoreWrite, readStore, writeStore } from "../lib/storage";
 import { PATCHES_PUZZLES } from "../lib/patches";
 import { TANGO_PUZZLES } from "../lib/tango";
 import { ZIP_PUZZLES } from "../lib/zip";
@@ -49,6 +48,11 @@ type Session = { game: RulesGame; idx: number; round: number };
 /** Volta à trilha logo após uma vitória: qual nível animar como concluído e qual como recém-liberado. */
 type Arrival = { game: RulesGame; justDone: number; justUnlocked?: number };
 type PerGame<T> = Record<RulesGame, T>;
+const CODE_UNSEEN_KEY = "mindloop:code-unseen"; // código de recuperação ainda não visto
+const FRESH_KEY = "mindloop:fresh"; // sessionStorage: acabou de reiniciar o jogo
+const SYNC_DELAY_MS = 2500; // espera juntar várias gravações antes de enviar
+/** Gravações que não são progresso (identidade, partida em andamento): não disparam sincronização. */
+const NO_SYNC = new Set([RANK_KEY, KEYS.save, KEYS.nick, CODE_UNSEEN_KEY]);
 
 // Para onde o "Voltar" da tela de opinião leva (ela pode ser aberta de qualquer tela pelo botão flutuante).
 const BACK_LABEL: Record<Exclude<View, "feedback">, string> = {
@@ -78,8 +82,6 @@ export default function App() {
   const [view, setView] = useState<View>("home");
   const [nick, setNick] = useState("");
   const [nickModal, setNickModal] = useState<null | { then: () => void }>(null); // o que fazer depois de salvar
-  const [draft, setDraft] = useState("");
-  const [nickError, setNickError] = useState<string | null>(null);
   const [seen, setSeen] = useState<PerGame<boolean>>(() => perGame(() => false)); // tutorial já concluído ou pulado
   /** Tutorial aberto: primeiro acesso (mostra "Pular") ou aberto pela pessoa (mostra "Fechar"). */
   const [tutorial, setTutorial] = useState<null | { game: RulesGame; first: boolean; finish: string }>(null);
@@ -105,7 +107,14 @@ export default function App() {
   const [toasts, setToasts] = useState<Achievement[]>([]); // fila de medalhas novas (uma por vez, fora da partida)
   const [winMedals, setWinMedals] = useState<Achievement[]>([]); // medalhas da vitória atual (tela de parabéns)
   const [newMedals, setNewMedals] = useState(0); // selo na aba Conquistas
-  const [rankId, setRankId] = useState<RankIdentity | null>(null);
+  // Identidade anônima (sem login): a mesma para progresso no servidor, recuperação e ranking.
+  const [me, setMe] = useState<Identity | null>(null);
+  const meRef = useRef(me);
+  meRef.current = me;
+  const [cloudIssue, setCloudIssue] = useState<null | "taken" | "offline">(null);
+  const [codeModal, setCodeModal] = useState<string | null>(null);
+  const [codeUnseen, setCodeUnseen] = useState(false);
+  const [profileTab, setProfileTab] = useState<"desempenho" | "ajustes">("desempenho");
   // Mindloop Investigação: progresso próprio (nunca altera fases, ranking ou desbloqueios).
   const [caseLog, setCaseLog] = useState<CaseLog>(emptyCaseLog);
   const caseLogRef = useRef(caseLog);
@@ -120,10 +129,10 @@ export default function App() {
   viewRef.current = view;
   const toCards = useRef(false); // ao voltar para o Início, rolar até os cards dos jogos
 
-  useEffect(() => {
-    initSound(); // prepara o áudio; nada toca antes do primeiro toque/clique da pessoa
+  /** Lê tudo do aparelho para a tela (na abertura e depois de baixar o progresso do servidor). */
+  function hydrate() {
     const n = readStore(KEYS.nick) ?? "";
-    if (n && !validateNick(n)) setNick(n);
+    setNick(n && !validateNick(n) ? n : "");
     setSeen(perGame((g) => !!readStore(TUTORIAL_KEY(g))));
     const prog = perGame((g) => parseProgress(readStore(PROGRESS_KEY(g))));
     const tms = perGame((g) => parseTimes(readStore(TIMES_KEY(g))));
@@ -143,9 +152,141 @@ export default function App() {
     setUnlocked(ev.unlocked);
     if (!stored || ev.fresh.length) writeStore(ACH_KEY, JSON.stringify(ev.unlocked));
     if (stored && ev.fresh.length) setToasts(ev.fresh);
-    setRankId(parseIdentity(readStore(RANK_KEY)));
+  }
+
+  useEffect(() => {
+    initSound(); // prepara o áudio; nada toca antes do primeiro toque/clique da pessoa
+    hydrate();
+    const id = parseIdentityFull(readStore(RANK_KEY));
+    meRef.current = id; setMe(id);
+    setCodeUnseen(readStore(CODE_UNSEEN_KEY) === "1");
     setReady(true);
+    // Depois de "Reiniciar jogo": começa como na primeira vez, já pedindo o novo apelido.
+    let fresh = false;
+    try { fresh = window.sessionStorage.getItem(FRESH_KEY) === "1"; window.sessionStorage.removeItem(FRESH_KEY); } catch { /* ignora */ }
+    if (fresh) openNick(() => {});
+    connect();
+    // Toda gravação de progresso agenda uma sincronização; ao sair do app, sincroniza na hora.
+    const off = onStoreWrite((key) => { if (!quiet.current && !NO_SYNC.has(key)) scheduleSync(); });
+    const onHide = () => { if (document.visibilityState === "hidden" && syncTimer.current) { window.clearTimeout(syncTimer.current); syncTimer.current = undefined; syncNow(); } };
+    document.addEventListener("visibilitychange", onHide);
+    return () => { off(); document.removeEventListener("visibilitychange", onHide); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // ---- Progresso no servidor (identidade anônima) ----
+  const quiet = useRef(false); // gravações feitas pela própria sincronização não reagendam outra
+  const syncTimer = useRef<number | undefined>(undefined);
+  const syncing = useRef(false);
+  const syncAgain = useRef(false);
+  const silently = (f: () => void) => { quiet.current = true; try { f(); } finally { quiet.current = false; } };
+  function saveMe(id: Identity | null) { meRef.current = id; setMe(id); silently(() => writeStore(RANK_KEY, id ? JSON.stringify(id) : null)); }
+  function markCodeUnseen(v: boolean) { setCodeUnseen(v); silently(() => writeStore(CODE_UNSEEN_KEY, v ? "1" : null)); }
+  function scheduleSync() {
+    if (!meRef.current || !rankingConfig()) return;
+    window.clearTimeout(syncTimer.current);
+    syncTimer.current = window.setTimeout(() => { syncTimer.current = undefined; syncNow(); }, SYNC_DELAY_MS);
+  }
+  /** Baixa, mescla e envia o progresso (mesmo jogador em vários aparelhos: nada se perde, nada duplica). */
+  async function syncNow() {
+    const m = meRef.current;
+    if (!m || !rankingConfig()) return;
+    if (syncing.current) { syncAgain.current = true; return; }
+    syncing.current = true;
+    try {
+      const local = readSnapshot(readStore);
+      const r = await syncSnapshot(m, local);
+      if (meRef.current?.id !== m.id) return; // a identidade mudou no meio (recuperação ou reinício)
+      if (!sameSnapshot(r.merged, local)) { silently(() => writeSnapshot(r.merged, writeStore)); hydrate(); }
+      if (r.nick && r.nick !== readStore(KEYS.nick)) { silently(() => writeStore(KEYS.nick, r.nick)); setNick(r.nick); }
+      saveMe({ ...meRef.current, rev: r.rev, listed: r.listed, nick: r.nick || meRef.current.nick });
+      setCloudIssue(null);
+    } catch (e) {
+      // O servidor não conhece mais este aparelho (conta reiniciada em outro lugar): segue só no aparelho.
+      if (e instanceof RankError && e.code === "AUTH") { saveMe(null); setCloudIssue("offline"); }
+    } finally {
+      syncing.current = false;
+      if (syncAgain.current) { syncAgain.current = false; scheduleSync(); }
+    }
+  }
+  /** Garante a identidade: cria uma para quem já tem apelido, gera o código de recuperação e sincroniza. */
+  async function connect() {
+    if (!rankingConfig()) return;
+    let m = meRef.current;
+    if (!m) {
+      const n = readStore(KEYS.nick);
+      if (!n || validateNick(n)) return;
+      try { m = await createPlayer(n, false); saveMe(m); markCodeUnseen(true); setCloudIssue(null); }
+      catch (e) { setCloudIssue(e instanceof RankError && e.code === "NICK_TAKEN" ? "taken" : "offline"); return; }
+    } else if (!m.recovery) {
+      try { const code = await issueRecovery(m); m = { ...m, recovery: code }; saveMe(m); markCodeUnseen(true); } catch { /* tenta na próxima abertura */ }
+    }
+    await syncNow();
+  }
+  /** Apelido escolhido ou trocado. Com servidor: o apelido é único entre todos os jogadores. */
+  async function saveNick(v: string): Promise<string | null> {
+    const online = !!rankingConfig();
+    const m = meRef.current;
+    if (online && m && v !== m.nick) {
+      try { await renamePlayer(m, v); saveMe({ ...m, nick: v }); }
+      catch (e) { return e instanceof RankError ? e.message : "Não foi possível salvar agora."; }
+    }
+    if (online && !m) {
+      try {
+        const id = await createPlayer(v, false);
+        saveMe(id); setCloudIssue(null); markCodeUnseen(true); setCodeModal(id.recovery ?? null);
+      } catch (e) {
+        if (e instanceof RankError && (e.code === "NICK_TAKEN" || e.code === "NICK_INVALID")) return e.message;
+        setCloudIssue("offline"); // sem internet: segue no aparelho e conecta na próxima abertura
+      }
+    }
+    setNick(v); writeStore(KEYS.nick, v);
+    const then = nickModal?.then;
+    setNickModal(null);
+    then?.();
+    scheduleSync();
+    return null;
+  }
+  /** Recupera uma identidade pelo código. Os dados do aparelho são SUBSTITUÍDOS pelos da conta (nunca misturados). */
+  async function recoverWith(code: string): Promise<string | null> {
+    try {
+      const id = await recoverPlayer(code);
+      if (meRef.current) { window.clearTimeout(syncTimer.current); await syncNow(); } // guarda o que a conta atual tinha
+      const remote = await loadRemote(id);
+      silently(() => {
+        clearStore(STORE_PREFIX);
+        writeSnapshot(remote.data ?? emptySnapshot(), writeStore);
+        writeStore(KEYS.nick, remote.nick);
+      });
+      saveMe({ ...id, nick: remote.nick, rev: remote.rev, listed: remote.listed });
+      markCodeUnseen(false);
+      setCloudIssue(null); setSession(null); setSave(null); setCaseRun(null);
+      hydrate();
+      const then = nickModal?.then;
+      setNickModal(null);
+      then?.();
+      return null;
+    } catch (e) {
+      return e instanceof RankError ? e.message : "Não foi possível recuperar agora.";
+    }
+  }
+  /** Reiniciar jogo: primeiro apaga no servidor (tudo ou nada), depois no aparelho, e recomeça do zero. */
+  async function resetAll(): Promise<string | null> {
+    const m = meRef.current;
+    if (m && rankingConfig()) {
+      try { await resetPlayer(m); }
+      catch (e) {
+        if (!(e instanceof RankError && e.code === "AUTH")) // AUTH: a conta já não existe no servidor
+          return e instanceof RankError && e.code === "NET" ? "Sem conexão agora. Nada foi apagado — tente de novo com internet." : "Não foi possível reiniciar agora. Nada foi apagado.";
+      }
+    }
+    window.clearTimeout(syncTimer.current);
+    meRef.current = null;
+    silently(() => clearStore(STORE_PREFIX));
+    try { window.sessionStorage.setItem(FRESH_KEY, "1"); } catch { /* ignora */ }
+    window.location.reload();
+    return null;
+  }
 
   // Cada tela começa do topo; a jornada cuida da própria rolagem (centraliza o nível destacado).
   useEffect(() => {
@@ -159,17 +300,7 @@ export default function App() {
 
   const persist = (s: Save | null) => { setSave(s); writeStore(KEYS.save, s ? JSON.stringify(s) : null); };
 
-  function openNick(then: () => void) { setDraft(nick); setNickError(null); setNickModal({ then }); }
-  function confirmNick(e: React.FormEvent) {
-    e.preventDefault();
-    const err = validateNick(draft);
-    if (err) return setNickError(err);
-    const v = draft.trim();
-    setNick(v); writeStore(KEYS.nick, v);
-    const then = nickModal?.then;
-    setNickModal(null);
-    then?.();
-  }
+  function openNick(then: () => void) { setNickModal({ then }); }
   function onTab(t: Tab) { setView(t); }
   // Ver a aba Conquistas zera o selo de medalhas novas.
   useEffect(() => { if (view === "achievements") setNewMedals(0); }, [view]);
@@ -231,7 +362,7 @@ export default function App() {
       setNewMedals((n) => n + ev.fresh.length);
     }
     // Ranking online: reenvia os melhores tempos do jogo (o servidor guarda só o melhor de cada nível).
-    if (rankId && rankingConfig()) syncGame(rankId, game, t.times).catch(() => { /* tenta de novo ao abrir o ranking */ });
+    if (meRef.current && rankingConfig()) syncGame(meRef.current, game, t.times).catch(() => { /* tenta de novo ao abrir o ranking */ });
   }
 
   // ---- Mindloop Investigação ----
@@ -265,7 +396,6 @@ export default function App() {
     return { solve: r.solve, medals: ev.fresh, bestMs: r.log.records[id].bestMs ?? ms };
   }
 
-  function saveRankId(id: RankIdentity | null) { setRankId(id); writeStore(RANK_KEY, id ? JSON.stringify(id) : null); }
   /** A animação no tabuleiro terminou: mostra a tela de parabéns (se a pessoa ainda está na partida). */
   function celebrated() {
     if (viewRef.current === "game") setShowComplete(true); // as medalhas novas aparecem na própria tela de parabéns
@@ -349,19 +479,29 @@ export default function App() {
   return (
     <>
       {view !== "home" && (
-        <header className={`top${view === "game" ? " in-game" : ""}`}>
+        <header className={`top${view === "game" || view === "case" ? " in-game" : ""}`}>
           <span className="brand"><img src="/cube.png" alt="" width={36} height={34} /><span className="wordmark">MindLoop</span></span>
-          {nick && <span className="chip" aria-label={`Apelido: ${nick}`}>{nick}</span>}
+          <span className="top-actions">
+            {nick && <span className="chip" aria-label={`Apelido: ${nick}`}>{nick}</span>}
+            {view !== "game" && view !== "feedback" && (
+              <button type="button" className="icon-btn" onClick={openFeedback} aria-label="Dar opinião sobre o MindLoop" title="Dar opinião">
+                <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M4.5 5.5h15A1.5 1.5 0 0 1 21 7v8.5a1.5 1.5 0 0 1-1.5 1.5H10l-4.5 3.5V17h-1A1.5 1.5 0 0 1 3 15.5V7a1.5 1.5 0 0 1 1.5-1.5z" /></svg>
+              </button>
+            )}
+          </span>
         </header>
       )}
 
-      <main id="main" className={view === "home" ? "home-main" : view === "game" ? "page in-game" : "page"}>
+      <main id="main" className={view === "home" ? "home-main" : view === "game" || view === "case" ? "page in-game" : "page"}>
         {!ready ? (
           <div className="wrap"><p role="status">Carregando…</p></div>
         ) : view === "home" ? (
           <>
             <section className="home" aria-label="Início">
               <img className="home-bg" src="/home-art.webp" alt="" aria-hidden="true" decoding="async" />
+              <button type="button" className="icon-btn home-fb" onClick={openFeedback} aria-label="Dar opinião sobre o MindLoop" title="Dar opinião">
+                <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M4.5 5.5h15A1.5 1.5 0 0 1 21 7v8.5a1.5 1.5 0 0 1-1.5 1.5H10l-4.5 3.5V17h-1A1.5 1.5 0 0 1 3 15.5V7a1.5 1.5 0 0 1 1.5-1.5z" /></svg>
+              </button>
               <div className="art">
                 <img src="/home-art.webp" width={944} height={1680} decoding="async" alt="MindLoop — Desafie sua mente. Um cubo mágico de quebra-cabeça sobre ilhas flutuantes, com os cristais dos jogos Mini Sudoku, Zip, Tango e Patches." fetchPriority="high" />
                 {ART_SPOTS.map((s) => (
@@ -377,7 +517,7 @@ export default function App() {
 
             <section id="jogos" className="screen games-home" aria-labelledby="jogos-title">
               <h1 id="jogos-title">Escolha sua aventura</h1>
-              <p className="lead">{nick ? `Bora, ${nick}! ` : ""}Cada jornada do MindLoop é um mundo de enigmas esperando por você. Use a lógica, desafie sua mente e prove que nenhum quebra-cabeça te para!</p>
+              <p className="lead">{nick ? `Bora, ${nick}! ` : ""}Quatro jornadas de enigmas esperando por você.</p>
               <div className="ggrid">
                 {CARDS.map((g) => {
                   const p = progress[g.id];
@@ -444,25 +584,40 @@ export default function App() {
           </div>
         ) : view === "profile" ? (
           <div className="wrap">
-            <h1>Perfil</h1>
-            {nick ? (
-              <div className="card"><span className="muted">Seu apelido</span><h2>{nick}</h2>
-                <button className="btn sec" onClick={() => openNick(() => setView("profile"))}>Alterar apelido</button></div>
-            ) : (
-              <div className="card"><p>Você ainda não escolheu um apelido.</p><button className="btn cta" onClick={() => openNick(() => setView("profile"))}>Escolher apelido</button></div>
-            )}
-            <p className="muted">O apelido fica salvo só neste aparelho. Não pedimos cadastro nem outros dados. Participar do ranking online é opcional (aba Ranking).</p>
-            <Stats log={log} progress={progress} />
-            <CaseSummary log={caseLog} onOpen={() => openCasebook(journeyGame)} />
-            <section className="card" aria-labelledby="snd-title">
-              <h2 id="snd-title">Sons</h2>
-              <SoundControls />
-              <p className="muted">Efeitos curtos que respondem às suas jogadas. A escolha fica salva neste aparelho e também pode ser mudada durante a partida, no menu “Mais”.</p>
-            </section>
-            <button className="btn sec" onClick={openFeedback}>Dar opinião</button>
+            <div className="page-head">
+              <h1>{nick || "Perfil"}</h1>
+              {nick && <span className="muted small">{doneCount(progress.sudoku) + doneCount(progress.zip) + doneCount(progress.tango) + doneCount(progress.patches)} fases · {Object.keys(unlocked).length} medalhas</span>}
+            </div>
+            <div className="tabs" role="tablist" aria-label="Seções do perfil">
+              {([["desempenho", "Desempenho"], ["ajustes", "Ajustes"]] as const).map(([id, label]) => (
+                <button key={id} role="tab" id={`tab-${id}`} aria-selected={profileTab === id} aria-controls={`panel-${id}`} className={profileTab === id ? "on" : ""} onClick={() => setProfileTab(id)}>
+                  {label}{id === "ajustes" && codeUnseen && <i className="dot" aria-label="(pendente)" />}
+                </button>
+              ))}
+            </div>
+            <div role="tabpanel" id={`panel-${profileTab}`} aria-labelledby={`tab-${profileTab}`} className="stack">
+              {profileTab === "desempenho" ? (
+                <>
+                  <CaseSummary log={caseLog} onOpen={() => openCasebook(journeyGame)} />
+                  <Stats log={log} progress={progress} />
+                </>
+              ) : (
+                <Settings nick={nick} me={me} online={!!rankingConfig()} issue={cloudIssue} codeUnseen={codeUnseen}
+                  onRename={() => openNick(() => {})} onShowCode={() => me?.recovery && setCodeModal(me.recovery)}
+                  onNewCode={async () => {
+                    const m = meRef.current; if (!m) return null;
+                    try { const code = await issueRecovery(m); saveMe({ ...m, recovery: code }); setCodeModal(code); return null; }
+                    catch (e) { return e instanceof RankError ? e.message : "Não foi possível gerar agora."; }
+                  }}
+                  onRecover={() => setNickModal({ then: () => {} })} onRetry={() => connect()} onReset={resetAll} onFeedback={openFeedback} />
+              )}
+            </div>
           </div>
         ) : view === "ranking" ? (
-          <Ranking nick={nick} times={times} me={rankId} onIdentity={saveRankId} />
+          <Ranking times={times} me={me}
+            onListed={async (l) => { const m = meRef.current; if (!m) return; await setListed(m, l); saveMe({ ...m, listed: l }); }}
+            onFixIdentity={() => { setProfileTab("ajustes"); setView("profile"); }}
+            onAuthLost={() => { saveMe(null); setCloudIssue("offline"); }} />
         ) : view === "achievements" ? (
           <Achievements ctx={achCtx} unlocked={unlocked} />
         ) : view === "feedback" ? (
@@ -554,27 +709,13 @@ export default function App() {
       )}
 
       {nickModal && (
-        <Modal title="Como podemos te chamar?" onClose={() => setNickModal(null)} closeLabel="Fechar">
-          <form className="stack" onSubmit={confirmNick} noValidate>
-            <p className="muted">Seu apelido identifica você nas partidas neste aparelho. Ele fica salvo só aqui — não é um cadastro.</p>
-            <div>
-              <label htmlFor="nick">Apelido</label>
-              <input id="nick" value={draft} maxLength={20} autoComplete="off" autoFocus placeholder="Ex.: Lia"
-                aria-invalid={!!nickError} aria-describedby={nickError ? "nick-err" : undefined}
-                onChange={(e) => { setDraft(e.target.value); setNickError(null); }} />
-              {nickError && <p id="nick-err" className="err" role="alert"><b aria-hidden="true">! </b>{nickError}</p>}
-            </div>
-            <button className="btn cta" type="submit">Continuar</button>
-          </form>
-        </Modal>
+        <NickModal initial={nick} renaming={!!nick} online={!!rankingConfig()} localProgress={hasProgress(readSnapshot(readStore))}
+          onSave={saveNick} onRecover={recoverWith} onClose={() => setNickModal(null)} />
       )}
+      {codeModal && <CodeModal code={codeModal} onClose={() => { setCodeModal(null); markCodeUnseen(false); }} />}
 
-      {/* Botão flutuante só nas telas de conteúdo; na partida e na jornada a opinião fica na barra/no topo (nada flutua sobre o jogo). */}
-      {ready && (view === "home" || view === "rules" || view === "profile" || view === "ranking" || view === "achievements") && !tutorial && !nickModal && !showComplete && (
-        <FeedbackFab onOpen={openFeedback} />
-      )}
-
-      <BottomNav active={TAB_OF[view]} onChange={(t) => (t === "achievements" ? openAchievements() : onTab(t))} inGame={view === "game"} badges={{ achievements: newMedals }} />
+      <BottomNav active={TAB_OF[view]} onChange={(t) => (t === "achievements" ? openAchievements() : onTab(t))} inGame={view === "game" || view === "case"}
+        badges={{ achievements: newMedals, profile: codeUnseen ? 1 : 0 }} />
     </>
   );
 }

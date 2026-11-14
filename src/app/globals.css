@@ -5,7 +5,7 @@
   --font-title: var(--ff-title, "Space Grotesk"), system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-body: var(--ff-body, Inter), system-ui, -apple-system, "Segoe UI", sans-serif;
   --nav-h: calc(64px + env(safe-area-inset-bottom, 0px));
-  --fab-room: 64px; /* espaço no fim das telas para o botão flutuante de opinião não cobrir o último conteúdo */
+  --fab-room: 0px; /* sem botão flutuante: nenhuma folga extra no fim das telas */
 }
 * { box-sizing: border-box; }
 html, body { margin: 0; background: #1B0B3F; color: var(--ink); font: 400 16px/1.5 var(--font-body); }
@@ -600,30 +600,7 @@ label { font-weight: 600; display: block; margin-bottom: 4px; }
 .pex-arrow { font: 700 22px var(--font-title); color: var(--violet); }
 .ptcell.edge-c { border-right: 0; } .ptcell.edge-r { border-bottom: 0; }
 
-/* ===== Botão flutuante de opinião (todas as telas) ===== */
-.fab { position: fixed; right: calc(14px + env(safe-area-inset-right, 0px)); bottom: calc(var(--nav-h) + 14px); z-index: 45;
-  display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 52px; padding: 0 20px 0 14px; border-radius: 999px;
-  border: 2px solid rgba(255,255,255,.4); color: #fff; font: 700 15px / 1 var(--font-title); letter-spacing: .01em; cursor: pointer;
-  background: linear-gradient(135deg, #762CEB 0%, #A23BE0 50%, #F05BC8 100%);
-  box-shadow: 0 10px 24px rgba(20,6,50,.5), 0 0 0 4px rgba(18,207,224,.22), inset 0 1px 0 rgba(255,255,255,.35);
-  -webkit-tap-highlight-color: transparent; transition: transform .15s ease-out, box-shadow .15s; animation: fab-in .45s cubic-bezier(.3,1.5,.5,1) both; }
-.fab svg { flex: none; filter: drop-shadow(0 1px 1px rgba(38,16,77,.4)); }
-.fab .fab-star { fill: var(--star); stroke: var(--star); stroke-width: 1; animation: lc-twinkle 2.4s ease-in-out infinite; transform-origin: 12px 11.5px; }
-.fab.compact { width: 52px; padding: 0; }
-.fab.compact .fab-txt { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
-@media (hover: hover) { .fab:hover { transform: translateY(-2px); box-shadow: 0 14px 28px rgba(20,6,50,.55), 0 0 0 5px rgba(18,207,224,.35), 0 0 22px rgba(240,91,200,.55), inset 0 1px 0 rgba(255,255,255,.35); } }
-.fab:active { transform: scale(.95); }
-.fab:focus-visible { outline: 3px solid var(--cyan); outline-offset: 3px; }
-@keyframes fab-in { from { transform: translateY(16px) scale(.8); opacity: 0; } }
-/* A mensagem rápida da jornada (canto de baixo) não fica por baixo do botão */
-.toast { right: calc(16px + 64px); }
-/* Celular deitado: o botão de opinião vai para a base do trilho lateral (não cobre o tabuleiro nem os controles) */
-@media (orientation: landscape) and (max-height: 540px) {
-  :root { --fab-room: 0px; }
-  .fab, .fab.compact { right: auto; left: calc(env(safe-area-inset-left, 0px) + (var(--rail) - env(safe-area-inset-left, 0px) - 48px) / 2); bottom: 10px; width: 48px; height: 48px; padding: 0; }
-  .fab .fab-txt { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
-  .toast { right: 16px; }
-}
+/* (O antigo botão flutuante de opinião virou um ícone no cabeçalho: nada flutua sobre o conteúdo.) */
 @media (orientation: landscape) and (max-height: 360px) { .bnav ul { margin-top: -40px; } }
 /* ===================== Tutoriais animados ===================== */
 .tut-scrim { z-index: 65; padding: 12px; background: rgba(15,6,40,.82); }

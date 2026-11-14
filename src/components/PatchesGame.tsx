@@ -4,6 +4,7 @@ import ZoomBoard from "./ZoomBoard";
 import GameToolbar from "./GameToolbar";
 import { useHintNudge, useLevelPlay } from "./useLevelPlay";
 import { useSfx } from "./useSound";
+import { useRevealedErrors } from "./useRevealedErrors";
 import PatchesTag, { KIND_HELP, KIND_NAME } from "./PatchesTag";
 import { useMemo, useRef, useState } from "react";
 import {
@@ -82,12 +83,20 @@ export default function PatchesGame({ puzzle, active, onMenu, onRules, onFeedbac
   const say = (tone: Tone, text: string) => setMsg({ tone, text });
 
   const problems = useMemo(() => findProblems(board, pieces), [board, pieces]);
-  const badSet = useMemo(() => new Set(problems.map((p) => p.piece)), [problems]);
+  // Peças com problema só aparecem marcadas depois que a pessoa para de jogar por um instante.
+  const keyOf = (q: Rect) => `${q.r}-${q.c}-${q.h}-${q.w}`;
+  const errs = useRevealedErrors(useMemo(() => problems.map((p) => keyOf(p.piece)), [problems]), pieces, (fresh) => {
+    if (won) return;
+    sfx("error");
+    const pr = problems.find((x) => fresh.includes(keyOf(x.piece))) ?? problems[0];
+    say("warn", coveredCount(pieces) === total ? "Toda a grade está coberta, mas há peças com “!”. Toque nelas para tirar." : `${problemText(pr)} Toque na peça para tirá-la ou desenhe outra por cima.`);
+  });
+  const badSet = useMemo(() => new Set(pieces.filter((q) => errs.visible.has(keyOf(q)))), [pieces, errs.visible]);
   const clueIndex = (q: Rect) => { const ks = cluesIn(board, q); return ks.length === 1 ? clues.indexOf(ks[0]) : -1; };
   const covered = coveredCount(pieces);
   // Legenda: só os formatos que aparecem neste nível, sempre na mesma ordem.
   const kindsUsed = (["q", "v", "h", "a"] as const).filter((kd) => clues.some((k) => k.kind === kd));
-  const placedOk = pieces.length - problems.length;
+  const placedOk = pieces.length - badSet.size;
 
   function commit(next: Rect[]) {
     setHistory((h) => [...h, pieces]);
@@ -103,14 +112,10 @@ export default function PatchesGame({ puzzle, active, onMenu, onRules, onFeedbac
     const next = [...kept, q];
     commit(next);
     if (isPatchesSolved(board, next)) { setAnchor(null); setCursor(null); play.win(); say("ok", "Grade completa! Cada peça tem um número, o tamanho e o formato certos."); return; }
-    const prob = pieceProblem(board, q);
-    // Peça certa = região concluída ("clac" + confirmação); peça errada = encaixe abafado + aviso discreto.
-    sfx(prob ? "error" : coveredCount(next) === total ? "place" : "complete", { count: area(q) });
+    // Mesmo som para qualquer peça: se ela está errada, o aviso vem depois (useRevealedErrors), não na hora.
+    sfx("complete", { count: area(q) });
     const out = replaced ? ` (${replaced === 1 ? "a peça que estava ali saiu" : `${replaced} peças que estavam ali saíram`})` : "";
-    if (prob) return say("warn", `${problemText(prob)} Toque na peça para tirá-la ou desenhe outra por cima.`);
-    const c = coveredCount(next);
-    if (c === total) return say("warn", "Toda a grade está coberta, mas ainda há peças com “!”. Toque nelas para ver o que corrigir.");
-    say("ok", `Boa! Peça de ${area(q)} casas encaixada${out}. ${c} de ${total} casas cobertas.`);
+    say("info", `Peça de ${area(q)} casas${out}. ${coveredCount(next)} de ${total} casas cobertas.`);
   }
 
   function remove(q: Rect) {
@@ -206,6 +211,7 @@ export default function PatchesGame({ puzzle, active, onMenu, onRules, onFeedbac
     onHint?.();
     setAnchor(null);
     if (problems.length) {
+      errs.revealNow(); // pediu ajuda: mostra o que está errado agora
       const p = problems[0];
       setTip({ rect: p.piece, wrong: true });
       return say("hint", `Primeiro, corrija a peça marcada com “!”. ${problemText(p)}`);

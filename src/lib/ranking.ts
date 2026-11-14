@@ -34,13 +34,15 @@ export class RankError extends Error {
 }
 
 const MESSAGES: Record<string, string> = {
-  NICK_TAKEN: "Esse apelido já está sendo usado no ranking. Escolha outro.",
+  NICK_TAKEN: "Esse apelido já está em uso. Escolha outro — ou, se ele é seu, use seu código de recuperação.",
   NICK_INVALID: "Esse apelido não é permitido no ranking. Escolha outro.",
   AUTH: "Não reconhecemos este aparelho no ranking. Entre de novo para continuar participando.",
   LIMIT: "Muitos envios seguidos. Espere um pouco e tente de novo.",
+  BAD_CODE: "Código não encontrado. Confira as letras e os números e tente de novo.",
+  STALE: "Seu progresso mudou em outro aparelho. Tente de novo.",
 };
 
-async function rpc<T>(fn: string, body: Record<string, unknown>): Promise<T> {
+export async function rpc<T>(fn: string, body: Record<string, unknown>): Promise<T> {
   const cfg = rankingConfig();
   if (!cfg) throw new RankError("Ranking online não configurado.", "OFF");
   const headers: Record<string, string> = { "Content-Type": "application/json", apikey: cfg.key };

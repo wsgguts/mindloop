@@ -23,11 +23,12 @@ O projeto fica no OneDrive; `scripts/link-next.mjs` (rodado antes do `dev` e do 
 - **Celular deitado:** a navegação vira um trilho lateral e o tabuleiro fica ao lado dos controles, do tamanho da tela.
 - **Tutoriais animados:** cada jogo tem o seu, com passos curtos (explicação, demonstração animada no tabuleiro real do jogo, “Observe”), barra de passos tocável, Voltar/Próximo, Repetir animação, Recomeçar e Pular. Abre sozinho na primeira partida de cada jogo e pode ser reaberto pelo “?” ao lado do título, pelo botão “Como jogar” da partida, pela jornada e pela aba Regras.
 - **Tela de parabéns:** **Continuar** abre o **próximo nível** da jornada; se a pessoa não tocar em nada, ao fim do temporizador (6,5 s) ela volta para a **jornada**. As duas ações são independentes: o primeiro evento vence e os demais são ignorados (sem navegação dupla). No nível 100 o botão vira “Ver jornada”. Medalhas ganhas na vitória aparecem ali mesmo, com “Ver todas as conquistas”.
-- **Ranking** (aba própria): ranking geral e por jogo (com filtro de dificuldade), pódio, lista, posição e destaque da própria pessoa. Sem login. Veja “Ranking online”.
+- **Ranking** (aba própria): ranking geral e por jogo (com filtro de dificuldade), pódio, lista, posição e destaque da própria pessoa. Sem login. Veja “Conta anônima, progresso no servidor e ranking”.
 - **Conquistas** (aba própria): 49 medalhas em 6 categorias (incluindo Investigação) e 4 raridades, com progresso, data de obtenção e o que falta.
 - **Meu desempenho** (Perfil): partidas, fases, aproveitamento, jornadas, ritmo, recordes, atividade dos últimos 14 dias, comparação entre jogos e, por jogo, tempo médio, melhor tempo, tentativas por vitória, evolução e histórico.
 - **Regras:** aba própria com o texto de referência de cada jogo.
-- **Opinião** (Perfil → Dar opinião): nota e comentário anônimos, enviados ao Netlify Forms (veja abaixo).
+- **Perfil:** abas Desempenho (estatísticas e investigações) e Ajustes (apelido, código de recuperação, sons, opinião e Reiniciar jogo).
+- **Opinião** (ícone de balão no cabeçalho, ou Perfil → Ajustes): nota e comentário anônimos, enviados ao Netlify Forms (veja abaixo).
 
 ### Os jogos
 | Jogo | Regra | Grades | Níveis gerados por |
@@ -50,7 +51,8 @@ Todos os níveis têm **solução única** e se resolvem **só com lógica** —
 | `mindloop:save` | partida de Mini Sudoku em andamento |
 | `mindloop:history` | histórico central de vitórias (jogo, nível, tempo, data, dicas, 1ª vez, recorde), sequência de vitórias e partidas iniciadas por jogo |
 | `mindloop:achievements` | conquistas obtidas: id → data |
-| `mindloop:rank` | identidade anônima do ranking (id, token, apelido) — só existe se a pessoa entrou no ranking |
+| `mindloop:rank` | identidade anônima (id, token, apelido, código de recuperação, participa do ranking, revisão do progresso no servidor) |
+| `mindloop:code-unseen` | o código de recuperação ainda não foi visto (selo no Perfil) |
 | `mindloop:cases` | Mindloop Investigação: por mistério, 1ª solução, melhor tempo, menor nº de dicas, XP, se foi pulado e o andamento salvo; histórico de soluções |
 
 **Um evento, todos os sistemas.** Cada vitória passa por um único ponto (`winLevel` em `App.tsx`), chamado uma vez por partida: progresso da jornada → recorde → histórico (`lib/history.ts`) → conquistas (`lib/achievements.ts`) → ranking (`lib/ranking.ts`). Estatísticas (`lib/stats.ts`) são calculadas desse histórico. Cada registro tem id próprio, então recarregar a página não duplica partidas, conquistas ou pontos.
@@ -111,19 +113,26 @@ Definida em `src/lib/scoring.ts` e repetida no banco (`supabase/migrations`). O 
 Para criar uma conquista nova, acrescente um item em `ACHIEVEMENTS` (`src/lib/achievements.ts`). Os limites de tempo ficam em constantes no mesmo arquivo. Nunca mude o `id` de uma conquista publicada.
 Notas: “Primeiro recorde pessoal” do briefing é a mesma condição de “Contra o Relógio”, por isso o especial virou “Caçador de Recordes” (10). Como todas as jornadas já começam liberadas, “Explorador” vale ao liberar um novo capítulo.
 
-## Ranking online (Supabase)
-Sem login: na primeira participação o aparelho ganha um **id anônimo + token aleatório** (o banco guarda só o hash do token) e a pessoa escolhe um apelido (único, sem palavrões; dá para trocar ou sair do ranking, o que apaga os dados dela no servidor).
-O navegador envia só **(jogo, nível, tempo)**. O servidor **calcula os pontos**, recusa tempos abaixo do mínimo plausível do nível e níveis pulados, e limita envios por minuto. As tabelas têm RLS ligado e nenhuma política: tudo passa por funções (`register_player`, `rename_player`, `delete_player`, `submit_results`, `get_ranking`). O ranking só devolve apelido, pontos e contagens.
+## Conta anônima, progresso no servidor e ranking (Supabase)
+**Sem login.** Ao escolher o apelido, o aparelho ganha uma **identidade anônima** (id + token aleatório; o banco guarda só o hash do token) e um **código de recuperação** de 16 caracteres (ex.: `ABCD-EFGH-JKMN-PQRS`; o banco guarda só o hash). Nenhum e-mail, senha ou dado pessoal.
+- **Progresso no servidor:** jornadas, tempos, histórico, conquistas, investigações e preferências ficam também no banco (`player_state`), com número de revisão. Cada gravação no aparelho agenda uma sincronização (2,5 s) e, ao sair do app, ela é feita na hora. A mesclagem (`src/lib/cloud.ts`) nunca perde nada do mesmo jogador: fases se somam, vale o melhor tempo, partidas e conquistas se unem pelo id. Se outro aparelho salvou no meio, o servidor responde `STALE` e o app baixa, mescla e tenta de novo.
+- **Limpar os dados do navegador:** a conta continua no servidor. Para voltar a ela: “Já jogou antes? Recuperar com código” (no pedido de apelido) ou Perfil → Ajustes. **Só o código recupera** — digitar o mesmo apelido nunca dá acesso à conta de outra pessoa (o apelido continua único e é recusado). Recuperar num aparelho com progresso de outra conta **substitui** os dados do aparelho (com aviso), nunca mistura históricos.
+- **Ranking:** participar é opcional (aba Ranking → Participar). Sair do ranking só esconde o apelido; pontos e progresso continuam guardados.
+- **Reiniciar jogo** (Perfil → Ajustes): pede para digitar `REINICIAR`, apaga primeiro no servidor (`reset_player`: jogador, resultados, progresso e aparelhos numa única transação; o apelido fica livre) e só depois no aparelho; recarrega já pedindo um novo apelido. Sem internet, nada é apagado.
+- O navegador envia só **(jogo, nível, tempo)** para o ranking; o servidor **calcula os pontos**, recusa tempos impossíveis e níveis pulados e limita envios por minuto. RLS ligado e nenhuma política: tudo passa por funções. O ranking devolve só apelido, pontos e contagens.
 
 **Configuração (uma vez):**
 1. Crie um projeto em supabase.com (pode ser o plano gratuito).
-2. Rode as migrações, em ordem: `supabase/migrations/20261109000100_ranking.sql` e depois `20261109000200_level_ref.sql` (pelo SQL Editor do painel ou com `supabase db push`). Elas só criam objetos novos e não apagam nada.
+2. Rode as migrações, em ordem (SQL Editor ou `supabase db push`): `20261109000100_ranking.sql`, `20261109000200_level_ref.sql` e `20261114000100_identity.sql`. Todas só acrescentam objetos e não apagam dados; a última pode ser aplicada num banco que já tem jogadores (eles continuam no ranking e o token antigo continua valendo; ao abrir o app, cada um recebe um código de recuperação).
 3. Em **Project Settings → API**, copie a URL do projeto e a chave **publishable** (ou a “anon”, a antiga).
-4. Crie `.env.local` a partir de `.env.example` com `NEXT_PUBLIC_SUPABASE_URL` e `NEXT_PUBLIC_SUPABASE_ANON_KEY`, e cadastre as mesmas variáveis na Netlify (Site configuration → Environment variables). Depois, faça um novo deploy.
+4. Crie `.env.local` a partir de `.env.example` com `NEXT_PUBLIC_SUPABASE_URL` e `NEXT_PUBLIC_SUPABASE_ANON_KEY`, e cadastre as mesmas variáveis na Netlify. Depois, faça um novo deploy.
 
-Sem essas variáveis o app funciona igual e a aba Ranking mostra só a pontuação real da pessoa (nunca jogadores inventados).
+Sem essas variáveis o app funciona igual, só no aparelho, e a aba Ranking mostra só a pontuação real da pessoa.
 Se mudar a fórmula ou os níveis, rode `npx vite-node scripts/gen_ranking_sql.ts` para regenerar `level_ref` e aplique a migração gerada.
-**Limites conhecidos:** o servidor não confere a solução do tabuleiro (só tempo e ordem dos níveis), então alguém com conhecimento técnico ainda pode enviar tempos falsos, desde que sejam plausíveis. O progresso de cada pessoa fica no aparelho; trocar de aparelho começa outra identidade no ranking.
+**Limites conhecidos:** o servidor não confere a solução do tabuleiro (só tempo e ordem dos níveis). Quem perder o código **e** os dados do navegador não recupera a conta (é o preço de não ter login); o apelido antigo continua reservado para ela.
+
+## Validação das jogadas
+Erros (número repetido, três símbolos iguais, peça errada, pista contrariada nas investigações) **não aparecem a cada toque**: só depois que o tabuleiro fica parado por `ERROR_REVEAL_MS` (1,2 s, em `src/components/useRevealedErrors.ts`, igual para os 4 jogos e as investigações). Erro corrigido some na hora; casa alterada recomeça a espera; o som de erro e a contagem que acende o botão Dica só contam erros revelados. Pedir uma dica mostra tudo na hora. No Zip, passar por um número fora de ordem continua sendo bloqueado (é uma regra de movimento, como uma parede).
 
 ## Estrutura
 ```

@@ -4,7 +4,6 @@ import { useSfx } from "../useSound";
 import { casesOf } from "../../lib/cases/catalog";
 import { MEDAL_LABEL, medalFor } from "../../lib/cases/config";
 import { type CaseLog, goldCount, recordOf, solvedCount, xpTotal } from "../../lib/cases/progress";
-import { KIND_NAME, KIND_OF } from "../../lib/cases/themes";
 import { ALL_GAMES, GAME_META } from "../../lib/games";
 import { CHAPTERS, isDone, type JourneyGame } from "../../lib/journey";
 import { formatTime } from "../../lib/records";
@@ -50,7 +49,6 @@ export default function CaseBook({ game, log, progress, onGame, onOpen, onBack }
         <div><dt>Lupas de ouro</dt><dd>{goldCount(log, game)}</dd></div>
         <div className="hl"><dt>XP total (todos os jogos)</dt><dd>{xpTotal(log)}</dd></div>
       </dl>
-      <p className="muted small">{KIND_NAME[KIND_OF[game]]}: cada mistério libera quando você conclui a fase indicada.</p>
 
       {CHAPTERS[game].map((ch) => {
         const list = cases.filter((c) => c.chapter === ch.id);

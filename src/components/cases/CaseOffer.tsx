@@ -52,8 +52,7 @@ export default function CaseOffer({ c, nextLevel, onInvestigate, onSkip }: Props
             <button ref={go} className="cx-go" onClick={() => { sfx("ui"); onInvestigate(); }}>Investigar agora</button>
             <button className="cx-skip" onClick={() => { sfx("ui"); onSkip(); }} aria-label={`Pular investigação e ir para o nível ${nextLevel}`}>Pular</button>
           </div>
-          <p className="cx-foot">Desafio opcional • Aproximadamente {a} a {b} minutos</p>
-          <p className="cx-foot small">Pular não tira pontos nem bloqueia nada: o mistério fica guardado no caderno de investigações.</p>
+          <p className="cx-foot">Opcional • {a} a {b} minutos • pular não tira pontos</p>
         </div>
       </section>
     </div>

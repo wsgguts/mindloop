@@ -1,0 +1,189 @@
+/* ===================== Padrão de interface do MindLoop =====================
+   Carregado por último. Define os tokens (espaços, raios, títulos) e os componentes comuns que todas as telas
+   usam: cabeçalho, título de página, abas, botões de ícone, estados de carregamento, Ajustes e conta.
+   A identidade (cores, artes, cristais, tipografia Space Grotesk + Inter) continua a mesma. */
+
+:root {
+  --sp-1: 4px; --sp-2: 8px; --sp-3: 12px; --sp-4: 16px; --sp-5: 24px;
+  --r-sm: 10px; --r-md: 14px; --r-lg: 20px;
+  --top-h: 52px;
+  --tap: 44px; /* alvo mínimo de toque */
+}
+
+/* ---------- Cabeçalho das telas internas: mais baixo, com o atalho de opinião ---------- */
+.top { min-height: var(--top-h); padding: 6px 16px; padding-top: calc(6px + env(safe-area-inset-top, 0px)); }
+.brand img { height: 30px; }
+.wordmark { font-size: 20px; }
+.top-actions { display: inline-flex; align-items: center; gap: var(--sp-2); min-width: 0; }
+.icon-btn { flex: none; display: inline-grid; place-items: center; width: var(--tap); height: var(--tap); border-radius: 50%; padding: 0; cursor: pointer;
+  border: 2px solid rgba(255,255,255,.35); background: rgba(255,255,255,.08); color: #fff; -webkit-tap-highlight-color: transparent; }
+.icon-btn:hover { background: rgba(255,255,255,.18); }
+.icon-btn:focus-visible { outline: 3px solid var(--cyan); outline-offset: 2px; }
+.home .home-fb { position: absolute; z-index: 3; top: calc(10px + env(safe-area-inset-top, 0px)); right: calc(10px + env(safe-area-inset-right, 0px));
+  background: rgba(18,6,40,.45); backdrop-filter: blur(4px); }
+
+/* ---------- Páginas: título + ação na mesma linha, menos altura perdida ---------- */
+.wrap { gap: var(--sp-3); padding: 18px 16px 24px; }
+@media (min-width: 640px) { .wrap { gap: var(--sp-4); padding: 28px 32px 36px; } }
+.wrap > h1, .page-head h1 { font-size: 24px; color: var(--cosmic); }
+@media (min-width: 640px) { .wrap > h1, .page-head h1 { font-size: 28px; } }
+.page-head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--sp-2); flex-wrap: wrap; min-width: 0; }
+.page-head h1 { overflow-wrap: anywhere; }
+.small { font-size: 13px; }
+
+/* ---------- Abas (Perfil: Desempenho | Ajustes) ---------- */
+.tabs { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 4px; padding: 4px; border-radius: 999px; background: #EFE4FF; }
+.tabs button { position: relative; min-height: 40px; border: 0; border-radius: 999px; background: transparent; color: var(--violet); font: 600 15px var(--font-body); cursor: pointer; }
+.tabs button.on { background: #fff; color: var(--cosmic); box-shadow: 0 2px 6px rgba(38,16,77,.15); }
+.tabs button:focus-visible { outline: 3px solid var(--cyan); outline-offset: 1px; }
+.dot { position: absolute; top: 8px; right: 18%; width: 8px; height: 8px; border-radius: 50%; background: var(--magenta); }
+
+/* ---------- Botões: variações comuns ---------- */
+.btn { font: 600 16px var(--font-body); border-radius: 12px; }
+.btn.danger { background: #C8243F; border-color: #C8243F; color: #fff; } .btn.danger:hover { background: #A81C33; }
+.btn.danger:disabled { opacity: .45; }
+.linkish { justify-self: start; min-height: 40px; padding: 0 2px; border: 0; background: none; color: var(--violet); font: 600 15px var(--font-body); text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+.linkish:focus-visible { outline: 3px solid var(--cyan); outline-offset: 2px; border-radius: 6px; }
+
+/* ---------- Ajustes e conta ---------- */
+.settings .card { gap: var(--sp-2); }
+.settings h2 { font-size: 18px; color: var(--cosmic); }
+.set-row { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-3); }
+.set-row > div { display: grid; gap: 2px; min-width: 0; }
+.set-row b { color: var(--cosmic); overflow-wrap: anywhere; }
+.set-row.attention { padding: 10px; border-radius: var(--r-md); background: #FFF7DB; border: 2px solid var(--star); }
+.danger-zone { border-color: #F3C4CD; }
+.code-box { display: grid; place-items: center; padding: 14px 8px; border-radius: var(--r-md); background: var(--cosmic); }
+.code-box code { font: 700 clamp(18px, 6vw, 24px)/1.2 ui-monospace, "SFMono-Regular", Consolas, monospace; letter-spacing: .08em; color: var(--star); user-select: all; }
+.code-input { font-family: ui-monospace, Consolas, monospace; letter-spacing: .08em; text-transform: uppercase; }
+
+/* ---------- Modais: nunca maiores que a tela ---------- */
+.modal { max-height: calc(100svh - 24px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)); padding: 18px; }
+.modal-head h2 { font-size: 20px; color: var(--cosmic); }
+.modal .list { padding-left: 18px; }
+
+/* ---------- Carregando ---------- */
+.skeleton-list { display: grid; gap: 8px; }
+.skeleton-list i { display: block; height: 44px; border-radius: 12px; background: linear-gradient(90deg, #EFE4FF 0%, #F8F2FF 50%, #EFE4FF 100%); background-size: 200% 100%; animation: skel 1.2s linear infinite; }
+@keyframes skel { to { background-position: -200% 0; } }
+
+/* ---------- Ranking: pontuação e ação na mesma faixa ---------- */
+.my-score { padding: 12px 14px; }
+.my-score b { font-size: 28px; } .my-score b small { font-size: 14px; color: #E6D9FA; }
+.my-actions { display: flex; gap: 6px; }
+.my-score .btn.sec { background: transparent; color: #fff; border-color: rgba(255,255,255,.55); }
+.chips.small button { min-height: 38px; padding: 0 12px; }
+
+/* ---------- Início: cards um pouco mais baixos ---------- */
+.gcard { min-height: 0; padding: 14px 10px 12px; }
+.gcard img { width: 72px; height: 72px; }
+
+/* ---------- Jornada: cabeçalho compacto no celular ---------- */
+@media (max-width: 520px) {
+  .journey { gap: 14px; }
+  .jbanner { padding: 10px 12px; gap: 10px; }
+  .jbanner img { width: 48px; height: 48px; }
+  .jbanner p:not(.jsub) { display: none; } /* a frase do mundo aparece no título e na arte; o objetivo do capítulo fica */
+}
+
+/* ===================== Investigação no celular ===================== */
+/* Etapa 1 — história: texto integral, leitura confortável, botão sempre visível no rodapé. */
+.cx-story-stage { gap: 10px; }
+.cx-story-art { position: relative; aspect-ratio: 16 / 8; border-radius: var(--r-md); overflow: hidden; border: 3px solid var(--gc); background: #1B0B3F; }
+.cx-story-art img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: center 35%; }
+.cx-story-art .cx-scene-art { position: absolute; right: 4%; top: 10%; bottom: 10%; left: auto; width: auto; height: 80%; }
+.cx-story-stage h1 { font-size: 24px; color: var(--cosmic); }
+.cx-story-stage .cx-story { font-size: 17px; line-height: 1.6; color: #2E2442; }
+.cx-facts { margin: 0; padding: 0; list-style: none; display: flex; flex-wrap: wrap; gap: 6px; }
+.cx-facts li { padding: 4px 10px; border-radius: 999px; background: #F1E8FF; color: var(--cosmic); font: 600 13px var(--font-body); }
+/* O botão fica DENTRO do cartão (o cartão recorta o que passa da borda): grudado no rodapé da tela enquanto o texto rola e,
+ * em telas altas, logo abaixo das informações do caso. Nunca some. */
+.cx-sticky { position: sticky; z-index: 2; bottom: 0; display: grid; margin: 4px -4px 0; padding: 12px 4px calc(4px + env(safe-area-inset-bottom, 0px));
+  background: linear-gradient(rgba(255,248,252,0), var(--cloud) 35%); }
+.cx-sticky .btn { width: min(100%, 520px); justify-self: center; min-height: 52px; font-size: 17px; }
+
+/* Etapa 2 — investigação: cabeçalho de uma linha, tabuleiro em cima, pistas embaixo. */
+.cx-play { gap: 10px; padding-top: 10px; grid-template-columns: minmax(0, 1fr); }
+/* Colunas sempre limitadas à largura da tela (sem isso, um conteúdo largo empurra o painel para fora). */
+.cx-grid, .cx-board, .cx-clues, .cx-code, .cx-route, .cx-layout, .cx-pattern { grid-template-columns: minmax(0, 1fr); min-width: 0; }
+.cx-head { display: grid; grid-template-columns: auto 1fr auto auto; align-items: center; gap: 8px; }
+.cx-back.icon { width: var(--tap); min-height: var(--tap); padding: 0; display: grid; place-items: center; font-size: 20px; }
+.cx-head-t { display: grid; min-width: 0; line-height: 1.25; }
+.cx-head-t b { font: 700 16px var(--font-title); color: var(--cosmic); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cx-head-t small { font-size: 12px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cx-timer { font-size: 14px; padding: 4px 8px; }
+.cx-clues h2 { display: flex; align-items: baseline; gap: 8px; font-size: 16px; }
+.cx-clues h2 small { font: 500 12px var(--font-body); color: var(--muted); }
+.cx-board { padding: 10px; gap: 8px; }
+.cx-board .note { padding: 8px 10px; font-size: 14px; }
+.cx-actions-bar { grid-template-columns: auto auto minmax(0, 1fr); }
+.cx-confirm { overflow: hidden; text-overflow: ellipsis; }
+.set-row .btn { white-space: nowrap; flex: none; }
+.cx-actions-bar .btn { min-height: 44px; font-size: 14px; padding: 0 12px; white-space: nowrap; }
+.cx-actions-bar small { font-size: 12px; opacity: .8; }
+.cx-confirm { grid-column: auto; }
+.cx-list button { padding: 7px 9px; font-size: 14px; }
+.cx-rules li { padding: 6px 9px; font-size: 13px; }
+
+/* Fila do Tango: sempre uma linha só (a ordem importa para "três iguais seguidos"). */
+.cx-line { gap: 4px; }
+.cx-person { padding: 6px 1px; border-radius: 10px; gap: 2px; }
+.cx-sym { width: min(36px, 100%); height: auto; aspect-ratio: 1; }
+.cx-name { font-size: clamp(10px, 2.8vw, 13px); }
+
+/* Celular em pé: tudo da investigação numa tela, sem rolar a página — as pistas rolam dentro do painel. */
+@media (max-width: 899px) and (orientation: portrait) {
+  .wrap.cx-play { min-height: 0; height: calc(100svh - 16px - env(safe-area-inset-bottom, 0px)); display: grid; grid-template-rows: auto minmax(0, 1fr); margin-top: 8px; }
+  .cx-play .cx-grid { display: grid; grid-template-rows: auto minmax(0, 1fr); grid-template-columns: minmax(0, 1fr); gap: 8px; min-height: 0; }
+  .cx-play .cx-clues { min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 2px 2px 8px; align-content: start;
+    border-top: 1px solid #E4D6F5; -webkit-mask-image: linear-gradient(#000 calc(100% - 14px), transparent); mask-image: linear-gradient(#000 calc(100% - 14px), transparent); }
+  .cx-map { aspect-ratio: 16 / 10; }
+  .cx-shelf { max-width: 300px; }
+  .cx-pad { grid-template-columns: repeat(auto-fit, minmax(40px, 1fr)); }
+  .cx-pad button { min-height: 42px; font-size: 16px; }
+}
+@media (max-width: 899px) and (orientation: portrait) and (max-height: 700px) {
+  .cx-dial-face { width: 42px; height: 42px; font-size: 20px; }
+  .cx-safe { padding: 8px; }
+  .cx-niche { border-radius: 8px; } .cx-obj { font-size: 22px; }
+  .cx-shelf { max-width: 200px; padding: 6px; gap: 4px; }
+  .cx-piece { min-height: 36px; padding: 0 10px 0 6px; font-size: 13px; } .cx-piece .cx-obj { font-size: 17px; }
+  .cx-layout, .cx-route, .cx-code { gap: 6px; }
+  .cx-help { font-size: 12px; }
+  .cx-board .note { padding: 6px 10px; font-size: 13px; }
+}
+
+/* Telas largas e celular deitado: tabuleiro à esquerda, pistas à direita (depois da regra de uma coluna acima). */
+@media (min-width: 900px) {
+  .cx-play .cx-grid { grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); align-items: start; }
+}
+@media (orientation: landscape) and (max-height: 540px) {
+  .wrap.cx-play { height: calc(100svh - 18px); display: grid; grid-template-rows: auto minmax(0, 1fr); margin-top: 6px; }
+  .cx-play .cx-grid { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); align-items: stretch; min-height: 0; }
+  .wrap.cx-play { padding-bottom: 10px; }
+  .cx-play .cx-board { position: static; overflow-y: auto; min-height: 0; max-height: 100%; align-content: start; }
+  .cx-play .cx-clues { overflow-y: auto; min-height: 0; max-height: 100%; }
+  .cx-story-art { aspect-ratio: 16 / 5; }
+}
+
+/* Partida no celular deitado: a coluna de controles cabe inteira (mensagem mais compacta). */
+@media (orientation: landscape) and (max-height: 540px) {
+  .wrap.play .note { padding: 6px 10px; font-size: 13px; line-height: 1.35; }
+  .wrap.play .zoom-hint:empty { display: none; }
+}
+@media (orientation: landscape) and (max-height: 540px) {
+  .wrap.play .game-title p.muted { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+  .wrap.play .game-title > div { min-width: 0; }
+  .wrap.play .gprogress > p.muted { display: none; } /* a barra de progresso já mostra o avanço */
+}
+@media (orientation: landscape) and (max-height: 400px) {
+  .wrap.play .ghead .game-title img { width: 36px; height: 36px; }
+  .wrap.play .gprogress { margin-top: 2px; }
+}
+
+/* Tutorial em telas estreitas: o seletor de velocidade nunca é cortado. */
+@media (max-width: 380px) {
+  .tut-speed { min-width: 0; flex: 1 1 auto; justify-content: space-between; }
+  .tut-speed button { min-width: 0; flex: 1; padding: 0 4px; font-size: 13px; }
+  .tut-speed-label { padding: 0 2px 0 6px; }
+}

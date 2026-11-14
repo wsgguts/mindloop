@@ -12,6 +12,8 @@ export interface BoardProps {
   a: number[];
   sel: number | null;
   done: boolean;
+  /** Marcas de erro no tabuleiro (três iguais, estrada inexistente): só depois de reveladas, como no resto do jogo. */
+  showErrors?: boolean;
   onSelect: (s: number | null) => void;
   onAssign: (s: number, v: number) => void;
 }
@@ -67,16 +69,16 @@ function CodeBoard(p: BoardProps) {
 
 // ---------------------------------------------------------------- Tango: fila de Cristais e Orbes
 
-function PatternBoard({ model, a, done, onAssign }: BoardProps) {
+function PatternBoard({ model, a, done, showErrors, onAssign }: BoardProps) {
   // Toque alterna: vazio → Cristal → Orbe → vazio (como no Tango).
   const cycle = (s: number) => onAssign(s, a[s] === -1 ? 0 : a[s] === 0 ? 1 : -1);
-  const triple = (i: number) => a[i] >= 0 && [[i - 2, i - 1], [i - 1, i + 1], [i + 1, i + 2]].some(([x, y]) => a[x] === a[i] && a[y] === a[i]);
+  const triple = (i: number) => !!showErrors && a[i] >= 0 && [[i - 2, i - 1], [i - 1, i + 1], [i + 1, i + 2]].some(([x, y]) => a[x] === a[i] && a[y] === a[i]);
   const half = model.slots.length / 2;
   const count = (v: number) => a.filter((x) => x === v).length;
   return (
     <div className="cx-pattern">
-      <p className="cx-dir" aria-hidden="true"><span className="h">← início da fila · fim da fila →</span><span className="v">↓ do início ao fim da fila</span></p>
-      <ol className={`cx-line${model.slots.length >= 6 ? " long" : ""}`} style={{ "--n": model.slots.length } as React.CSSProperties}>
+      <p className="cx-dir" aria-hidden="true">← início da fila · fim da fila →</p>
+      <ol className="cx-line" style={{ "--n": model.slots.length } as React.CSSProperties}>
         {model.slots.map((s, i) => (
           <li key={i}>
             <button className={`cx-person${a[i] >= 0 ? " set" : ""}${triple(i) ? " bad" : ""}`} disabled={done} onClick={() => cycle(i)}
@@ -88,9 +90,8 @@ function PatternBoard({ model, a, done, onAssign }: BoardProps) {
         ))}
       </ol>
       <p className="cx-count" aria-live="polite">
-        <span className={count(0) > half ? "over" : ""}><TangoSymbol v={CRISTAL} size={18} /> {count(0)}/{half}</span>
-        <span className={count(1) > half ? "over" : ""}><TangoSymbol v={ORBE} size={18} /> {count(1)}/{half}</span>
-        <small>Toque numa pessoa para trocar o símbolo.</small>
+        <span className={showErrors && count(0) > half ? "over" : ""}><TangoSymbol v={CRISTAL} size={18} /> {count(0)}/{half}</span>
+        <span className={showErrors && count(1) > half ? "over" : ""}><TangoSymbol v={ORBE} size={18} /> {count(1)}/{half}</span>
       </p>
     </div>
   );
@@ -99,7 +100,7 @@ function PatternBoard({ model, a, done, onAssign }: BoardProps) {
 // ---------------------------------------------------------------- Zip: mapa de lugares e estradas
 
 function RouteBoard(p: BoardProps) {
-  const { model, a, sel, done, onSelect } = p;
+  const { model, a, sel, done, showErrors, onSelect } = p;
   const pos = model.pos!;
   const at: number[] = [];
   a.forEach((v, s) => { if (v >= 0) at[v] = s; });
@@ -113,7 +114,7 @@ function RouteBoard(p: BoardProps) {
             <line key={i} x1={pos[x][0]} y1={pos[x][1]} x2={pos[y][0]} y2={pos[y][1]} className="road" vectorEffect="non-scaling-stroke" />
           ))}
           {legs.map(([x, y], i) => (
-            <line key={`l${i}`} x1={pos[x][0]} y1={pos[x][1]} x2={pos[y][0]} y2={pos[y][1]} className={`leg${hasEdge(model, x, y) ? "" : " bad"}`} vectorEffect="non-scaling-stroke" />
+            <line key={`l${i}`} x1={pos[x][0]} y1={pos[x][1]} x2={pos[y][0]} y2={pos[y][1]} className={`leg${showErrors && !hasEdge(model, x, y) ? " bad" : ""}`} vectorEffect="non-scaling-stroke" />
           ))}
         </svg>
         {model.slots.map((s, i) => (

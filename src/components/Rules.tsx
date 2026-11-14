@@ -112,7 +112,6 @@ export function RulesContent({ game }: { game: RulesGame }) {
         <li>Toque numa casa do caminho, ou use Desfazer, para voltar e tentar outra rota.</li>
         <li>No teclado: setas estendem o caminho e Backspace volta um passo.</li>
       </ul>
-      <div className="note info"><b aria-hidden="true">ℹ</b><span>Versão provisória das regras do Zip, ainda a confirmar com a equipe MindLoop.</span></div>
     </div>
   ) : (
     <div className="stack">
@@ -124,7 +123,6 @@ export function RulesContent({ game }: { game: RulesGame }) {
         <li>Se um número repetir, a casa ganha um “!” e uma mensagem explica onde.</li>
         <li>Pode desfazer, pedir uma dica ou reiniciar quando quiser.</li>
       </ul>
-      <div className="note info"><b aria-hidden="true">ℹ</b><span>Versão provisória das regras (grades 4×4 e 6×6), ainda a confirmar com a equipe MindLoop.</span></div>
     </div>
   );
 }
