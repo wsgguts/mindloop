@@ -1,7 +1,7 @@
 "use client";
 import TangoSymbol from "../TangoSymbol";
 import { CRISTAL, ORBE } from "../../lib/tangoLogic";
-import { type Model, cellName, hasEdge, the } from "../../lib/cases/model";
+import { type Model, cellName, hasEdge, layoutVoice, patternVoice, stopOrd, the, valueText } from "../../lib/cases/model";
 
 // Área interativa de dedução de cada tipo de mistério. Todas seguem o mesmo gesto:
 // escolha um item (disco, pessoa, lugar, objeto) e depois o valor (número, símbolo, parada, casa).
@@ -19,6 +19,12 @@ export interface BoardProps {
 }
 
 const symOf = (v: number) => (v === 0 ? CRISTAL : ORBE);
+/** Valor do Tango: o ícone da história (☂️, 🍫, 🟢…) ou, sem ícone, o símbolo clássico (Cristal/Orbe). */
+function Sym({ model, v, size }: { model: Model; v: number; size: number | string }) {
+  const icon = model.values[v]?.icon;
+  return icon ? <span className="cx-emoji" style={{ fontSize: typeof size === "number" ? size : undefined }} aria-hidden="true">{icon}</span> : <TangoSymbol v={symOf(v)} size={size} />;
+}
+const deArt = (e: { label: string; g?: "m" | "f" }) => `${e.g === "f" ? "da" : "do"} ${e.label}`;
 
 export default function CaseBoard(p: BoardProps) {
   switch (p.model.kind) {
@@ -58,7 +64,7 @@ function CodeBoard(p: BoardProps) {
           <button key={i} className={`cx-dial${sel === i ? " sel" : ""}${a[i] >= 0 ? " set" : ""}`} disabled={done}
             aria-pressed={sel === i} aria-label={`${s.label}: ${a[i] >= 0 ? a[i] + 1 : "vazio"}`} onClick={() => onSelect(sel === i ? null : i)}>
             <span className="cx-dial-face">{a[i] >= 0 ? a[i] + 1 : "?"}</span>
-            <small>{s.label.split(" ")[0]}</small>
+            <small>{s.icon && <span aria-hidden="true">{s.icon} </span>}{s.label}</small>
           </button>
         ))}
       </div>
@@ -77,21 +83,21 @@ function PatternBoard({ model, a, done, showErrors, onAssign }: BoardProps) {
   const count = (v: number) => a.filter((x) => x === v).length;
   return (
     <div className="cx-pattern">
-      <p className="cx-dir" aria-hidden="true">← início da fila · fim da fila →</p>
+      <p className="cx-dir" aria-hidden="true">← começo {deArt(patternVoice(model).line)} · fim {deArt(patternVoice(model).line)} →</p>
       <ol className="cx-line" style={{ "--n": model.slots.length } as React.CSSProperties}>
         {model.slots.map((s, i) => (
           <li key={i}>
             <button className={`cx-person${a[i] >= 0 ? " set" : ""}${triple(i) ? " bad" : ""}`} disabled={done} onClick={() => cycle(i)}
-              aria-label={`${s.label}, posição ${i + 1}: ${a[i] === 0 ? "Cristal" : a[i] === 1 ? "Orbe" : "vazio"}. Toque para trocar.`}>
-              <span className="cx-sym">{a[i] >= 0 ? <TangoSymbol v={symOf(a[i])} size="100%" /> : <i />}</span>
+              aria-label={`${s.label}, posição ${i + 1}: ${a[i] >= 0 ? model.values[a[i]].label : "vazio"}. Toque para trocar.`}>
+              <span className="cx-sym">{a[i] >= 0 ? <Sym model={model} v={a[i]} size="100%" /> : <i />}</span>
               <span className="cx-pos" aria-hidden="true">{i + 1}</span><span className="cx-name">{s.label}</span>
             </button>
           </li>
         ))}
       </ol>
       <p className="cx-count" aria-live="polite">
-        <span className={showErrors && count(0) > half ? "over" : ""}><TangoSymbol v={CRISTAL} size={18} /> {count(0)}/{half}</span>
-        <span className={showErrors && count(1) > half ? "over" : ""}><TangoSymbol v={ORBE} size={18} /> {count(1)}/{half}</span>
+        <span className={showErrors && count(0) > half ? "over" : ""} aria-label={`${model.values[0].label}: ${count(0)} de ${half}`}><Sym model={model} v={0} size={18} /> {count(0)}/{half}</span>
+        <span className={showErrors && count(1) > half ? "over" : ""} aria-label={`${model.values[1].label}: ${count(1)} de ${half}`}><Sym model={model} v={1} size={18} /> {count(1)}/{half}</span>
       </p>
     </div>
   );
@@ -119,15 +125,15 @@ function RouteBoard(p: BoardProps) {
         </svg>
         {model.slots.map((s, i) => (
           <button key={i} className={`cx-place${sel === i ? " sel" : ""}${a[i] >= 0 ? " set" : ""}`} style={{ left: `${pos[i][0]}%`, top: `${pos[i][1]}%` }}
-            disabled={done} aria-pressed={sel === i} aria-label={`${s.label}: ${a[i] >= 0 ? `${a[i] + 1}ª parada` : "sem ordem"}`} onClick={() => onSelect(sel === i ? null : i)}>
+            disabled={done} aria-pressed={sel === i} aria-label={`${s.label}: ${a[i] >= 0 ? valueText(model, a[i]) : "sem ordem"}`} onClick={() => onSelect(sel === i ? null : i)}>
             <span className="cx-pin">{s.icon}</span>
             <span className="cx-pname">{s.label}</span>
             {a[i] >= 0 && <b className="cx-step">{a[i] + 1}</b>}
           </button>
         ))}
       </div>
-      <p className="cx-help">{sel === null ? "Toque num lugar e depois escolha em que parada ele foi visitado." : `Em que parada ${the(model.slots[sel])} foi visitad${model.slots[sel].g === "f" ? "a" : "o"}?`}</p>
-      <Pad {...p} label={(v) => `${v + 1}ª`} />
+      <p className="cx-help">{sel === null ? "Toque num lugar e depois escolha a posição dele no percurso." : `Em que posição do percurso aparece ${the(model.slots[sel])}?`}</p>
+      <Pad {...p} label={(v) => stopOrd(model, v)} />
     </div>
   );
 }
@@ -155,7 +161,7 @@ function LayoutBoard({ model, a, sel, done, onSelect, onAssign }: BoardProps) {
             const v = r * cols + c, o = ownerOf(v);
             return (
               <button key={v} role="gridcell" className={`cx-niche${o >= 0 ? " full" : ""}${o >= 0 && o === sel ? " sel" : ""}${sel !== null && o < 0 ? " target" : ""}`} disabled={done}
-                aria-label={`Casa ${cellName(model, v)}: ${o >= 0 ? model.slots[o].label : "vazia"}`} onClick={() => tapCell(v)}>
+                aria-label={`${layoutVoice(model).cell.label} ${cellName(model, v)}: ${o >= 0 ? model.slots[o].label : "vazio"}`} onClick={() => tapCell(v)}>
                 {o >= 0 ? <><span className="cx-obj">{model.slots[o].icon}</span><small>{model.slots[o].label}</small></> : <small className="cx-cell">{cellName(model, v)}</small>}
               </button>
             );
@@ -172,7 +178,7 @@ function LayoutBoard({ model, a, sel, done, onSelect, onAssign }: BoardProps) {
           <button className="cx-piece out" onClick={() => { onAssign(sel, -1); onSelect(null); }}>↩ Tirar {model.slots[sel].label} da grade</button>
         )}
       </div>
-      <p className="cx-help">{sel === null ? "Escolha uma peça e depois a casa onde ela fica." : `Onde fica ${the(model.slots[sel])}? Toque numa casa.`}</p>
+      <p className="cx-help">{sel === null ? `Escolha um item e depois ${the(layoutVoice(model).cell)} onde ele fica.` : `Onde fica ${the(model.slots[sel])}? Toque na grade.`}</p>
     </div>
   );
 }

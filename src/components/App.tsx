@@ -95,6 +95,8 @@ export default function App() {
   const [result, setResult] = useState<LevelResult | null>(null); // vitória recém-conquistada
   const [showComplete, setShowComplete] = useState(false); // tela de parabéns aberta
   const [arrival, setArrival] = useState<Arrival | null>(null);
+  /** A jornada abre na visão geral (vindo do Início ou do caderno) ou direto no mapa (vindo de uma partida). */
+  const [journeyStart, setJourneyStart] = useState<"overview" | "map">("overview");
   const [rating, setRating] = useState<number | null>(null);
   const [comment, setComment] = useState("");
   const [fbStatus, setFbStatus] = useState<"idle" | "sending" | "ok" | "error">("idle");
@@ -121,6 +123,8 @@ export default function App() {
   caseLogRef.current = caseLog;
   const [caseRun, setCaseRun] = useState<CaseRun | null>(null);
   const [bookGame, setBookGame] = useState<RulesGame>("sudoku");
+  /** Capítulo aberto no caderno de investigações (null = visão geral); volta a ele ao sair de um mistério. */
+  const [bookChapter, setBookChapter] = useState<number | null>(null);
   const logRef = useRef(log);
   logRef.current = log;
   const hintsRef = useRef(0); // dicas pedidas na partida atual
@@ -308,10 +312,10 @@ export default function App() {
 
   /** Card, nome, arte ou "Jogar agora" de um jogo: abre a jornada dele (pedindo o apelido na primeira vez). */
   function openGame(id: RulesGame) {
-    if (nick) openJourney(id);
-    else openNick(() => openJourney(id));
+    if (nick) openJourney(id, "overview");
+    else openNick(() => openJourney(id, "overview"));
   }
-  function openJourney(game: RulesGame) { setJourneyGame(game); setArrival(null); setView("journey"); }
+  function openJourney(game: RulesGame, start: "overview" | "map" = "map") { setJourneyGame(game); setJourneyStart(start); setArrival(null); setView("journey"); }
 
   const saveLog = (l: PlayerLog) => { logRef.current = l; setLog(l); writeStore(HISTORY_KEY, JSON.stringify(l)); };
 
@@ -378,7 +382,7 @@ export default function App() {
     saveCases(recordSkip(caseLogRef.current, caseRun.id, Date.now())); // pular nunca tira pontos nem bloqueia nada
     leaveCase();
   }
-  function openCasebook(game: RulesGame) { setBookGame(game); setCaseRun(null); setView("casebook"); }
+  function openCasebook(game: RulesGame) { setBookGame(game); setBookChapter(null); setCaseRun(null); setView("casebook"); }
   function openCaseFromBook(id: string) { setCaseRun({ id, mode: "play" }); setView("case"); }
   function caseDraft(id: string, d: Draft | null) { saveCases(saveDraft(caseLogRef.current, id, d)); }
   /** Mistério resolvido — ponto único de registro: progresso da investigação → XP → conquistas. */
@@ -420,6 +424,7 @@ export default function App() {
     if (to === "home") return goHome();
     const firstTime = !isDone(before, level);
     setJourneyGame(game);
+    setJourneyStart("map");
     setView("journey");
     setArrival({ game, justDone: level, justUnlocked: firstTime && level < LEVELS_PER_GAME ? level + 1 : undefined });
   }
@@ -543,7 +548,7 @@ export default function App() {
             </section>
           </>
         ) : view === "journey" ? (
-          <Journey key={journeyGame} game={journeyGame} done={progress[journeyGame]}
+          <Journey key={`${journeyGame}-${journeyStart}`} game={journeyGame} done={progress[journeyGame]} start={journeyStart}
             focus={focusLevel(progress[journeyGame], lastPlayed[journeyGame])}
             justDone={arrival?.game === journeyGame ? arrival.justDone : undefined}
             justUnlocked={arrival?.game === journeyGame ? arrival.justUnlocked : undefined}
@@ -559,11 +564,11 @@ export default function App() {
               continueLabel={caseRun.next ? `Continuar para o nível ${caseRun.next.idx + 1}` : "Voltar às investigações"}
               onContinue={() => leaveCase()}
               exitLabel={caseRun.next ? "Ir para a jornada" : "Voltar às investigações"}
-              onExit={() => { const run = caseRun; setCaseRun(null); if (run.next) { setJourneyGame(run.next.game); setView("journey"); } else setView("casebook"); }}
+              onExit={() => { const run = caseRun; setCaseRun(null); if (run.next) openJourney(run.next.game, "map"); else setView("casebook"); }}
               onDraft={(d) => caseDraft(runCase.id, d)} onSolve={(ms, h) => solveCase(runCase.id, ms, h)} />
           )
         ) : view === "casebook" ? (
-          <CaseBook game={bookGame} log={caseLog} progress={progress} onGame={setBookGame} onOpen={openCaseFromBook} onBack={() => openJourney(bookGame)} />
+          <CaseBook game={bookGame} log={caseLog} progress={progress} onGame={(g) => { setBookGame(g); setBookChapter(null); }} chapter={bookChapter} onChapter={setBookChapter} onOpen={openCaseFromBook} onBack={() => openJourney(bookGame, "overview")} />
         ) : view === "rules" ? (
           <div className="wrap">
             <h1>Regras</h1>

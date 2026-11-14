@@ -6,7 +6,7 @@ import { emptyProgress } from "../journey";
 import { CASE_PATTERNS, caseLevels, xpFor, medalFor } from "./config";
 import { CASES_DATA } from "./data";
 import { allCases, caseAfter, caseById, casesOf, firstBroken, isCorrect } from "./catalog";
-import { generateCase } from "./generate";
+import { generateGame } from "./generate";
 import { type Model, allAssignments, clueState, clueText, deduce, evalClue, solveAll } from "./model";
 import { emptyCaseLog, goldCount, parseCaseLog, recordSkip, recordSolve, saveDraft, shouldOffer, solvedCount, xpTotal } from "./progress";
 
@@ -63,12 +63,9 @@ describe("banco de mistérios", () => {
     }
   });
 
-  it("o banco é reproduzível: gerar de novo dá o mesmo resultado", () => {
-    for (const c of CASES_DATA.filter((_, i) => i % 15 === 0)) {
-      const g = generateCase(c.game, c.level, caseLevels(c.game).indexOf(c.level));
-      expect(g).toEqual(c);
-    }
-  });
+  it("o banco é reproduzível: gerar de novo dá o mesmo resultado (data.ts está atualizado)", () => {
+    for (const g of ALL_GAMES) expect(generateGame(g)).toEqual(CASES_DATA.filter((c) => c.game === g));
+  }, 120_000);
 
   it("dificuldade cresce ao longo da jornada", () => {
     for (const g of ALL_GAMES) {
@@ -89,7 +86,10 @@ describe("catálogo (textos, dicas e explicação)", () => {
       expect(c.goal.endsWith("?")).toBe(true);
       expect(c.art.startsWith("/")).toBe(true);
       expect(c.clueTexts.length).toBeGreaterThan(0);
-      expect(c.clueTexts.every((t) => /^[A-ZÀ-Ú]/.test(t) && t.endsWith(".") && !t.includes("undefined"))).toBe(true);
+      expect(c.clueTexts.every((t) => /^[A-ZÀ-Ú]/.test(t) && t.endsWith(".") && !t.includes("undefined") && !t.includes("{"))).toBe(true);
+      expect([...c.notes, ...c.ruleTexts, c.ending, ...c.explanation].every((t) => !t.includes("undefined") && !t.includes("{")), c.id).toBe(true);
+      expect(c.ending.length, c.id).toBeGreaterThan(30);
+      expect(c.structureName.length, c.id).toBeGreaterThan(5);
       expect(c.hints).toHaveLength(3);
       expect(c.hints.every((h) => h.length > 20 && !h.includes("undefined"))).toBe(true);
       expect(c.explanation.length).toBeGreaterThanOrEqual(c.model.slots.length - 1);

@@ -10,7 +10,11 @@ export const CASES_KEY = "mindloop:cases";
 const MAX_HISTORY = 1000;
 
 /** Investigação em andamento (para continuar depois de recarregar ou fechar o app). */
-export interface Draft { a: number[]; hints: number; ms: number }
+export interface Draft {
+  a: number[]; hints: number; ms: number;
+  /** História do caso quando o rascunho foi salvo: se o conteúdo do caso mudar, o rascunho antigo é ignorado. */
+  k?: string;
+}
 
 export interface CaseRecord {
   /** Primeira solução (ms desde 1970). */
@@ -48,7 +52,7 @@ export function parseCaseLog(raw: string | null): CaseLog {
       if (!r || typeof r !== "object") continue;
       const rec: CaseRecord = { solvedAt: numOrNull(r.solvedAt), bestMs: numOrNull(r.bestMs), bestHints: numOrNull(r.bestHints), xp: isNum(r.xp) ? r.xp : 0, skippedAt: numOrNull(r.skippedAt) };
       const d = r.draft;
-      if (d && Array.isArray(d.a) && d.a.every((v) => Number.isInteger(v) && v >= -1) && isNum(d.hints) && isNum(d.ms)) rec.draft = { a: d.a, hints: Math.min(MAX_HINTS, d.hints), ms: d.ms };
+      if (d && Array.isArray(d.a) && d.a.every((v) => Number.isInteger(v) && v >= -1) && isNum(d.hints) && isNum(d.ms)) rec.draft = { a: d.a, hints: Math.min(MAX_HINTS, d.hints), ms: d.ms, ...(typeof d.k === "string" ? { k: d.k } : {}) };
       records[id] = rec;
     }
     const seen = new Set<string>();

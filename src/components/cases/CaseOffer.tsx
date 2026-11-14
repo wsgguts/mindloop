@@ -47,7 +47,7 @@ export default function CaseOffer({ c, nextLevel, onInvestigate, onSkip }: Props
           <span className="cx-pill">Desafio especial</span>
           <h1 id="cx-offer-title">Um novo mistério surgiu!</h1>
           <p id="cx-offer-desc">{c.description}</p>
-          <p className="cx-meta"><b>{c.title}</b> · {KIND_NAME[c.kind]} · {c.difficultyLabel}</p>
+          <p className="cx-meta"><b>{c.title}</b> · {KIND_NAME[c.kind]} · {c.structureName} · {c.difficultyLabel}</p>
           <div className="cx-actions">
             <button ref={go} className="cx-go" onClick={() => { sfx("ui"); onInvestigate(); }}>Investigar agora</button>
             <button className="cx-skip" onClick={() => { sfx("ui"); onSkip(); }} aria-label={`Pular investigação e ir para o nível ${nextLevel}`}>Pular</button>

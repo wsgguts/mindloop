@@ -206,7 +206,7 @@ export default function Game({ puzzle, initialGrid, initialMs = 0, active, onSav
       </div>
 
       {confirm && (
-        <div className="note warn" role="alertdialog" aria-label="Confirmação">
+        <div className="note warn gconfirm" role="alertdialog" aria-label="Confirmação">
           <div style={{ display: "grid", gap: 8 }}>
             <span>{confirm === "restart" ? "Reiniciar volta o puzzle ao começo e apaga suas jogadas. Continuar?" : "Encerrar descarta o progresso desta partida. Continuar?"}</span>
             <div className="row">

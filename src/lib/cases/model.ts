@@ -9,6 +9,8 @@
 //   • escrever o texto da pista, das dicas e da explicação (clueText / assignText).
 // Assim o texto nunca diverge da lógica. Funções puras, sem React.
 
+import { type CodeVoice, type LayoutVoice, type PatternVoice, type RouteVoice, type Voice, fill, numero } from "./voice";
+
 export type CaseKind = "code" | "pattern" | "route" | "layout";
 
 /** Uma entidade com nome (slot ou valor). g = gênero gramatical (artigos "o/a", "do/da"). */
@@ -26,14 +28,20 @@ export interface Model {
   edges?: [number, number][];
   /** route: posição de cada lugar no mapa (0–100). */
   pos?: [number, number][];
-  /** pattern: verbo no singular e no plural ("carrega", "carregam"). */
+  /** pattern: verbo no singular e no plural ("carrega", "carregam"). (Casos antigos; hoje vem da voz.) */
   verb?: [string, string];
+  /** Palavras da história usadas nos textos (posta pelo catálogo; não fica gravada no banco). */
+  voice?: Voice;
 }
 
 export type Clue =
   | { k: "is" | "not"; s: number; v: number }
   | { k: "either"; s: number; v: [number, number] }
-  | { k: "lt" | "next" | "same" | "opp" | "left" | "above" | "touch" | "apart"; a: number; b: number }
+  | { k: "lt" | "next" | "twice" | "same" | "opp" | "left" | "above" | "touch" | "apart" | "sameRow" | "sameCol"; a: number; b: number }
+  /** O valor de s fica estritamente entre o de a (menor) e o de b (maior). */
+  | { k: "between"; s: number; a: number; b: number }
+  /** Exatamente n dos slots ss têm o valor v. */
+  | { k: "countIn"; ss: number[]; v: number; n: number }
   | { k: "diff"; a: number; b: number; d: number }
   | { k: "sum"; ss: number[]; t: number }
   | { k: "parity"; s: number; even: boolean }
@@ -53,7 +61,8 @@ const rc = (m: Model, v: number): [number, number] => [Math.floor(v / m.grid![1]
 export function involved(m: Model, c: Clue): number[] {
   switch (c.k) {
     case "is": case "not": case "either": case "parity": case "row": case "col": return [c.s];
-    case "sum": return c.ss;
+    case "sum": case "countIn": return c.ss;
+    case "between": return [c.s, c.a, c.b];
     case "count": case "noTriple": case "roads": return m.slots.map((_, i) => i);
     default: return [c.a, c.b];
   }
@@ -69,12 +78,17 @@ export function evalClue(m: Model, c: Clue, a: number[]): boolean {
     case "lt": return n(c.a) < n(c.b);
     case "next": return n(c.b) === n(c.a) + 1;
     case "diff": return Math.abs(n(c.a) - n(c.b)) === c.d;
+    case "twice": return n(c.a) === 2 * n(c.b);
+    case "between": return n(c.a) < n(c.s) && n(c.s) < n(c.b);
+    case "countIn": return c.ss.filter((s) => a[s] === c.v).length === c.n;
     case "sum": return c.ss.reduce((t, s) => t + n(s), 0) === c.t;
     case "parity": return (n(c.s) % 2 === 0) === c.even;
     case "same": return a[c.a] === a[c.b];
     case "opp": return a[c.a] !== a[c.b];
     case "row": return rc(m, a[c.s])[0] === c.r;
     case "col": return rc(m, a[c.s])[1] === c.c;
+    case "sameRow": return rc(m, a[c.a])[0] === rc(m, a[c.b])[0];
+    case "sameCol": return rc(m, a[c.a])[1] === rc(m, a[c.b])[1];
     case "left": return rc(m, a[c.a])[1] < rc(m, a[c.b])[1];
     case "above": return rc(m, a[c.a])[0] < rc(m, a[c.b])[0];
     case "touch": case "apart": {
@@ -229,37 +243,88 @@ export function deduce(m: Model, clues: Clue[]): Deduction {
   return { solved, steps, rounds, domains: D };
 }
 
+
 // ---------------------------------------------------------------- texto
+// Todas as frases saem daqui, usando a "voz" da história (voice.ts). Sem voz, valem palavras neutras.
 
 const cap = (t: string) => t.charAt(0).toUpperCase() + t.slice(1);
 const art = (e: Ent) => (e.g === "f" ? "a" : "o");
 /** "o Vaso", "a Lia". Nomes de pessoas também levam artigo (uso comum no português do Brasil). */
 export const the = (e: Ent) => `${art(e)} ${e.label}`;
 const de = (e: Ent) => `${e.g === "f" ? "da" : "do"} ${e.label}`;
+const em = (e: Ent) => `${e.g === "f" ? "na" : "no"} ${e.label}`;
+const indef = (e: Ent) => `${e.g === "f" ? "uma" : "um"} ${e.label}`;
 const ord = (n: number, g: "m" | "f" = "f") => `${n}${g === "f" ? "ª" : "º"}`;
+const plural = (e: Ent) => e.pl ?? `${e.label}s`;
+const allFem = (es: Ent[]) => es.every((e) => e.g === "f");
+const join = (xs: string[]) => (xs.length === 1 ? xs[0] : `${xs.slice(0, -1).join(", ")} e ${xs[xs.length - 1]}`);
+
+const DEFAULT_CODE: CodeVoice = numero("é", "número");
+const DEFAULT_PATTERN: PatternVoice = { verb: ["tem", "têm"], kind: { label: "símbolo", g: "m", pl: "símbolos" }, line: { label: "fila", g: "f" } };
+const DEFAULT_ROUTE: RouteVoice = { stop: { label: "parada", g: "f" }, road: { label: "estrada", g: "f" }, actor: "O caminho", path: "no caminho" };
+const DEFAULT_LAYOUT: LayoutVoice = { cell: { label: "casa", g: "f" }, rule: "Cada casa guarda no máximo uma peça." };
+export const codeVoice = (m: Model) => (m.kind === "code" && m.voice ? (m.voice as CodeVoice) : DEFAULT_CODE);
+export const patternVoice = (m: Model): PatternVoice => (m.kind === "pattern" && m.voice ? (m.voice as PatternVoice) : { ...DEFAULT_PATTERN, verb: m.verb ?? DEFAULT_PATTERN.verb });
+export const routeVoice = (m: Model) => (m.kind === "route" && m.voice ? (m.voice as RouteVoice) : DEFAULT_ROUTE);
+export const layoutVoice = (m: Model) => (m.kind === "layout" && m.voice ? (m.voice as LayoutVoice) : DEFAULT_LAYOUT);
 
 const ROW_NAMES: Record<number, string[]> = { 1: ["única"], 2: ["de cima", "de baixo"], 3: ["de cima", "do meio", "de baixo"] };
 const COL_NAMES: Record<number, string[]> = { 1: ["única"], 2: ["da esquerda", "da direita"], 3: ["da esquerda", "do meio", "da direita"] };
 export const cellName = (m: Model, v: number) => { const [r, c] = rc(m, v); return `${"ABCDE"[c]}${r + 1}`; };
 
-/** Nome curto do valor: "5", "3ª parada", "Cristal", "B2". */
+/** Ordinal da parada no gênero da voz: "3ª", "3º". */
+export const stopOrd = (m: Model, v: number) => ord(v + 1, routeVoice(m).stop.g);
+
+/** Nome curto do valor: "5", "3ª parada", "Cristal", "canteiro B2". */
 export function valueText(m: Model, v: number): string {
   switch (m.kind) {
     case "code": return String(num(m, v));
-    case "route": return v === m.values.length - 1 ? "última parada" : `${ord(v + 1)} parada`;
+    case "route": { const st = routeVoice(m).stop; return v === m.values.length - 1 ? `últim${st.g === "f" ? "a" : "o"} ${st.label}` : `${stopOrd(m, v)} ${st.label}`; }
     case "pattern": return m.values[v].label;
-    case "layout": return `casa ${cellName(m, v)}`;
+    case "layout": return `${layoutVoice(m).cell.label} ${cellName(m, v)}`;
   }
 }
 
-/** Frase "slot tem valor": "o 2º disco é 5", "a Biblioteca foi a 3ª parada"… */
+/** Variáveis comuns dos modelos de texto do Mini Sudoku. */
+function codeVars(m: Model, x: Record<string, number | undefined>): Record<string, string | number> {
+  const out: Record<string, string | number> = { V: m.values.length };
+  for (const k of ["a", "b", "s"]) { const i = x[k]; if (i !== undefined) { out[k] = the(m.slots[i]); out[`de_${k}`] = de(m.slots[i]); } }
+  for (const k of ["n", "x", "y", "d", "t"]) if (x[k] !== undefined) out[k] = x[k]!;
+  return out;
+}
+
+/** Frase "slot tem valor": "a Lia mora no 3º andar", "a Biblioteca foi a 3ª parada"… */
 export function assignText(m: Model, s: number, v: number): string {
   const e = m.slots[s];
   switch (m.kind) {
-    case "code": return `${the(e)} é ${num(m, v)}`;
-    case "route": return `${the(e)} foi a ${valueText(m, v)}`;
-    case "pattern": return `${the(e)} ${m.verb?.[0] ?? "tem"} um ${m.values[v].label}`;
-    case "layout": return `${the(e)} está na ${valueText(m, v)}`;
+    case "code": return fill(codeVoice(m).is, codeVars(m, { a: s, n: num(m, v) }));
+    case "route": return `${the(e)} foi ${art(routeVoice(m).stop)} ${valueText(m, v)}`;
+    case "pattern": { const P = patternVoice(m); return `${the(e)} ${P.verb[0]} ${P.bare ? m.values[v].label : indef(m.values[v])}`; }
+    case "layout": return `${the(e)} está ${em(layoutVoice(m).cell)} ${cellName(m, v)}`;
+  }
+}
+
+/** Regras fixas que não são pistas (mostradas com ★): o que os números significam, quantas peças por casa… */
+export function ruleNotes(m: Model): string[] {
+  if (m.kind === "code") return [fill(codeVoice(m).rule, { V: m.values.length })];
+  if (m.kind === "layout") return [layoutVoice(m).rule];
+  return [];
+}
+
+function codeClue(m: Model, c: Clue): string | null {
+  const V = codeVoice(m);
+  switch (c.k) {
+    case "is": return fill(V.is, codeVars(m, { a: c.s, n: num(m, c.v) }));
+    case "not": return fill(V.not, codeVars(m, { a: c.s, n: num(m, c.v) }));
+    case "either": { const [x, y] = [...c.v].sort((p, q) => p - q); return fill(V.either, codeVars(m, { a: c.s, x: x + 1, y: y + 1 })); }
+    case "lt": return fill(V.lt, codeVars(m, { a: c.a, b: c.b }));
+    case "next": return fill(V.next, codeVars(m, { a: c.a, b: c.b }));
+    case "diff": return fill(V.diff, codeVars(m, { a: c.a, b: c.b, d: c.d }));
+    case "twice": return fill(V.twice, codeVars(m, { a: c.a, b: c.b }));
+    case "between": return fill(V.between, codeVars(m, { s: c.s, a: c.a, b: c.b }));
+    case "parity": return fill(V.parity, { ...codeVars(m, { a: c.s }), par: c.even ? "par" : "ímpar" });
+    case "sum": return fill(V.sum, { ...codeVars(m, { t: c.t }), list: join(c.ss.map((s) => the(m.slots[s]))), de_list: join(c.ss.map((s) => de(m.slots[s]))) });
+    default: return null;
   }
 }
 
@@ -268,54 +333,73 @@ const fem = (x: Ent, y: Ent) => x.g === "f" && y.g === "f";
 const viz = (x: Ent, y: Ent) => (fem(x, y) ? "vizinhas" : "vizinhos");
 const um = (x: Ent, y: Ent) => (fem(x, y) ? "uma" : "um");
 const dout = (x: Ent, y: Ent) => (fem(x, y) ? "da outra" : "do outro");
-const plural = (e: Ent) => e.pl ?? `${e.label}s`;
-const list = (es: Ent[]) => es.length === 1 ? the(es[0]) : `${es.slice(0, -1).map(the).join(", ")} e ${the(es[es.length - 1])}`;
+const list = (es: Ent[]) => join(es.map(the));
+
+function patternClue(m: Model, c: Clue): string | null {
+  const S = m.slots, P = patternVoice(m), k = P.kind, kf = k.g === "f";
+  const val = (v: number) => (P.bare ? m.values[v].label : indef(m.values[v]));
+  switch (c.k) {
+    case "is": return assignText(m, c.s, c.v);
+    case "same": return P.same ? fill(P.same, { a: the(S[c.a]), b: the(S[c.b]) }) : `${the(S[c.a])} e ${the(S[c.b])} ${P.verb[1]} ${kf ? "a mesma" : "o mesmo"} ${k.label}`;
+    case "opp": return P.opp ? fill(P.opp, { a: the(S[c.a]), b: the(S[c.b]) }) : `${the(S[c.a])} e ${the(S[c.b])} ${P.verb[1]} ${plural(k)} diferentes`;
+    case "countIn": {
+      const es = c.ss.map((s) => S[s]), f = allFem(es);
+      if (c.n === 0) return `${es.map((e, i) => `${i ? "nem" : "Nem"} ${the(e)}`).join(", ")} ${P.verb[1]} ${P.bare ? plural(m.values[c.v]) : indef(m.values[c.v])}`;
+      if (c.n === es.length) return `${list(es)} ${P.verb[1]} ${plural(m.values[c.v])}`;
+      if (c.n === 1) return `Dentre ${list(es)}, só ${f ? "uma" : "um"} ${P.verb[0]} ${val(c.v)}`;
+      return `Dentre ${list(es)}, exatamente ${c.n === 2 ? (f ? "duas" : "dois") : c.n} ${P.verb[1]} ${plural(m.values[c.v])}`;
+    }
+    case "count": return P.count ? fill(P.count, { h: S.length / 2 }) : `Há ${S.length / 2} ${plural(m.values[0])} e ${S.length / 2} ${plural(m.values[1])} ${em(P.line)}`;
+    case "noTriple": return P.triple ?? `Nunca há três ${plural(k)} iguais seguid${kf ? "as" : "os"} ${em(P.line)}`;
+    default: return null;
+  }
+}
+
+function routeClue(m: Model, c: Clue): string | null {
+  const S = m.slots, R = routeVoice(m), st = R.stop, stf = st.g === "f";
+  switch (c.k) {
+    case "is": return assignText(m, c.s, c.v);
+    case "not": return `${the(S[c.s])} não foi ${art(st)} ${valueText(m, c.v)}`;
+    case "either": { const [x, y] = [...c.v].sort((p, q) => p - q); return `${the(S[c.s])} foi ${art(st)} ${valueText(m, x)} ou ${art(st)} ${valueText(m, y)}`; }
+    case "lt": return `${the(S[c.a])} veio antes ${de(S[c.b])} ${R.path}`;
+    case "next": return `${the(S[c.b])} veio logo depois ${de(S[c.a])}`;
+    case "between": return `${the(S[c.s])} veio depois ${de(S[c.a])} e antes ${de(S[c.b])}`;
+    case "diff": return c.d === 1
+      ? `${the(S[c.a])} e ${the(S[c.b])} foram ${plural(st)} seguid${stf ? "as" : "os"} (${stf ? "uma logo após a outra" : "um logo após o outro"}, em alguma ordem)`
+      : `Entre ${the(S[c.a])} e ${the(S[c.b])} houve exatamente ${c.d - 1} ${c.d - 1 === 1 ? `${stf ? "outra" : "outro"} ${st.label}` : `${stf ? "outras" : "outros"} ${plural(st)}`}`;
+    case "roads": return `${R.actor} passa uma única vez por cada lugar e só segue ${R.road.g === "f" ? "pelas" : "pelos"} ${plural(R.road)} do mapa`;
+    default: return null;
+  }
+}
 
 /** Texto da pista (frase completa, com ponto final). */
 export function clueText(m: Model, c: Clue): string {
   const S = m.slots;
-  const t = (() => {
+  const own = m.kind === "code" ? codeClue(m, c) : m.kind === "pattern" ? patternClue(m, c) : m.kind === "route" ? routeClue(m, c) : null;
+  const t = own ?? (() => {
     switch (c.k) {
       case "is": return assignText(m, c.s, c.v);
-      case "not":
-        return m.kind === "code" ? `${the(S[c.s])} não é ${num(m, c.v)}`
-          : m.kind === "route" ? `${the(S[c.s])} não foi a ${valueText(m, c.v)}`
-          : `${the(S[c.s])} não está na ${valueText(m, c.v)}`;
-      case "either": {
-        const [x, y] = [...c.v].sort((p, q) => p - q);
-        return m.kind === "code" ? `${the(S[c.s])} é ${num(m, x)} ou ${num(m, y)}`
-          : m.kind === "route" ? `${the(S[c.s])} foi a ${valueText(m, x)} ou a ${valueText(m, y)}`
-          : `${the(S[c.s])} está na casa ${cellName(m, x)} ou na ${cellName(m, y)}`;
-      }
-      case "lt": return m.kind === "route" ? `${the(S[c.a])} veio antes ${de(S[c.b])} no caminho` : `${the(S[c.a])} é menor que ${the(S[c.b])}`;
-      case "next": return m.kind === "route" ? `${the(S[c.b])} veio logo depois ${de(S[c.a])}` : `${the(S[c.b])} é exatamente 1 a mais que ${the(S[c.a])}`;
-      case "diff":
-        if (m.kind === "route") return c.d === 1 ? `${the(S[c.a])} e ${the(S[c.b])} foram paradas seguidas (uma logo após a outra, em alguma ordem)`
-          : `Entre ${the(S[c.a])} e ${the(S[c.b])} houve exatamente ${c.d - 1} ${c.d - 1 === 1 ? "outra parada" : "outras paradas"}`;
-        return `A diferença entre ${the(S[c.a])} e ${the(S[c.b])} é ${c.d}`;
-      case "sum": return `${list(c.ss.map((s) => S[s]))} somam ${c.t}`;
-      case "parity": return `${the(S[c.s])} é um número ${c.even ? "par" : "ímpar"}`;
-      case "same": return m.kind === "pattern" ? `${the(S[c.a])} e ${the(S[c.b])} ${m.verb?.[1] ?? "têm"} o mesmo símbolo` : `${the(S[c.a])} e ${the(S[c.b])} são iguais`;
-      case "opp": return m.kind === "pattern" ? `${the(S[c.a])} e ${the(S[c.b])} ${m.verb?.[1] ?? "têm"} símbolos diferentes` : `${the(S[c.a])} e ${the(S[c.b])} são diferentes`;
+      case "not": return `${the(S[c.s])} não está ${em(layoutVoice(m).cell)} ${cellName(m, c.v)}`;
+      case "either": { const [x, y] = [...c.v].sort((p, q) => p - q); const cell = layoutVoice(m).cell; return `${the(S[c.s])} está ${em(cell)} ${cellName(m, x)} ou ${em(cell)} ${cellName(m, y)}`; }
       case "row": return `${the(S[c.s])} está na linha ${ROW_NAMES[m.grid![0]][c.r]}`;
       case "col": return `${the(S[c.s])} está na coluna ${COL_NAMES[m.grid![1]][c.c]}`;
+      case "sameRow": return `${the(S[c.a])} e ${the(S[c.b])} estão na mesma linha`;
+      case "sameCol": return `${the(S[c.a])} e ${the(S[c.b])} estão na mesma coluna`;
       case "left": return `${the(S[c.a])} fica numa coluna à esquerda ${de(S[c.b])}`;
       case "above": return `${the(S[c.a])} fica numa linha acima ${de(S[c.b])}`;
       case "touch": return `${the(S[c.a])} e ${the(S[c.b])} são ${viz(S[c.a], S[c.b])} (lado a lado ou ${um(S[c.a], S[c.b])} em cima ${dout(S[c.a], S[c.b])})`;
       case "apart": return `${the(S[c.a])} e ${the(S[c.b])} não são ${viz(S[c.a], S[c.b])} (nem lado a lado, nem ${um(S[c.a], S[c.b])} em cima ${dout(S[c.a], S[c.b])})`;
-      case "count": return `Há a mesma quantidade de ${plural(m.values[0])} e de ${plural(m.values[1])} (${m.slots.length / 2} de cada)`;
-      case "noTriple": return `Nunca há três símbolos iguais seguidos na fila`;
-      case "roads": return `O caminho passa uma única vez por cada lugar e só segue pelas estradas do mapa`;
+      default: return `${list(involved(m, c).map((s) => S[s]))} seguem uma regra especial`;
     }
   })();
   return `${cap(t)}.`;
 }
 
-/** Explica uma dedução: "Pela pista 3, o 2º disco é 5." */
+/** Explica uma dedução: "Pela pista 3, a Lia mora no 2º andar." */
 export function stepText(m: Model, st: Step, label: (i: number) => string = (i) => `pista ${i + 1}`): string {
   const what = assignText(m, st.s, st.v);
   if (st.by === "distinct") return `Como nenhum valor se repete, só sobra uma opção: ${what}.`;
-  if (st.by === "only") return `${cap(valueText(m, st.v))} só cabe num lugar: ${what}.`;
+  if (st.by === "only") return `Só há uma possibilidade para ${m.kind === "code" ? "o " : ""}${valueText(m, st.v)}: ${what}.`;
   const others = st.uses.filter((u) => u !== st.by);
   const by = others.length ? `Juntando a ${label(others[0])} com a ${label(st.by as number)}` : `Pela ${label(st.by as number)}`;
   return `${by}, ${what}.`;

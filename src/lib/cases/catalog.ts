@@ -1,6 +1,7 @@
 // Mindloop Investigação — catálogo: transforma cada registro do banco (data.ts) num mistério completo, com
-// título, história, cenário, pistas em texto, resposta, explicação passo a passo, 3 dicas progressivas,
-// dificuldade, recompensa e tempo estimado. Para acrescentar mistérios basta gerar o banco de novo
+// título, história, cenário, pistas em texto (na voz da história), resposta, explicação passo a passo,
+// 3 dicas progressivas, estrutura investigativa, desfecho, dificuldade, recompensa e tempo estimado.
+// Para acrescentar mistérios basta escrever as histórias (stories/*.ts) e gerar o banco de novo
 // (scripts/gen_cases.ts): nada aqui precisa mudar.
 
 import type { JourneyGame } from "../journey";
@@ -8,8 +9,11 @@ import { sceneArt, sceneOf } from "../scenes";
 import { BASE_XP, DIFFICULTY_LABEL, type Difficulty, ESTIMATE } from "./config";
 import { CASES_DATA } from "./data";
 import type { CaseData } from "./generate";
-import { type CaseKind, type Clue, type Model, type Step, clueText, deduce, evalClue, involved, isRule, stepText, the } from "./model";
-import { GENERAL_HINT, KIND_OF, THEMES, WORLD_IN } from "./themes";
+import { type CaseKind, type Clue, type Ent, type Model, type Step, clueText, deduce, evalClue, involved, isRule, ruleNotes, stepText, the } from "./model";
+import type { Story } from "./story";
+import { STRUCTURES, type StructureId } from "./structures";
+import { GENERAL_HINT, KIND_OF, storyByKey } from "./themes";
+import { type CodeVoice, fill } from "./voice";
 
 export interface Case {
   id: string;
@@ -23,6 +27,13 @@ export interface Case {
   description: string;
   story: string;
   goal: string;
+  /** Desfecho da história, mostrado ao resolver. */
+  ending: string;
+  /** Chave da história (stories/*.ts): identifica o conteúdo do caso (rascunhos salvos usam). */
+  storyKey: string;
+  /** Estrutura investigativa (a forma do raciocínio) e seu nome. */
+  structure: StructureId;
+  structureName: string;
   /** Cenário: o mundo do capítulo (nome e pintura). */
   world: string;
   art: string;
@@ -32,6 +43,8 @@ export interface Case {
   /** Pistas numeradas, na ordem em que aparecem. */
   clues: Clue[];
   ruleTexts: string[];
+  /** Regras fixas que não são pistas (o que os números significam, uma peça por casa…). */
+  notes: string[];
   clueTexts: string[];
   answer: number[];
   /** Explicação lógica da solução, passo a passo. */
@@ -45,11 +58,25 @@ export interface Case {
   xp: number;
 }
 
+/** Chamada do convite: cada tipo de caso tem a sua, e a estrutura dá o "tempero". */
 const TEASER: Record<CaseKind, string> = {
-  code: "Um segredo numérico precisa ser desvendado. Analise as pistas, use sua lógica e descubra a combinação.",
-  pattern: "Algo quebrou o equilíbrio da fila. Analise as pistas, use sua lógica e devolva cada símbolo ao seu lugar.",
-  route: "Um caminho misterioso foi percorrido. Analise as pistas, use sua lógica e reconstrua a rota.",
-  layout: "Tudo saiu do lugar. Analise as pistas, use sua lógica e descubra onde cada peça fica.",
+  code: "Números escondidos contam esta história.",
+  pattern: "Uma fileira perdeu o equilíbrio.",
+  route: "Um percurso precisa ser refeito.",
+  layout: "Cada coisa tem o seu lugar — mas qual?",
+};
+const STRUCTURE_TEASER: Record<StructureId, string> = {
+  progressiva: "Uma pista firme abre caminho para as outras.",
+  exclusao: "Nada é dito às claras: descubra o que não pode ser.",
+  cruzamento: "Só cruzando as informações a verdade aparece.",
+  sequencia: "Reconstrua a ordem dos acontecimentos.",
+  equilibrio: "As contas precisam fechar.",
+  espacial: "Linhas e colunas guardam a resposta.",
+  alinhamento: "Quem está junto de quem?",
+  percurso: "O mapa é a maior pista.",
+  restricoes: "Várias regras valem ao mesmo tempo.",
+  contradicao: "Uma das possibilidades esconde uma contradição.",
+  indireta: "As pistas dizem pouco — as regras dizem o resto.",
 };
 
 /** Escolhe a dedução que as dicas 2 e 3 vão revelar: a primeira que usa uma relação entre pistas (não uma pista direta). */
@@ -58,37 +85,62 @@ function keyStep(d: CaseData, steps: Step[]): Step | undefined {
   return steps.find(rel) ?? steps.find((st) => typeof st.by === "number" && d.clues[st.by].k !== "is") ?? steps[0];
 }
 
+const de = (e: Ent) => `${e.g === "f" ? "da" : "do"} ${e.label}`;
+const em = (e: Ent) => `${e.g === "f" ? "na" : "no"} ${e.label}`;
+const cap = (t: string) => t.charAt(0).toUpperCase() + t.slice(1);
+
+/** Desfecho com os marcadores preenchidos pela resposta real ({primeiro}, {ultimo}, {maior}, {menor}…). */
+function endingOf(story: Story, m: Model, sol: number[]): string {
+  const at = (v: number) => m.slots[sol.indexOf(v)];
+  const vars: Record<string, string> = {};
+  if (m.kind === "route") {
+    const first = at(0), last = at(m.slots.length - 1);
+    Object.assign(vars, { primeiro: the(first), ultimo: the(last), de_primeiro: de(first), de_ultimo: de(last), em_primeiro: em(first), em_ultimo: em(last) });
+  }
+  if (m.kind === "code") {
+    const hi = m.slots[sol.indexOf(Math.max(...sol))], lo = m.slots[sol.indexOf(Math.min(...sol))];
+    Object.assign(vars, { maior: the(hi), menor: the(lo) });
+  }
+  return cap(fill(story.ending, vars));
+}
+
 export function buildCase(d: CaseData): Case {
   const kind = KIND_OF[d.game];
-  const theme = THEMES[kind][d.theme];
+  const story = storyByKey(d.story);
+  if (!story) throw new Error(`História ${d.story} não encontrada (${d.id})`);
+  const voice = kind === "code" && story.rule ? { ...(story.voice as CodeVoice), rule: story.rule } : story.voice;
+  const model: Model = { ...d.model, voice };
+  const st = STRUCTURES[d.structure];
   const scene = sceneOf(d.chapter);
-  const n = d.model.slots.length;
   // Numeração mostrada ao jogador: só as pistas (as regras ficam à parte, sem número).
   const numbered = d.clues.map((c, i) => ({ c, i })).filter((x) => !isRule(x.c));
   const label = (i: number) => (isRule(d.clues[i]) ? "regra do caso" : `pista ${numbered.findIndex((x) => x.i === i) + 1}`);
-  const ded = deduce(d.model, d.clues);
+  const ded = deduce(model, d.clues);
   const key = keyStep(d, ded.steps);
   const keyClues = key ? [...new Set([...(key.uses ?? []), ...(typeof key.by === "number" ? [key.by] : [])])].filter((i) => !isRule(d.clues[i])) : [];
-  const slot = key ? the(d.model.slots[key.s]) : "";
+  const slot = key ? the(model.slots[key.s]) : "";
   const hint2 = !key ? GENERAL_HINT[kind]
     : keyClues.length >= 2 ? `Compare a ${label(keyClues[0])} com a ${label(keyClues[1])}: juntas, elas revelam algo importante sobre ${slot}.`
     : keyClues.length === 1 ? `A ${label(keyClues[0])} é a chave para descobrir ${slot}. Veja quais opções ela deixa de fora${d.clues.some(isRule) ? ", junto com as regras do caso" : ""}.`
     : `Observe as regras do caso com atenção: sozinhas, elas já dizem algo sobre ${slot}.`;
   return {
     id: d.id, game: d.game, kind, chapter: d.chapter, level: d.level,
-    title: theme.title,
-    description: TEASER[kind],
-    story: theme.intro(WORLD_IN[d.chapter - 1], n),
-    goal: theme.goal,
+    title: story.title,
+    description: `${TEASER[kind]} ${STRUCTURE_TEASER[d.structure]}`,
+    story: story.intro,
+    goal: story.goal,
+    ending: endingOf(story, model, d.sol),
+    storyKey: d.story, structure: d.structure, structureName: st.name,
     world: scene.name, art: sceneArt(scene),
-    model: d.model,
+    model,
     rules: d.clues.filter(isRule),
     clues: numbered.map((x) => x.c),
-    ruleTexts: d.clues.filter(isRule).map((c) => clueText(d.model, c)),
-    clueTexts: numbered.map((x) => clueText(d.model, x.c)),
+    ruleTexts: d.clues.filter(isRule).map((c) => clueText(model, c)),
+    notes: ruleNotes(model),
+    clueTexts: numbered.map((x) => clueText(model, x.c)),
     answer: d.sol,
-    explanation: ded.steps.map((st) => stepText(d.model, st, label)),
-    hints: [GENERAL_HINT[kind], hint2, key ? stepText(d.model, key, label) : GENERAL_HINT[kind]],
+    explanation: ded.steps.map((s) => stepText(model, s, label)),
+    hints: [st.hint, hint2, key ? stepText(model, key, label) : GENERAL_HINT[kind]],
     difficulty: d.difficulty,
     difficultyLabel: DIFFICULTY_LABEL[d.difficulty],
     estimate: ESTIMATE[d.difficulty],

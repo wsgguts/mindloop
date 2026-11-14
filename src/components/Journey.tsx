@@ -1,11 +1,12 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useSfx } from "./useSound";
+import { useFitHeight } from "./useFitHeight";
 import Gem from "./Gem";
 import { CHAPTERS, LEVELS_PER_GAME, LEVELS_PER_CHAPTER, chapterDone, chapterOf, currentLevel, doneCount, isComplete, isDone, isUnlocked, type JourneyGame } from "../lib/journey";
 import { GAME_META } from "../lib/games";
 import JourneyScene from "./JourneyScene";
-import { sceneOf, scenePoints } from "../lib/scenes";
+import { sceneArt, sceneOf, scenePoints } from "../lib/scenes";
 
 interface Props {
   game: JourneyGame;
@@ -25,9 +26,21 @@ interface Props {
   /** Mindloop Investigação: mistérios resolvidos deste jogo e acesso ao caderno. */
   cases?: { solved: number; total: number };
   onCases?: () => void;
+  /** Por onde a jornada abre: a visão geral (capítulos) ou direto no mapa do capítulo do nível destacado. */
+  start?: "overview" | "map";
 }
 
-export default function Journey({ game, done, focus, justDone, justUnlocked, onPlay, onBack, onHelp, onFeedback, cases, onCases }: Props) {
+const HelpIcon = () => (
+  <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9.5" /><path d="M9.3 9.2a2.8 2.8 0 0 1 5.4 1c0 1.9-2.7 2.4-2.7 4" /><path d="M12 17.6h.01" /></svg>
+);
+
+/**
+ * Jornada em duas etapas:
+ *  • visão geral — título, progresso, Investigações e os 10 capítulos em cartões (com a pintura de cada mundo);
+ *  • mapa — só uma barra compacta (voltar aos capítulos, mundo, capítulo anterior/seguinte) e a trilha inteira.
+ * Ao voltar de uma partida, a jornada abre direto no mapa (com a animação de chegada).
+ */
+export default function Journey({ game, done, focus, justDone, justUnlocked, onPlay, onBack, onHelp, cases, onCases, start = "overview" }: Props) {
   const { name, color, cur: curColor } = GAME_META[game];
   const next = currentLevel(done); // primeiro nível ainda não concluído
   const cur = focus; // nível destacado ("JOGAR")
@@ -35,13 +48,14 @@ export default function Journey({ game, done, focus, justDone, justUnlocked, onP
   const count = doneCount(done);
   const curChapter = chapterOf(game, cur).id;
   const [chapterId, setChapterId] = useState(curChapter);
+  const [stage, setStage] = useState<"overview" | "map">(justDone !== undefined ? "map" : start);
   const ch = CHAPTERS[game][chapterId - 1];
   const world = sceneOf(ch.id); // o capítulo N acontece no mundo N, em qualquer um dos 4 jogos
   const points = scenePoints(world);
   const curRef = useRef<HTMLLIElement>(null);
-  const chipsRef = useRef<HTMLDivElement>(null);
-  const scrollToCur = useRef<ScrollBehavior | null>("auto"); // ao abrir, leva a pessoa direto ao nível em que parou
+  const scrollToCur = useRef<ScrollBehavior | null>("auto"); // ao abrir o mapa, leva a pessoa direto ao nível em que parou
   const [offscreen, setOffscreen] = useState(false);
+  const sfx = useSfx(game);
   /** Rola a página até o nível destacado ficar no centro da área visível (acima da barra de navegação).
    *  Nos primeiros níveis de cada capítulo (no pé da trilha) a página para no fim da trilha: o nível fica
    *  embaixo, mas visível, e a arte continua preenchendo a tela (sem faixa vazia). */
@@ -60,7 +74,7 @@ export default function Journey({ game, done, focus, justDone, justUnlocked, onP
   const rootRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const root = rootRef.current;
-    if (!root) return;
+    if (!root || stage !== "map") return;
     let touched = false;
     const stop = () => { touched = true; };
     const evs = ["touchstart", "wheel", "keydown", "pointerdown"] as const;
@@ -72,31 +86,29 @@ export default function Journey({ game, done, focus, justDone, justUnlocked, onP
     document.fonts?.ready.then(again).catch(() => {});
     const end = window.setTimeout(() => { touched = true; }, 2500);
     return () => { ro?.disconnect(); window.removeEventListener("resize", again); evs.forEach((e) => window.removeEventListener(e, stop)); window.clearTimeout(end); };
-  }, [chapterId, centerOnCur]);
+  }, [chapterId, stage, centerOnCur]);
 
   const [toast, setToast] = useState("");
 
   useEffect(() => {
-    if (scrollToCur.current && curRef.current) {
-      centerOnCur(scrollToCur.current);
-      scrollToCur.current = null;
-    }
-    // Centraliza o capítulo escolhido na faixa de capítulos (só na horizontal, sem mexer na página).
-    const row = chipsRef.current, chip = row?.querySelector<HTMLElement>("[aria-pressed=true]");
-    if (row && chip) row.scrollLeft = chip.offsetLeft - (row.clientWidth - chip.offsetWidth) / 2;
-  }, [chapterId]);
+    if (stage === "overview") { window.scrollTo(0, 0); return; }
+    const how = scrollToCur.current;
+    if (!how) return;
+    scrollToCur.current = null;
+    if (curRef.current) centerOnCur(how);
+    else window.scrollTo({ top: document.documentElement.scrollHeight, behavior: how }); // outro capítulo: abre no pé da trilha (nível 1)
+  }, [chapterId, stage, centerOnCur]);
   useEffect(() => {
     const el = curRef.current;
     if (!el || typeof IntersectionObserver === "undefined") { setOffscreen(false); return; }
     const io = new IntersectionObserver(([e]) => setOffscreen(!e.isIntersecting));
     io.observe(el);
     return () => io.disconnect();
-  }, [chapterId, cur]);
+  }, [chapterId, cur, stage]);
   useEffect(() => { if (!toast) return; const t = setTimeout(() => setToast(""), 2600); return () => clearTimeout(t); }, [toast]);
 
   // Ao voltar de uma vitória, o nível seguinte "abre" com uma animação (só quando ele acabou de ser liberado).
   const unlockedNow = justUnlocked !== undefined && !isDone(done, justUnlocked) ? justUnlocked : undefined;
-  const sfx = useSfx(game);
   // Som de progressão junto com a animação do nível recém-liberado (que começa 1 s depois de chegar).
   useEffect(() => {
     if (unlockedNow === undefined) return;
@@ -113,58 +125,96 @@ export default function Journey({ game, done, focus, justDone, justUnlocked, onP
     if (chapterId === curChapter) centerOnCur("smooth");
     else { scrollToCur.current = "smooth"; setChapterId(curChapter); }
   }
+  /** Abre o mapa de um capítulo: o do nível destacado vai centralizado nele; os outros abrem no pé da trilha. */
+  function openMap(id: number) { sfx("ui"); scrollToCur.current = "auto"; setChapterId(id); setStage("map"); }
+  function step(d: number) {
+    const id = chapterId + d;
+    if (id < 1 || id > CHAPTERS[game].length) return;
+    sfx("ui"); scrollToCur.current = "auto"; setChapterId(id);
+  }
+
+  useFitHeight(rootRef, [stage]); // visão geral: cabe inteira na tela do celular, sem rolar
+  const style = { "--gc": color, ...(curColor && { "--cur": curColor }) } as React.CSSProperties;
+
+  if (stage === "overview") {
+    return (
+      <div ref={rootRef} className="journey jov fit" style={style}>
+        <header className="jhead">
+          <div className="jtop">
+            <button className="back" onClick={onBack}>‹ Início</button>
+            <button className="back jhelp" onClick={onHelp}><HelpIcon />Como jogar</button>
+          </div>
+          <div className="title">
+            <Gem kind={game} size={52} />
+            <div><h1>{name}</h1><p>{count} de {LEVELS_PER_GAME} níveis concluídos</p></div>
+          </div>
+          {complete && (
+            <p className="jdone" role="note"><b aria-hidden="true">★</b> Jornada completa! Todos os níveis estão liberados — escolha qualquer um para jogar de novo.</p>
+          )}
+          <div className="progress" role="progressbar" aria-label="Progresso na jornada" aria-valuemin={0} aria-valuemax={LEVELS_PER_GAME} aria-valuenow={count}>
+            <i style={{ width: `${count}%` }} />
+          </div>
+        </header>
+
+        <div className="jov-actions">
+          <button className="jcontinue" onClick={() => openMap(curChapter)} aria-label={`${complete ? "Rever a jornada" : count ? "Continuar a jornada" : "Começar a jornada"}: nível ${cur}, ${sceneOf(curChapter).name}`}>
+            <span>{complete ? "Rever a jornada" : count ? "Continuar" : "Começar"}</span>
+            <b>Nível {cur} ›</b>
+          </button>
+          {cases && onCases && (
+            <button className="jcases jcases-tile" onClick={() => { sfx("ui"); onCases(); }} aria-label={`Investigações: ${cases.solved} de ${cases.total} mistérios resolvidos. Abrir caderno.`}>
+              <span><span aria-hidden="true">🔍 </span>Investigações</span>
+              <b>{cases.solved}/{cases.total} ›</b>
+            </button>
+          )}
+        </div>
+
+        <section className="jov-sec" aria-labelledby={`jov-${game}`}>
+          <h2 id={`jov-${game}`}>Capítulos</h2>
+          <ol className="jgrid">
+            {CHAPTERS[game].map((c) => {
+              const n = chapterDone(done, c);
+              const full = n === LEVELS_PER_CHAPTER;
+              const open = isUnlocked(done, c.from);
+              const here = c.id === curChapter && !complete;
+              const w = sceneOf(c.id);
+              return (
+                <li key={c.id}>
+                  <button className={`jcard${full ? " full" : ""}${open ? "" : " shut"}${here ? " here" : ""}`} onClick={() => openMap(c.id)}
+                    aria-label={`Capítulo ${c.id}: ${w.name}, níveis ${c.from} a ${c.to}, ${n} de ${LEVELS_PER_CHAPTER} concluídos${full ? ", completo" : open ? "" : ", bloqueado"}${here ? ", você está aqui" : ""}`}>
+                    <img src={sceneArt(w)} alt="" loading="lazy" decoding="async" />
+                    <span className="jcard-tag" aria-hidden="true">{full ? "✓" : open ? c.id : "🔒"}</span>
+                    <span className="jcard-b">
+                      <b>{w.name}</b>
+                      <small>{here ? <em className="jcard-now">Você está aqui</em> : <><span className="jcard-word">Níveis </span>{c.from}–{c.to}</>} · {n}/{LEVELS_PER_CHAPTER}</small>
+                      <i className="jcard-bar" aria-hidden="true"><i style={{ width: `${n * 10}%` }} /></i>
+                    </span>
+                  </button>
+                </li>
+              );
+            })}
+          </ol>
+        </section>
+      </div>
+    );
+  }
 
   return (
-    <div ref={rootRef} className={`journey${justDone !== undefined ? " enter" : ""}`} style={{ "--gc": color, ...(curColor && { "--cur": curColor }) } as React.CSSProperties}>
-      <header className="jhead">
-        <div className="jtop">
-          <button className="back" onClick={onBack}>‹ Início</button>
-          <button className="back jhelp" onClick={onHelp}><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9.5" /><path d="M9.3 9.2a2.8 2.8 0 0 1 5.4 1c0 1.9-2.7 2.4-2.7 4" /><path d="M12 17.6h.01" /></svg>Como jogar</button>
+    <div ref={rootRef} className={`journey jmap${justDone !== undefined ? " enter" : ""}`} style={style}>
+      <header className="jmapbar">
+        <button className="back" onClick={() => { sfx("ui"); setStage("overview"); }} aria-label="Voltar aos capítulos da jornada">‹ Capítulos</button>
+        <div className="jmap-t">
+          <b>{world.name}</b>
+          <small>Cap. {ch.id} · níveis {ch.from}–{ch.to} · {chapterDone(done, ch)}/{LEVELS_PER_CHAPTER}</small>
         </div>
-        <div className="title">
-          <Gem kind={game} size={52} />
-          <div><h1>{name}</h1><p>{count} de {LEVELS_PER_GAME} níveis concluídos</p></div>
-        </div>
-        {complete && (
-          <p className="jdone" role="note"><b aria-hidden="true">★</b> Jornada completa! Todos os níveis estão liberados — escolha qualquer um para jogar de novo.</p>
-        )}
-        <div className="progress" role="progressbar" aria-label="Progresso na jornada" aria-valuemin={0} aria-valuemax={LEVELS_PER_GAME} aria-valuenow={count}>
-          <i style={{ width: `${count}%` }} />
-        </div>
-        {cases && onCases && (
-          <button className="jcases" onClick={() => { sfx("ui"); onCases(); }} aria-label={`Investigações: ${cases.solved} de ${cases.total} mistérios resolvidos. Abrir caderno.`}>
-            <span aria-hidden="true">🔍</span><b>Investigações</b><small>{cases.solved}/{cases.total} mistérios</small><span aria-hidden="true">›</span>
-          </button>
-        )}
+        <span className="jmap-nav">
+          <button onClick={() => step(-1)} disabled={chapterId === 1} aria-label="Capítulo anterior">‹</button>
+          <button onClick={() => step(1)} disabled={chapterId === CHAPTERS[game].length} aria-label="Próximo capítulo">›</button>
+        </span>
       </header>
 
-      <nav className="jchips" ref={chipsRef} aria-label="Capítulos da jornada">
-        {CHAPTERS[game].map((c) => {
-          const complete = chapterDone(done, c) === LEVELS_PER_CHAPTER;
-          const open = isUnlocked(done, c.from);
-          return (
-            <button key={c.id} className={`jchip${complete ? " full" : ""}${open ? "" : " shut"}${c.id === curChapter ? " here" : ""}`}
-              aria-pressed={c.id === chapterId} aria-label={`Capítulo ${c.id}: ${sceneOf(c.id).name} — ${c.title}${complete ? ", concluído" : open ? "" : ", bloqueado"}`}
-              title={`${sceneOf(c.id).name} · níveis ${c.from}–${c.to}`}
-              onClick={() => setChapterId(c.id)}>
-              {complete ? "✓" : c.id}
-            </button>
-          );
-        })}
-      </nav>
-
-      <section className="jch" aria-labelledby={`ch-${game}-${ch.id}`}>
-        <div className="jbanner">
-          <img src={ch.id % 2 ? "/avatar-cat.webp" : "/avatar-kid.webp"} alt="" width={64} height={64} decoding="async" />
-          <div>
-            <span className="cap">CAPÍTULO {ch.id} · NÍVEIS {ch.from}–{ch.to}</span>
-            <h2 id={`ch-${game}-${ch.id}`}>{world.name}</h2>
-            <p>{world.tagline}</p>
-            <p className="jsub"><b>{ch.title}:</b> {ch.text}</p>
-            <span className="cnt">{chapterDone(done, ch)} de {LEVELS_PER_CHAPTER} concluídos</span>
-          </div>
-        </div>
-
+      <section className="jch" aria-label={`Capítulo ${ch.id}: ${world.name}`}>
+        <p className="jmap-tip"><b>{ch.title}:</b> {ch.text}</p>
         {/* O mundo e os níveis formam um único bloco: os pontos usam % da arte e rolam junto com ela.
             O mundo (cenário) é o mesmo nos 4 jogos; o jogo só muda a luz, os cristais e as partículas. */}
         <div className="trail">

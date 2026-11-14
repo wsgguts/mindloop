@@ -42,7 +42,8 @@ const ICON: Record<Tone, string> = { info: "ℹ", ok: "✓", warn: "!", hint: "?
 export default function CaseScreen({ c, record, active, continueLabel, onContinue, exitLabel, onExit, onDraft, onSolve }: Props) {
   const m = c.model;
   const look = GAME_LOOK[c.game];
-  const draft = record.draft && record.draft.a.length === m.slots.length ? record.draft : null;
+  // Rascunho só vale para o MESMO conteúdo de caso (se o mistério foi reescrito, começa do zero).
+  const draft = record.draft && record.draft.k === c.storyKey && record.draft.a.length === m.slots.length ? record.draft : null;
   const [a, setA] = useState<number[]>(() => draft?.a.map((v) => (v < m.values.length ? v : -1)) ?? m.slots.map(() => -1));
   const [hints, setHints] = useState(draft?.hints ?? 0);
   const [sel, setSel] = useState<number | null>(null);
@@ -95,7 +96,7 @@ export default function CaseScreen({ c, record, active, continueLabel, onContinu
   const first = useRef(true);
   useEffect(() => {
     if (first.current) { first.current = false; return; }
-    if (!result) onDraft({ a, hints, ms: Math.round(clock.read()) });
+    if (!result) onDraft({ a, hints, ms: Math.round(clock.read()), k: c.storyKey });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [a, hints]);
 
@@ -170,6 +171,7 @@ export default function CaseScreen({ c, record, active, continueLabel, onContinu
             <p><b>{MEDAL_LABEL[medal]}</b> — {hints === 0 ? "sem nenhuma dica. Dedução pura!" : `com ${hints} dica${hints > 1 ? "s" : ""}.`}</p>
           </div>
         </div>
+        <p className="cx-ending">{c.ending}</p>
         <dl className="cx-kpis">
           <div><dt>Tempo</dt><dd>{formatTime(s.ms)}</dd></div>
           <div className={s.record ? "hl" : ""}><dt>{s.record ? "Novo recorde!" : "Melhor tempo"}</dt><dd>{formatTime(result.bestMs)}</dd></div>
@@ -210,7 +212,8 @@ export default function CaseScreen({ c, record, active, continueLabel, onContinu
         <p className="cx-goal"><b>🔍 {c.goal}</b></p>
         <ul className="cx-facts" aria-label="Sobre o caso">
           <li>⏱ {c.estimate[0]}–{c.estimate[1]} min</li>
-          <li>{c.clues.length} pistas</li>
+          <li>🧩 {c.structureName}</li>
+          <li>{c.clues.length} {c.clues.length === 1 ? "pista" : "pistas"}</li>
           <li>{record.solvedAt !== null ? "Revisão (XP já ganho)" : `${xpFor(c.difficulty, hints)} XP`}</li>
         </ul>
         <div className="cx-sticky">
@@ -223,7 +226,7 @@ export default function CaseScreen({ c, record, active, continueLabel, onContinu
   return (
     <div className="wrap cx-play" style={style}>
       <header className="cx-head">
-        <button className="cx-back icon" onClick={() => { onDraft({ a, hints, ms: Math.round(clock.read()) }); onExit(); }} aria-label={exitLabel} title={exitLabel}>‹</button>
+        <button className="cx-back icon" onClick={() => { onDraft({ a, hints, ms: Math.round(clock.read()), k: c.storyKey }); onExit(); }} aria-label={exitLabel} title={exitLabel}>‹</button>
         <div className="cx-head-t"><b id="cx-title">{c.title}</b><small>{c.goal}</small></div>
         <button className="cx-back icon" onClick={() => setStage("story")} aria-label="Reler a história" title="Reler a história">📖</button>
         <span className="cx-timer" aria-label={`Tempo: ${formatTime(clock.ms)}`}>{formatTime(clock.ms)}</span>
@@ -250,8 +253,9 @@ export default function CaseScreen({ c, record, active, continueLabel, onContinu
               {c.hints.slice(0, hints).map((h, i) => <li key={i}><b>Dica {i + 1}</b>{h}</li>)}
             </ol>
           )}
-          {c.ruleTexts.length > 0 && (
+          {(c.notes.length > 0 || c.ruleTexts.length > 0) && (
             <ul className="cx-rules" aria-label="Regras do caso">
+              {c.notes.map((t, i) => <li key={`n${i}`}><span className="cx-st" aria-hidden="true">★</span>{t}</li>)}
               {c.ruleTexts.map((t, i) => (
                 <li key={i} className={ruleStates[i] === false || broken === -1 - i ? "bad" : ruleStates[i] ? "ok" : ""}><span className="cx-st" aria-hidden="true">{ruleStates[i] === false ? "✗" : ruleStates[i] ? "✓" : "★"}</span>{t}</li>
               ))}

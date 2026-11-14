@@ -232,7 +232,7 @@ export default function TangoGame({ puzzle, active, onMenu, onRules, onFeedback,
       <div className={`note ${msg.tone}`} role="status" aria-live="polite"><b aria-hidden="true">{ICON[msg.tone]}</b><span>{msg.text}</span></div>
 
       {confirm && (
-        <div className="note warn" role="alertdialog" aria-label="Confirmação">
+        <div className="note warn gconfirm" role="alertdialog" aria-label="Confirmação">
           <div style={{ display: "grid", gap: 8 }}>
             <span>Reiniciar apaga os símbolos que você colocou. Continuar?</span>
             <div className="row"><button className="btn" onClick={restart}>Sim, reiniciar</button><button className="btn sec" onClick={() => setConfirm(false)}>Cancelar</button></div>
