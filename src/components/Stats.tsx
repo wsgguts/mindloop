@@ -18,10 +18,10 @@ function Trend({ v }: { v: number | null }) {
     : <span className="trend down">▼ {-d} pontos de ritmo abaixo das 5 partidas anteriores</span>;
 }
 
-export default function Stats({ log, progress }: { log: PlayerLog; progress: Record<JourneyGame, string> }) {
+export default function Stats({ log, progress, games = ALL_GAMES }: { log: PlayerLog; progress: Record<JourneyGame, string>; games?: JourneyGame[] }) {
   const [game, setGame] = useState<JourneyGame>("sudoku");
   const o = overallStats(log, progress);
-  const per = ALL_GAMES.map((g) => gameStats(g, log, progress[g]));
+  const per = games.map((g) => gameStats(g, log, progress[g]));
   const gs = per.find((s) => s.game === game)!;
   const maxDay = Math.max(1, ...o.activity.map((a) => a.count));
   const enough = o.matches >= MIN_MATCHES;
@@ -81,7 +81,7 @@ export default function Stats({ log, progress }: { log: PlayerLog; progress: Rec
 
       <h3>Desempenho por jogo</h3>
       <div className="seg" role="group" aria-label="Escolher jogo">
-        {ALL_GAMES.map((g) => (
+        {games.map((g) => (
           <button key={g} className={game === g ? "on" : ""} aria-pressed={game === g} onClick={() => setGame(g)}>
             <Gem kind={g} size={28} />{GAME_META[g].name}
           </button>

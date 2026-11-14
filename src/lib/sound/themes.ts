@@ -5,11 +5,12 @@
 // • Tango: duas "vozes" quentes (Cristal agudo, Orbe grave, a uma quinta de distância) que formam acordes.
 // • Zip: synth moderno em pluck; a nota sobe conforme o caminho avança, como quem percorre uma linha.
 // • Patches: encaixes de madeira (clique + corpo), mais graves para peças maiores, e um "clic" de peça certa.
+// • Astros (bônus): sinos celestes; cada astro novo soa um degrau acima, e a marca × é um toque seco.
 // Erros são sempre graves, baixos e curtos: avisam sem constranger.
 
 import type { Synth, Theme } from "./engine";
 
-export type SoundGame = "sudoku" | "tango" | "zip" | "patches";
+export type SoundGame = "sudoku" | "tango" | "zip" | "patches" | "astros";
 
 const PENTA = [0, 2, 4, 7, 9]; // pentatônica maior
 const scale = (root: number, i: number, steps = PENTA) => root + 12 * Math.floor(i / steps.length) + steps[((i % steps.length) + steps.length) % steps.length];
@@ -197,7 +198,39 @@ const PATCHES: Theme = {
   },
 };
 
-export const THEMES: Record<SoundGame, Theme> = { sudoku: SUDOKU, tango: TANGO, zip: ZIP, patches: PATCHES };
+// ---------------------------------------------------------------- Astros: sinos celestes, Mi maior com brilho
+
+/** Cada astro novo soa um degrau acima (o céu vai se completando); a marca × é um toque seco e baixo. */
+const astroNote = (count = 1) => scale(76, Math.max(0, count - 1));
+/** Sino: fundamental longa + parcial inarmônica curta (timbre de sininho de vidro). */
+function bell(s: Synth, m: number, t: number, g: number, dur = 0.7, send = 0.35) {
+  const f = s.hz(m);
+  s.tone({ f, t, dur, g, send });
+  s.tone({ f: f * 2.76, t, dur: dur * 0.35, g: g * 0.22, send });
+  s.tone({ f: f * 5.4, t, dur: dur * 0.12, g: g * 0.06, type: "triangle", send });
+}
+
+const ASTROS: Theme = {
+  select: (s) => s.tone({ f: s.hz(64), dur: 0.05, g: 0.04, type: "triangle", lp: 1200, send: 0.03 }), // marca × (anotação)
+  place: (s, o) => bell(s, astroNote(o.count), 0, 0.1, 0.6),
+  erase: (s) => s.tone({ f: s.hz(83), f2: s.hz(76), dur: 0.12, g: 0.045, send: 0.15 }),
+  complete: (s, o) => {
+    // Várias casas marcadas de uma vez: cascata curta e descendente, como poeira de estrelas.
+    const k = Math.max(2, Math.min(6, Math.round((o.count ?? 3) / 3)));
+    for (let i = 0; i < k; i++) bell(s, 100 - i * 3, i * 0.04, 0.025, 0.25, 0.45);
+  },
+  error: (s) => softNo(s, 64, 63, 0.065, "sine", 1000),
+  hint: (s) => { bell(s, 88, 0, 0.045, 0.7, 0.5); bell(s, 95, 0.12, 0.04, 0.8, 0.55); },
+  ui: (s) => bell(s, 88, 0, 0.03, 0.25, 0.25),
+  win: (s, o) => {
+    // Os astros acendem em onda: um sino por astro subindo a escala e um acorde aberto de Mi maior.
+    const k = Math.max(5, Math.min(9, o.count ?? 7));
+    for (let i = 0; i < k; i++) bell(s, scale(76, i), 0.5 + i * 0.12, 0.07, 0.9, 0.4);
+    [64, 71, 76, 80, 83, 88].forEach((m, i) => s.tone({ f: s.hz(m), t: 0.5 + k * 0.12 + i * 0.02, dur: 2, g: 0.03, a: 0.05, send: 0.5 }));
+  },
+};
+
+export const THEMES: Record<SoundGame, Theme> = { sudoku: SUDOKU, tango: TANGO, zip: ZIP, patches: PATCHES, astros: ASTROS };
 
 /** Tema de um jogo (eventos que ele não define caem na base). Sem jogo: só a base (interface). */
 export const themeFor = (g?: SoundGame): Theme => (g ? THEMES[g] : BASE);

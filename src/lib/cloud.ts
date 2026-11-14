@@ -11,14 +11,14 @@
 
 import { ACH_KEY, type Unlocked, parseUnlocked } from "./achievements";
 import { CASES_KEY, type CaseLog, type CaseRecord, emptyCaseLog, parseCaseLog } from "./cases/progress";
-import { ALL_GAMES } from "./games";
+import { EVERY_GAME } from "./games";
 import { HISTORY_KEY, type PlayerLog, emptyLog, parseLog } from "./history";
 import { type JourneyGame, emptyProgress, parseLevel, parseProgress } from "./journey";
 import { type Times, parseTimes } from "./records";
 import { RankError, type RankIdentity, rpc } from "./ranking";
 
 type PerGame<T> = Record<JourneyGame, T>;
-const perGame = <T,>(f: (g: JourneyGame) => T): PerGame<T> => ({ sudoku: f("sudoku"), zip: f("zip"), tango: f("tango"), patches: f("patches") });
+const perGame = <T,>(f: (g: JourneyGame) => T): PerGame<T> => ({ sudoku: f("sudoku"), zip: f("zip"), tango: f("tango"), patches: f("patches"), astros: f("astros") });
 
 export const PROGRESS_KEY = (g: JourneyGame) => `mindloop:progress:${g}`;
 export const TIMES_KEY = (g: JourneyGame) => `mindloop:times:${g}`;
@@ -67,7 +67,7 @@ export function readSnapshot(read: Read): Snapshot {
 
 /** Grava um snapshot no aparelho (substitui os mesmos campos; não mexe no apelido nem na identidade). */
 export function writeSnapshot(s: Snapshot, write: Write): void {
-  for (const g of ALL_GAMES) {
+  for (const g of EVERY_GAME) {
     write(PROGRESS_KEY(g), s.progress[g]);
     write(TIMES_KEY(g), JSON.stringify(s.times[g]));
     write(LAST_KEY(g), s.last[g] === null ? null : String(s.last[g]));
@@ -86,7 +86,7 @@ export function parseSnapshot(raw: unknown): Snapshot | null {
   const g = <T,>(x: unknown, k: JourneyGame): T | undefined => (x && typeof x === "object" ? (x as Record<string, T>)[k] : undefined);
   const str = (x: unknown) => (x === undefined || x === null ? null : typeof x === "string" ? x : JSON.stringify(x));
   return readSnapshot((key) => {
-    for (const k of ALL_GAMES) {
+    for (const k of EVERY_GAME) {
       if (key === PROGRESS_KEY(k)) return str(g(o.progress, k));
       if (key === TIMES_KEY(k)) return str(g(o.times, k));
       if (key === LAST_KEY(k)) return str(g(o.last, k));
@@ -159,7 +159,7 @@ export function sameSnapshot(a: Snapshot, b: Snapshot): boolean {
 
 /** Tem algum progresso? (para avisar antes de substituir os dados do aparelho). */
 export const hasProgress = (s: Snapshot) =>
-  ALL_GAMES.some((g) => s.progress[g].includes("1")) || s.history.matches.length > 0 || Object.keys(s.cases.records).length > 0;
+  EVERY_GAME.some((g) => s.progress[g].includes("1")) || s.history.matches.length > 0 || Object.keys(s.cases.records).length > 0;
 
 // ---------------------------------------------------------------- servidor
 

@@ -2,7 +2,7 @@
 // Fica SEPARADO do progresso das jornadas de propósito: investigar ou pular nunca muda fases, pontos do ranking
 // ou desbloqueios. Funções puras; quem lê e grava é o App.
 
-import { ALL_GAMES } from "../games";
+import { EVERY_GAME } from "../games";
 import type { JourneyGame } from "../journey";
 import { type Difficulty, MAX_HINTS, xpFor } from "./config";
 
@@ -39,7 +39,7 @@ const blank = (): CaseRecord => ({ solvedAt: null, bestMs: null, bestHints: null
 
 const isNum = (x: unknown): x is number => typeof x === "number" && Number.isFinite(x) && x >= 0;
 const numOrNull = (x: unknown) => (isNum(x) ? x : null);
-const isGame = (g: unknown): g is JourneyGame => typeof g === "string" && (ALL_GAMES as string[]).includes(g);
+const isGame = (g: unknown): g is JourneyGame => typeof g === "string" && (EVERY_GAME as string[]).includes(g);
 
 /** Lê o progresso salvo; dados ausentes ou corrompidos viram um progresso vazio (o app segue funcionando). */
 export function parseCaseLog(raw: string | null): CaseLog {

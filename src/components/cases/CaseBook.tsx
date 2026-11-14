@@ -22,6 +22,10 @@ interface Props {
   /** Capítulo aberto (null = visão geral). Fica no App para voltar ao mesmo capítulo depois de um mistério. */
   chapter?: number | null;
   onChapter?: (ch: number | null) => void;
+  /** Modo Administrador (testes): todos os mistérios liberados. */
+  admin?: boolean;
+  /** Jogos que aparecem na troca de jogo (o bônus só depois de liberado). */
+  games?: JourneyGame[];
 }
 
 const fmtDate = (t: number) => new Date(t).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
@@ -35,7 +39,7 @@ const fmtDate = (t: number) => new Date(t).toLocaleDateString("pt-BR", { day: "2
  * Liberado = a fase de referência já foi concluída. Dá para investigar um caso pulado, continuar um começado ou
  * rever um resolvido (modo revisão, sem XP repetido).
  */
-export default function CaseBook({ game, log, progress, onGame, onOpen, onBack, chapter = null, onChapter }: Props) {
+export default function CaseBook({ game, log, progress, onGame, onOpen, onBack, chapter = null, onChapter, admin = false, games = ALL_GAMES }: Props) {
   const sfx = useSfx(game);
   const [localCh, setLocalCh] = useState<number | null>(chapter);
   const ch = onChapter ? chapter : localCh;
@@ -45,7 +49,7 @@ export default function CaseBook({ game, log, progress, onGame, onOpen, onBack, 
   useFitHeight(rootRef, [ch, history, game]);
 
   const cases = casesOf(game);
-  const open = (c: Case) => isDone(progress[game], c.level);
+  const open = (c: Case) => admin || isDone(progress[game], c.level);
   const solved = (c: Case) => recordOf(log, c.id).solvedAt !== null;
   const style = { "--gc": GAME_META[game].color } as React.CSSProperties;
 
@@ -137,7 +141,7 @@ export default function CaseBook({ game, log, progress, onGame, onOpen, onBack, 
       </header>
 
       <div className="cx-games" role="group" aria-label="Escolher jogo">
-        {ALL_GAMES.map((g) => (
+        {games.map((g) => (
           <button key={g} className={game === g ? "on" : ""} aria-pressed={game === g} onClick={() => { sfx("ui"); onGame(g); }}>
             <Gem kind={g} size={26} /><span>{GAME_META[g].name}</span>
           </button>

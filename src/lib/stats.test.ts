@@ -6,7 +6,7 @@ import { refMs } from "./scoring";
 import { MIN_MATCHES, gameStats, overallStats } from "./stats";
 
 const prog = (n: number) => { let p = emptyProgress(); for (let i = 1; i <= n; i++) p = markDone(p, i); return p; };
-const empty = { sudoku: emptyProgress(), zip: emptyProgress(), tango: emptyProgress(), patches: emptyProgress() };
+const empty = { sudoku: emptyProgress(), zip: emptyProgress(), tango: emptyProgress(), patches: emptyProgress(), astros: emptyProgress() };
 
 describe("médias de desempenho", () => {
   it("histórico vazio: zeros e nenhuma média inventada", () => {

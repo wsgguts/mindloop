@@ -3,7 +3,7 @@
 // então recarregar a página ou voltar a uma tela nunca duplica partidas.
 // Funções puras; quem lê e grava no aparelho é o App (chave mindloop:history).
 
-import { ALL_GAMES } from "./games";
+import { EVERY_GAME } from "./games";
 import { LEVELS_PER_GAME, type JourneyGame } from "./journey";
 import type { Times } from "./records";
 
@@ -35,10 +35,10 @@ export interface PlayerLog {
 export const HISTORY_KEY = "mindloop:history";
 const MAX_MATCHES = 3000;
 
-const zeroStarts = (): Record<JourneyGame, number> => ({ sudoku: 0, zip: 0, tango: 0, patches: 0 });
+const zeroStarts = (): Record<JourneyGame, number> => ({ sudoku: 0, zip: 0, tango: 0, patches: 0, astros: 0 });
 export const emptyLog = (): PlayerLog => ({ v: 1, matches: [], streak: 0, bestStreak: 0, starts: zeroStarts() });
 
-const isGame = (g: unknown): g is JourneyGame => typeof g === "string" && (ALL_GAMES as string[]).includes(g);
+const isGame = (g: unknown): g is JourneyGame => typeof g === "string" && (EVERY_GAME as string[]).includes(g);
 const posInt = (n: unknown): n is number => typeof n === "number" && Number.isInteger(n) && n >= 0;
 
 function validMatch(m: unknown): m is Match {
@@ -59,7 +59,7 @@ export function parseLog(raw: string | null): PlayerLog | null {
     const seen = new Set<string>();
     const matches = o.matches.filter((m) => validMatch(m) && !seen.has(m.id) && !!seen.add(m.id));
     const starts = zeroStarts();
-    for (const g of ALL_GAMES) if (posInt(o.starts?.[g])) starts[g] = o.starts![g];
+    for (const g of EVERY_GAME) if (posInt(o.starts?.[g])) starts[g] = o.starts![g];
     return { v: 1, matches, streak: posInt(o.streak) ? o.streak : 0, bestStreak: posInt(o.bestStreak) ? o.bestStreak : 0, starts };
   } catch { return null; }
 }
@@ -71,7 +71,7 @@ export function parseLog(raw: string | null): PlayerLog | null {
  */
 export function importLegacy(times: Record<JourneyGame, Times>): PlayerLog {
   const log = emptyLog();
-  for (const g of ALL_GAMES) {
+  for (const g of EVERY_GAME) {
     for (const [k, ms] of Object.entries(times[g])) {
       const level = Number(k);
       log.matches.push({ id: `legacy-${g}-${level}`, game: g, level, ms, at: null, hints: null, first: true, record: false });

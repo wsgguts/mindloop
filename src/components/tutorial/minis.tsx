@@ -5,6 +5,8 @@
 
 import TangoSymbol from "../TangoSymbol";
 import PatchesTag from "../PatchesTag";
+import AstroSymbol, { MarkSymbol } from "../AstroSymbol";
+import { SKY_COLORS } from "../../lib/astros";
 import { area, type Kind, type Rect } from "../../lib/patchesLogic";
 
 export type RC = [number, number];
@@ -169,6 +171,41 @@ export function MiniPatches({ n, clues, colors, pieces, preview, ghost, anchor, 
           <PatchesTag v={v} kind={kind} color={colors[i]} />
         </span>
       ))}
+    </div>
+  );
+}
+
+// ---------------- Mini Astros ----------------
+export interface AstrosP {
+  /** Constelação de cada casa. */
+  regions: number[][];
+  /** 0 vazia, 1 marcada (×), 2 astro. */
+  grid: number[][];
+  sel?: RC; bad?: RC[]; hl?: RC[]; ok?: RC[];
+  win?: boolean;
+  pad?: boolean; press?: "a" | "m" | "x";
+}
+export function MiniAstros({ regions, grid, sel, bad, hl, ok, win, pad, press }: AstrosP) {
+  const n = regions.length;
+  const diff = (r: number, c: number, y: number, x: number) => y >= 0 && y < n && x >= 0 && x < n && regions[y][x] !== regions[r][c];
+  return (
+    <div className="tut-col">
+      <div className={cls("aboard", `n${n}`, win && "win", "tut-board")} style={{ gridTemplateColumns: `repeat(${n}, 1fr)`, width: `min(100%, ${n * 48}px)` }}>
+        {grid.map((row, r) => row.map((v, c) => (
+          <div key={`${r}-${c}`} data-t={`c-${r}-${c}`} style={{ "--sky": SKY_COLORS[regions[r][c] % SKY_COLORS.length], "--r": r, "--c": c } as React.CSSProperties}
+            className={cls("acell", diff(r, c, r - 1, c) && "et", diff(r, c, r, c + 1) && "er", diff(r, c, r + 1, c) && "eb", diff(r, c, r, c - 1) && "el",
+              v === 2 && "star", sel && sel[0] === r && sel[1] === c && "sel", has(bad, r, c) && "bad", has(hl, r, c) && "tut-hl", has(ok, r, c) && "tut-ok")}>
+            {v === 2 ? <AstroSymbol size="70%" /> : v === 1 ? <MarkSymbol size="34%" /> : null}
+          </div>
+        )))}
+      </div>
+      {pad && (
+        <div className="tpad tut-pad">
+          <span data-t="pad-a" className={cls("btn sec", press === "a" && "tut-press")}><AstroSymbol size={22} />Astro</span>
+          <span data-t="pad-m" className={cls("btn sec", press === "m" && "tut-press")}><MarkSymbol size={14} />Marcar</span>
+          <span data-t="pad-x" className={cls("btn sec", press === "x" && "tut-press")}>Apagar</span>
+        </div>
+      )}
     </div>
   );
 }

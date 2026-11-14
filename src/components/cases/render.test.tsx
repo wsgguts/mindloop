@@ -60,7 +60,7 @@ describe("telas das investigações (135 mistérios)", () => {
   });
 
   it("caderno: a visão geral mostra os 10 capítulos, e cada capítulo lista os seus mistérios", () => {
-    const progress = { sudoku: emptyProgress(), zip: emptyProgress(), tango: emptyProgress(), patches: emptyProgress() };
+    const progress = { sudoku: emptyProgress(), zip: emptyProgress(), tango: emptyProgress(), patches: emptyProgress(), astros: emptyProgress() };
     for (const g of ["sudoku", "zip", "tango", "patches"] as const) {
       const ov = text(renderToString(h(CaseBook, { game: g, log: emptyCaseLog(), progress, onGame: noop, onOpen: noop, onBack: noop, chapter: null, onChapter: noop })));
       expect(ov).toContain("Mistérios por capítulo");

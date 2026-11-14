@@ -27,7 +27,7 @@ describe("histórico de partidas", () => {
     expect(l.starts.zip).toBe(3);
   });
   it("importa os recordes antigos sem perder nada e sem data", () => {
-    const l = importLegacy({ sudoku: { 1: 40000, 2: 50000 }, zip: {}, tango: { 7: 90000 }, patches: {} });
+    const l = importLegacy({ sudoku: { 1: 40000, 2: 50000 }, zip: {}, tango: { 7: 90000 }, patches: {}, astros: {} });
     expect(l.matches).toHaveLength(3);
     expect(l.matches.every((m) => m.at === null)).toBe(true);
     expect(distinctDays(l.matches)).toBe(0);
@@ -39,7 +39,7 @@ describe("histórico de partidas", () => {
     const raw = JSON.stringify({ v: 1, matches: [ok, ok, { ...ok, id: "b", level: 500 }, { id: "c" }], streak: 3, bestStreak: 4, starts: { sudoku: 2 } });
     const l = parseLog(raw)!;
     expect(l.matches.map((m) => m.id)).toEqual(["a"]);
-    expect(l.starts).toEqual({ sudoku: 2, zip: 0, tango: 0, patches: 0 });
+    expect(l.starts).toEqual({ sudoku: 2, zip: 0, tango: 0, patches: 0, astros: 0 });
   });
   it("sessão: vitórias com até 30 min entre si; dias distintos pelo calendário", () => {
     const ms = [0, 10, 20, 100, 110].map((min, i) => mk({ id: String(i), at: T0 + min * 60_000 }));

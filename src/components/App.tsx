@@ -20,14 +20,18 @@ import PatchesGame from "./PatchesGame";
 import { initSound } from "../lib/sound/engine";
 import TangoGame from "./TangoGame";
 import ZipGame from "./ZipGame";
+import AstrosGame from "./AstrosGame";
+import { AstrosGem } from "./AstroSymbol";
+import { ASTROS_PUZZLES } from "../lib/astros";
 import { COMMENT_MAX, submitFeedback, validateFeedback } from "../lib/feedback";
-import { ALL_GAMES, GAME_META } from "../lib/games";
+import { ALL_GAMES, BONUS_GAME, EVERY_GAME, GAME_META, bonusUnlocked, isMainGame, visibleGames } from "../lib/games";
 import { LEVELS_PER_GAME, doneCount, emptyProgress, focusLevel, isComplete, isDone, markDone, parseLevel, parseProgress } from "../lib/journey";
 import { PUZZLES, puzzleGrid } from "../lib/puzzles";
 import { type Times, parseTimes, recordTime } from "../lib/records";
 import type { Grid } from "../lib/sudoku";
 import { validateNick } from "../lib/nick";
 import { KEYS, clearStore, onStoreWrite, readStore, writeStore } from "../lib/storage";
+import { enterAdmin, isAdmin, leaveAdmin } from "../lib/admin";
 import { PATCHES_PUZZLES } from "../lib/patches";
 import { TANGO_PUZZLES } from "../lib/tango";
 import { ZIP_PUZZLES } from "../lib/zip";
@@ -67,7 +71,7 @@ const TUTORIAL_KEY = (g: RulesGame) => `mindloop:tutorial:${g}`;
 const PROGRESS_KEY = (g: RulesGame) => `mindloop:progress:${g}`;
 const TIMES_KEY = (g: RulesGame) => `mindloop:times:${g}`; // melhor tempo de cada nível
 const LAST_KEY = (g: RulesGame) => `mindloop:last:${g}`; // último nível jogado (referência de retorno)
-const perGame = <T,>(f: (g: RulesGame) => T): PerGame<T> => ({ sudoku: f("sudoku"), zip: f("zip"), tango: f("tango"), patches: f("patches") });
+const perGame = <T,>(f: (g: RulesGame) => T): PerGame<T> => ({ sudoku: f("sudoku"), zip: f("zip"), tango: f("tango"), patches: f("patches"), astros: f("astros") });
 
 // Áreas clicáveis sobre os cristais da arte do Início (em % da imagem home-art.webp; original em home-art.jpg).
 const ART_SPOTS: { id: RulesGame; left: number; top: number; width: number; height: number }[] = [
@@ -117,6 +121,21 @@ export default function App() {
   const [codeModal, setCodeModal] = useState<string | null>(null);
   const [codeUnseen, setCodeUnseen] = useState(false);
   const [profileTab, setProfileTab] = useState<"desempenho" | "ajustes">("desempenho");
+  // Modo Administrador (testes): a conta real fica pausada e o app usa um jogador de teste numa área separada,
+  // com tudo liberado e sem servidor (sem sincronização, ranking ou pontuação). Ver lib/admin.ts e lib/storage.ts.
+  const [admin, setAdmin] = useState(false);
+  /** Sem servidor: Supabase não configurado ou Modo Administrador ligado (a conta real não é tocada). */
+  const offline = () => isAdmin() || !rankingConfig();
+  /** Liga/desliga o modo e recarrega o app já lendo a outra área (testes ↔ conta real). */
+  async function changeAdmin(on: boolean) {
+    if (on) {
+      // Antes de pausar a conta real, envia ao servidor o que ainda estava para sincronizar.
+      if (syncTimer.current) { window.clearTimeout(syncTimer.current); syncTimer.current = undefined; }
+      await syncNow().catch(() => { /* fica salvo no aparelho e sincroniza na volta */ });
+      enterAdmin();
+    } else leaveAdmin();
+    window.location.reload();
+  }
   // Mindloop Investigação: progresso próprio (nunca altera fases, ranking ou desbloqueios).
   const [caseLog, setCaseLog] = useState<CaseLog>(emptyCaseLog);
   const caseLogRef = useRef(caseLog);
@@ -138,6 +157,7 @@ export default function App() {
     const n = readStore(KEYS.nick) ?? "";
     setNick(n && !validateNick(n) ? n : "");
     setSeen(perGame((g) => !!readStore(TUTORIAL_KEY(g))));
+    setAdmin(isAdmin());
     const prog = perGame((g) => parseProgress(readStore(PROGRESS_KEY(g))));
     const tms = perGame((g) => parseTimes(readStore(TIMES_KEY(g))));
     setProgress(prog);
@@ -187,14 +207,14 @@ export default function App() {
   function saveMe(id: Identity | null) { meRef.current = id; setMe(id); silently(() => writeStore(RANK_KEY, id ? JSON.stringify(id) : null)); }
   function markCodeUnseen(v: boolean) { setCodeUnseen(v); silently(() => writeStore(CODE_UNSEEN_KEY, v ? "1" : null)); }
   function scheduleSync() {
-    if (!meRef.current || !rankingConfig()) return;
+    if (!meRef.current || offline()) return;
     window.clearTimeout(syncTimer.current);
     syncTimer.current = window.setTimeout(() => { syncTimer.current = undefined; syncNow(); }, SYNC_DELAY_MS);
   }
   /** Baixa, mescla e envia o progresso (mesmo jogador em vários aparelhos: nada se perde, nada duplica). */
   async function syncNow() {
     const m = meRef.current;
-    if (!m || !rankingConfig()) return;
+    if (!m || offline()) return;
     if (syncing.current) { syncAgain.current = true; return; }
     syncing.current = true;
     try {
@@ -215,7 +235,7 @@ export default function App() {
   }
   /** Garante a identidade: cria uma para quem já tem apelido, gera o código de recuperação e sincroniza. */
   async function connect() {
-    if (!rankingConfig()) return;
+    if (offline()) return;
     let m = meRef.current;
     if (!m) {
       const n = readStore(KEYS.nick);
@@ -229,7 +249,7 @@ export default function App() {
   }
   /** Apelido escolhido ou trocado. Com servidor: o apelido é único entre todos os jogadores. */
   async function saveNick(v: string): Promise<string | null> {
-    const online = !!rankingConfig();
+    const online = !offline();
     const m = meRef.current;
     if (online && m && v !== m.nick) {
       try { await renamePlayer(m, v); saveMe({ ...m, nick: v }); }
@@ -276,6 +296,7 @@ export default function App() {
   }
   /** Reiniciar jogo: primeiro apaga no servidor (tudo ou nada), depois no aparelho, e recomeça do zero. */
   async function resetAll(): Promise<string | null> {
+    if (isAdmin()) { leaveAdmin(); window.location.reload(); return null; } // no modo de testes, "reiniciar" só descarta a área de testes
     const m = meRef.current;
     if (m && rankingConfig()) {
       try { await resetPlayer(m); }
@@ -312,6 +333,7 @@ export default function App() {
 
   /** Card, nome, arte ou "Jogar agora" de um jogo: abre a jornada dele (pedindo o apelido na primeira vez). */
   function openGame(id: RulesGame) {
+    if (id === BONUS_GAME && !bonusOpen) return; // jogo bônus ainda bloqueado
     if (nick) openJourney(id, "overview");
     else openNick(() => openJourney(id, "overview"));
   }
@@ -366,7 +388,8 @@ export default function App() {
       setNewMedals((n) => n + ev.fresh.length);
     }
     // Ranking online: reenvia os melhores tempos do jogo (o servidor guarda só o melhor de cada nível).
-    if (meRef.current && rankingConfig()) syncGame(meRef.current, game, t.times).catch(() => { /* tenta de novo ao abrir o ranking */ });
+    // O ranking online conta só os 4 jogos principais (o servidor não conhece o jogo bônus).
+    if (meRef.current && !offline() && isMainGame(game)) syncGame(meRef.current, game, t.times).catch(() => { /* tenta de novo ao abrir o ranking */ });
   }
 
   // ---- Mindloop Investigação ----
@@ -463,6 +486,10 @@ export default function App() {
   }
 
   const CARDS: { id: RulesGame; name: string; text: string; kind: GemKind; color: string }[] = ALL_GAMES.map((g) => ({ id: g, kind: g, ...GAME_META[g] }));
+  // Jogo bônus: abre com as 4 jornadas principais completas, ou no Modo Administrador (testes).
+  const bonusEarned = bonusUnlocked(progress);
+  const bonusOpen = admin || bonusEarned;
+  const visible = visibleGames(bonusOpen);
 
   const inGame = !!session && view === "game";
   // O cronômetro só corre com a partida na tela e nada por cima.
@@ -487,7 +514,8 @@ export default function App() {
         <header className={`top${view === "game" || view === "case" ? " in-game" : ""}`}>
           <span className="brand"><img src="/cube.png" alt="" width={36} height={34} /><span className="wordmark">MindLoop</span></span>
           <span className="top-actions">
-            {nick && <span className="chip" aria-label={`Apelido: ${nick}`}>{nick}</span>}
+            {admin ? <span className="chip admin-chip" aria-label="Modo Administrador ligado: jogador de teste, fora do ranking">🔧 Admin</span>
+              : nick && <span className="chip" aria-label={`Apelido: ${nick}`}>{nick}</span>}
             {view !== "game" && view !== "feedback" && (
               <button type="button" className="icon-btn" onClick={openFeedback} aria-label="Dar opinião sobre o MindLoop" title="Dar opinião">
                 <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M4.5 5.5h15A1.5 1.5 0 0 1 21 7v8.5a1.5 1.5 0 0 1-1.5 1.5H10l-4.5 3.5V17h-1A1.5 1.5 0 0 1 3 15.5V7a1.5 1.5 0 0 1 1.5-1.5z" /></svg>
@@ -514,6 +542,16 @@ export default function App() {
                     style={{ left: `${s.left}%`, top: `${s.top}%`, width: `${s.width}%`, height: `${s.height}%` }}
                     aria-label={`Jogar ${GAME_META[s.id].name}`} />
                 ))}
+                {/* Símbolo do jogo bônus na parte de baixo da arte, sob a logo: apagado e com cadeado até liberar; liberado, brilha e abre o jogo. */}
+                <button type="button" className={`bonus-spot${bonusOpen ? " open" : ""}`}
+                  onClick={() => (bonusOpen ? openGame(BONUS_GAME) : document.getElementById("bonus-card")?.scrollIntoView({ behavior: "smooth", block: "center" }))}
+                  aria-label={bonusOpen ? `Jogar ${GAME_META[BONUS_GAME].name}, o jogo bônus` : `${GAME_META[BONUS_GAME].name}: jogo bônus bloqueado. Complete as 4 jornadas para liberar. Ver o que falta.`}>
+                  {bonusOpen && <><span className="bs-halo" aria-hidden="true" /><span className="bs-ring" aria-hidden="true" />
+                    {[0, 1, 2, 3, 4, 5].map((i) => <span key={i} className="bs-spark" style={{ "--i": i } as React.CSSProperties} aria-hidden="true" />)}</>}
+                  <span className="bs-gem"><AstrosGem size={64} /></span>
+                  {!bonusOpen && <span className="bs-lock" aria-hidden="true">🔒</span>}
+                  {bonusOpen && <span className="bs-tag" aria-hidden="true">Bônus</span>}
+                </button>
                 <button className="hotspot" onClick={() => document.getElementById("jogos")?.scrollIntoView({ behavior: "smooth", block: "start" })} aria-label="Jogar agora: ver os jogos">
                   <span aria-hidden="true">Jogar agora</span>
                 </button>
@@ -544,11 +582,48 @@ export default function App() {
                     </article>
                   );
                 })}
+                {(() => {
+                  // Jogo bônus: card próprio. Bloqueado, mostra quanto falta em cada jornada principal.
+                  const meta = GAME_META[BONUS_GAME];
+                  const count = doneCount(progress[BONUS_GAME]);
+                  const full = isComplete(progress[BONUS_GAME]);
+                  if (!bonusOpen) {
+                    return (
+                      <article id="bonus-card" className="gcard bonus locked" style={{ "--gc": meta.color } as React.CSSProperties} aria-labelledby="bonus-name">
+                        <span className="gem-wrap"><Gem kind={BONUS_GAME} size={88} /><span className="gem-lock" aria-hidden="true">🔒</span></span>
+                        <span className="badge bonus">Jogo bônus · bloqueado</span>
+                        <h2 className="gname" id="bonus-name">{meta.name}</h2>
+                        <p className="gtext">Complete as 4 jornadas principais para liberar este jogo.</p>
+                        <ul className="bonus-req" aria-label="Jornadas que faltam">
+                          {ALL_GAMES.map((g) => {
+                            const n = doneCount(progress[g]);
+                            return <li key={g} className={n === LEVELS_PER_GAME ? "ok" : ""}><span>{GAME_META[g].name}</span><b>{n === LEVELS_PER_GAME ? "✓ completa" : `${n}/${LEVELS_PER_GAME}`}</b></li>;
+                          })}
+                        </ul>
+                        <button className="btn sec gplay" disabled aria-label={`${meta.name}: bloqueado até completar as 4 jornadas principais`}>🔒 Bloqueado</button>
+                      </article>
+                    );
+                  }
+                  return (
+                    <article id="bonus-card" className="gcard bonus" style={{ "--gc": meta.color } as React.CSSProperties} onClick={() => openGame(BONUS_GAME)}>
+                      <Gem kind={BONUS_GAME} size={88} />
+                      <span className={`badge bonus${full ? " full" : ""}`}>{full ? "★ Jornada completa" : bonusEarned ? "★ Jogo bônus" : "Bônus · modo administrador"}</span>
+                      <h2 className="gname">{meta.name}</h2>
+                      <p className="gtext">{meta.text}</p>
+                      <div className="gprog" aria-hidden="true"><i style={{ width: `${count}%` }} /></div>
+                      <span className="gcount">{count}/{LEVELS_PER_GAME} níveis</span>
+                      <button className="btn cta gplay" onClick={(e) => { e.stopPropagation(); openGame(BONUS_GAME); }}
+                        aria-label={`Jogar ${meta.name} (jogo bônus) agora — ${count} de ${LEVELS_PER_GAME} níveis concluídos`}>
+                        Jogar agora
+                      </button>
+                    </article>
+                  );
+                })()}
               </div>
             </section>
           </>
         ) : view === "journey" ? (
-          <Journey key={`${journeyGame}-${journeyStart}`} game={journeyGame} done={progress[journeyGame]} start={journeyStart}
+          <Journey key={`${journeyGame}-${journeyStart}`} game={journeyGame} done={progress[journeyGame]} start={journeyStart} admin={admin}
             focus={focusLevel(progress[journeyGame], lastPlayed[journeyGame])}
             justDone={arrival?.game === journeyGame ? arrival.justDone : undefined}
             justUnlocked={arrival?.game === journeyGame ? arrival.justUnlocked : undefined}
@@ -568,12 +643,12 @@ export default function App() {
               onDraft={(d) => caseDraft(runCase.id, d)} onSolve={(ms, h) => solveCase(runCase.id, ms, h)} />
           )
         ) : view === "casebook" ? (
-          <CaseBook game={bookGame} log={caseLog} progress={progress} onGame={(g) => { setBookGame(g); setBookChapter(null); }} chapter={bookChapter} onChapter={setBookChapter} onOpen={openCaseFromBook} onBack={() => openJourney(bookGame, "overview")} />
+          <CaseBook game={bookGame} log={caseLog} progress={progress} admin={admin} games={visible} onGame={(g) => { setBookGame(g); setBookChapter(null); }} chapter={bookChapter} onChapter={setBookChapter} onOpen={openCaseFromBook} onBack={() => openJourney(bookGame, "overview")} />
         ) : view === "rules" ? (
           <div className="wrap">
             <h1>Regras</h1>
             <div className="seg" role="group" aria-label="Escolher jogo">
-              {ALL_GAMES.map((g) => (
+              {visible.map((g) => (
                 <button key={g} className={rulesTab === g ? "on" : ""} aria-pressed={rulesTab === g} onClick={() => setRulesTab(g)}>
                   <Gem kind={g} size={28} />{GAME_META[g].name}
                 </button>
@@ -591,7 +666,7 @@ export default function App() {
           <div className="wrap">
             <div className="page-head">
               <h1>{nick || "Perfil"}</h1>
-              {nick && <span className="muted small">{doneCount(progress.sudoku) + doneCount(progress.zip) + doneCount(progress.tango) + doneCount(progress.patches)} fases · {Object.keys(unlocked).length} medalhas</span>}
+              {nick && <span className="muted small">{EVERY_GAME.reduce((a, g) => a + doneCount(progress[g]), 0)} fases · {Object.keys(unlocked).length} medalhas</span>}
             </div>
             <div className="tabs" role="tablist" aria-label="Seções do perfil">
               {([["desempenho", "Desempenho"], ["ajustes", "Ajustes"]] as const).map(([id, label]) => (
@@ -604,7 +679,7 @@ export default function App() {
               {profileTab === "desempenho" ? (
                 <>
                   <CaseSummary log={caseLog} onOpen={() => openCasebook(journeyGame)} />
-                  <Stats log={log} progress={progress} />
+                  <Stats log={log} progress={progress} games={visible} />
                 </>
               ) : (
                 <Settings nick={nick} me={me} online={!!rankingConfig()} issue={cloudIssue} codeUnseen={codeUnseen}
@@ -614,9 +689,17 @@ export default function App() {
                     try { const code = await issueRecovery(m); saveMe({ ...m, recovery: code }); setCodeModal(code); return null; }
                     catch (e) { return e instanceof RankError ? e.message : "Não foi possível gerar agora."; }
                   }}
-                  onRecover={() => setNickModal({ then: () => {} })} onRetry={() => connect()} onReset={resetAll} onFeedback={openFeedback} />
+                  onRecover={() => setNickModal({ then: () => {} })} onRetry={() => connect()} onReset={resetAll} onFeedback={openFeedback}
+                  admin={admin} onAdmin={changeAdmin} />
               )}
             </div>
+          </div>
+        ) : view === "ranking" && admin ? (
+          <div className="wrap stack">
+            <h1>Ranking</h1>
+            <div className="note warn" role="note"><b aria-hidden="true">🔧</b>
+              <span><b>Modo Administrador ligado.</b> O jogador de teste não participa do ranking e não soma pontos. Sua conta está pausada e volta com tudo (pontos, posição e progresso) quando você desligar o modo em Perfil → Ajustes.</span></div>
+            <button className="btn sec" onClick={() => { setProfileTab("ajustes"); setView("profile"); }}>Ir para os Ajustes</button>
           </div>
         ) : view === "ranking" ? (
           <Ranking times={times} me={me}
@@ -688,6 +771,11 @@ export default function App() {
         {activeSession?.game === "tango" && (
           <div hidden={!inGame}>
             <TangoGame key={`t-${activeSession.idx}-${activeSession.round}`} puzzle={TANGO_PUZZLES[activeSession.idx]} {...sessionProps("tango", activeSession.idx)} />
+          </div>
+        )}
+        {activeSession?.game === "astros" && (
+          <div hidden={!inGame}>
+            <AstrosGame key={`a-${activeSession.idx}-${activeSession.round}`} puzzle={ASTROS_PUZZLES[activeSession.idx]} {...sessionProps("astros", activeSession.idx)} />
           </div>
         )}
         {activeSession?.game === "patches" && (

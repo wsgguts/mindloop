@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ALL_GAMES } from "../games";
+import { EVERY_GAME } from "../games";
 import { ACHIEVEMENTS, evaluate } from "../achievements";
 import { emptyLog } from "../history";
 import { emptyProgress } from "../journey";
@@ -10,11 +10,11 @@ import { generateGame } from "./generate";
 import { type Model, allAssignments, clueState, clueText, deduce, evalClue, solveAll } from "./model";
 import { emptyCaseLog, goldCount, parseCaseLog, recordSkip, recordSolve, saveDraft, shouldOffer, solvedCount, xpTotal } from "./progress";
 
-const progress = { sudoku: emptyProgress(), zip: emptyProgress(), tango: emptyProgress(), patches: emptyProgress() };
+const progress = { sudoku: emptyProgress(), zip: emptyProgress(), tango: emptyProgress(), patches: emptyProgress(), astros: emptyProgress() };
 
 describe("banco de mistérios", () => {
   it("segue a agenda de config.ts: um mistério por fase agendada, em todos os jogos", () => {
-    for (const g of ALL_GAMES) {
+    for (const g of EVERY_GAME) {
       const levels = caseLevels(g);
       expect(CASES_DATA.filter((c) => c.game === g).map((c) => c.level)).toEqual(levels);
       expect(levels.length).toBeGreaterThanOrEqual(30);
@@ -33,7 +33,7 @@ describe("banco de mistérios", () => {
 
   it("ids únicos, e cada jogo só tem os próprios mistérios", () => {
     expect(new Set(CASES_DATA.map((c) => c.id)).size).toBe(CASES_DATA.length);
-    for (const g of ALL_GAMES) expect(casesOf(g).every((c) => c.game === g && c.id.startsWith(`${g}-`))).toBe(true);
+    for (const g of EVERY_GAME) expect(casesOf(g).every((c) => c.game === g && c.id.startsWith(`${g}-`))).toBe(true);
   });
 
   it("todo mistério tem UMA única solução, que é a resposta guardada", () => {
@@ -64,11 +64,11 @@ describe("banco de mistérios", () => {
   });
 
   it("o banco é reproduzível: gerar de novo dá o mesmo resultado (data.ts está atualizado)", () => {
-    for (const g of ALL_GAMES) expect(generateGame(g)).toEqual(CASES_DATA.filter((c) => c.game === g));
+    for (const g of EVERY_GAME) expect(generateGame(g)).toEqual(CASES_DATA.filter((c) => c.game === g));
   }, 120_000);
 
   it("dificuldade cresce ao longo da jornada", () => {
-    for (const g of ALL_GAMES) {
+    for (const g of EVERY_GAME) {
       const cs = casesOf(g);
       for (let i = 1; i < cs.length; i++) expect(cs[i].difficulty).toBeGreaterThanOrEqual(cs[i - 1].difficulty);
       const size = (m: Model) => m.slots.length * m.values.length;
@@ -143,7 +143,7 @@ describe("verificação da resposta", () => {
   });
 
   it("caseAfter encontra o mistério de cada fase agendada e nada nas outras", () => {
-    for (const g of ALL_GAMES) {
+    for (const g of EVERY_GAME) {
       const levels = new Set(caseLevels(g));
       for (let l = 1; l <= 100; l++) expect(!!caseAfter(g, l)).toBe(levels.has(l));
     }

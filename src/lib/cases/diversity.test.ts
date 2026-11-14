@@ -2,7 +2,7 @@
 // Se alguém acrescentar ou reescrever histórias (stories/*.ts) copiando uma antiga, ou se o gerador voltar a
 // produzir casos vizinhos parecidos, estes testes falham e dizem onde.
 import { describe, expect, it } from "vitest";
-import { ALL_GAMES } from "../games";
+import { EVERY_GAME } from "../games";
 import { allCases, casesOf } from "./catalog";
 import { caseLevels } from "./config";
 import { CASES_DATA } from "./data";
@@ -24,7 +24,7 @@ describe("histórias: originalidade", () => {
   const stories = Object.values(STORIES).flat();
 
   it("uma história por caso, em todos os jogos, sem reaproveitar nenhuma", () => {
-    for (const g of ALL_GAMES) expect(STORIES[g].length, g).toBe(caseLevels(g).length);
+    for (const g of EVERY_GAME) expect(STORIES[g].length, g).toBe(caseLevels(g).length);
     expect(new Set(stories.map((s) => s.key)).size).toBe(stories.length);
     expect(new Set(CASES_DATA.map((c) => c.story)).size).toBe(CASES_DATA.length);
   });
@@ -46,7 +46,7 @@ describe("histórias: originalidade", () => {
   });
 
   it("personagens, objetos e lugares não são reciclados entre histórias do mesmo jogo", () => {
-    for (const g of ALL_GAMES) {
+    for (const g of EVERY_GAME) {
       const ss = STORIES[g];
       for (let i = 0; i < ss.length; i++) for (let j = i + 1; j < ss.length; j++) {
         const A = new Set(ss[i].slots.map((e) => e.label));
@@ -73,7 +73,7 @@ describe("histórias: originalidade", () => {
   });
 
   it("variedade de universos e de tons em cada jogo, sem dois vizinhos no mesmo universo", () => {
-    for (const g of ALL_GAMES) {
+    for (const g of EVERY_GAME) {
       const ss = STORIES[g];
       expect(new Set(ss.map((s) => s.universe)).size, g).toBeGreaterThanOrEqual(15);
       expect(new Set(ss.map((s) => s.tone)).size, g).toBeGreaterThanOrEqual(4);
@@ -97,12 +97,12 @@ describe("estruturas investigativas: o raciocínio varia de verdade", () => {
   });
 
   it("cada jogo usa várias estruturas, e o banco usa todas", () => {
-    for (const g of ALL_GAMES) expect(new Set(casesOf(g).map((c) => c.structure)).size, g).toBeGreaterThanOrEqual(6);
+    for (const g of EVERY_GAME) expect(new Set(casesOf(g).map((c) => c.structure)).size, g).toBeGreaterThanOrEqual(6);
     expect(new Set(CASES_DATA.map((c) => c.structure)).size).toBe(Object.keys(STRUCTURES).length);
   });
 
   it("casos vizinhos nunca repetem estrutura, combinação de pistas ou resposta", () => {
-    for (const g of ALL_GAMES) {
+    for (const g of EVERY_GAME) {
       const cs = CASES_DATA.filter((c) => c.game === g);
       for (let i = 1; i < cs.length; i++) {
         const [a, b] = [cs[i - 1], cs[i]];
@@ -114,7 +114,7 @@ describe("estruturas investigativas: o raciocínio varia de verdade", () => {
   });
 
   it("nunca três casos seguidos com a mesma quantidade de pistas (e quase sempre muda de um para o outro)", () => {
-    for (const g of ALL_GAMES) {
+    for (const g of EVERY_GAME) {
       const n = CASES_DATA.filter((c) => c.game === g).map((c) => clueCount(c.clues));
       let same = 0;
       for (let i = 1; i < n.length; i++) {
@@ -126,21 +126,21 @@ describe("estruturas investigativas: o raciocínio varia de verdade", () => {
   });
 
   it("a agenda de estruturas não repete a estrutura do caso anterior", () => {
-    for (const g of ALL_GAMES) {
+    for (const g of EVERY_GAME) {
       const plan = structurePlan(g, KIND_OF[g], CASES_DATA.filter((c) => c.game === g).map((c) => c.difficulty));
       for (let i = 1; i < plan.length; i++) expect(plan[i]).not.toBe(plan[i - 1]);
     }
   });
 
   it("a primeira dica ensina o jeito de pensar da estrutura (não é igual para todos os casos)", () => {
-    for (const g of ALL_GAMES) expect(new Set(casesOf(g).map((c) => c.hints[0])).size, g).toBeGreaterThanOrEqual(5);
+    for (const g of EVERY_GAME) expect(new Set(casesOf(g).map((c) => c.hints[0])).size, g).toBeGreaterThanOrEqual(5);
   });
 });
 
 describe("dificuldade: cresce pela lógica, não pelo texto", () => {
   const mean = (xs: number[]) => xs.reduce((a, b) => a + b, 0) / Math.max(1, xs.length);
   it("os mistérios Mestre exigem mais pistas e mais etapas encadeadas que os Iniciante", () => {
-    for (const g of ALL_GAMES) {
+    for (const g of EVERY_GAME) {
       const by = (d: Difficulty) => CASES_DATA.filter((c) => c.game === g && c.difficulty === d);
       const steps = (d: Difficulty) => mean(by(d).map((c) => deduce(c.model, c.clues).rounds));
       const clues = (d: Difficulty) => mean(by(d).map((c) => clueCount(c.clues)));

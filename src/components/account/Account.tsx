@@ -4,6 +4,7 @@ import Modal from "../Modal";
 import SoundControls from "../SoundControls";
 import { type Identity, normalizeCode } from "../../lib/cloud";
 import { validateNick } from "../../lib/nick";
+import { checkAdminPassword } from "../../lib/admin";
 
 // Conta anônima do MindLoop: apelido, código de recuperação e reinício. Sem e-mail, senha ou cadastro.
 
@@ -128,13 +129,28 @@ interface SettingsProps {
   onRetry: () => void;
   onReset: () => Outcome;
   onFeedback: () => void;
+  /** Modo Administrador (testes): tudo liberado neste aparelho. */
+  admin: boolean;
+  onAdmin: (on: boolean) => void;
 }
 
 export const RESET_WORD = "REINICIAR";
 
-export function Settings({ nick, me, online, issue, codeUnseen, onRename, onShowCode, onNewCode, onRecover, onRetry, onReset, onFeedback }: SettingsProps) {
+export function Settings({ nick, me, online, issue, codeUnseen, onRename, onShowCode, onNewCode, onRecover, onRetry, onReset, onFeedback, admin, onAdmin }: SettingsProps) {
   const [resetOpen, setResetOpen] = useState(false);
   const [codeMsg, setCodeMsg] = useState<string | null>(null);
+  // Modo Administrador: a conta real está pausada; apelido, nuvem e reinício ficam fora de alcance até desligar.
+  if (admin) {
+    return (
+      <div className="settings stack">
+        <AdminSection admin={admin} onAdmin={onAdmin} />
+        <section className="card stack" aria-labelledby="snd-title">
+          <h2 id="snd-title">Sons</h2>
+          <SoundControls />
+        </section>
+      </div>
+    );
+  }
   return (
     <div className="settings stack">
       <section className="card set-row">
@@ -187,6 +203,8 @@ export function Settings({ nick, me, online, issue, codeUnseen, onRename, onShow
         <button className="btn sec sm" onClick={onFeedback}>Enviar</button>
       </section>
 
+      <AdminSection admin={admin} onAdmin={onAdmin} />
+
       <section className="card stack danger-zone" aria-labelledby="rst-t">
         <h2 id="rst-t">Reiniciar jogo</h2>
         <p className="muted small">Apaga todo o seu progresso e começa do zero.</p>
@@ -195,6 +213,55 @@ export function Settings({ nick, me, online, issue, codeUnseen, onRename, onShow
 
       {resetOpen && <ResetModal online={online} hasCloud={!!me} onReset={onReset} onClose={() => setResetOpen(false)} />}
     </div>
+  );
+}
+
+/** Modo Administrador: libera todos os níveis, capítulos e investigações para a equipe testar. */
+function AdminSection({ admin, onAdmin }: { admin: boolean; onAdmin: (on: boolean) => void }) {
+  const [asking, setAsking] = useState(false);
+  const [typed, setTyped] = useState("");
+  const [error, setError] = useState(false);
+  const [busy, setBusy] = useState(false);
+  function enter(e: React.FormEvent) {
+    e.preventDefault();
+    if (!checkAdminPassword(typed)) { setError(true); return; }
+    setBusy(true); onAdmin(true); // o app recarrega já no modo de testes
+  }
+  return (
+    <section className="card stack" aria-labelledby="adm-t">
+      <h2 id="adm-t">Modo Administrador</h2>
+      {admin ? (
+        <>
+          <div className="set-row attention">
+            <div><b>🔧 Ligado</b><span className="muted small">Jogador de teste com tudo liberado: todos os níveis, investigações e o jogo bônus.</span></div>
+            <button className="btn cta sm" disabled={busy} onClick={() => { setBusy(true); onAdmin(false); }}>{busy ? "Saindo…" : "Desligar"}</button>
+          </div>
+          <ul className="list small">
+            <li>Sua conta está <b>pausada</b>: progresso, medalhas e pontos ficam guardados, sem mudança.</li>
+            <li>O teste <b>não participa do ranking</b>, não soma pontos e não é enviado ao servidor.</li>
+            <li>Ao desligar, tudo o que foi feito no teste é descartado e você volta para a sua conta, de onde parou.</li>
+          </ul>
+        </>
+      ) : asking ? (
+        <form className="stack" onSubmit={enter} noValidate>
+          <p className="muted small">Sua conta fica pausada enquanto o modo estiver ligado e volta igualzinha quando você desligar.</p>
+          <div>
+            <label htmlFor="adm-pw">Senha</label>
+            <input id="adm-pw" type="password" value={typed} autoComplete="off" autoFocus onChange={(e) => { setTyped(e.target.value); setError(false); }} />
+          </div>
+          {error && <p className="err" role="alert"><b aria-hidden="true">! </b>Senha incorreta.</p>}
+          <div className="row">
+            <button className="btn cta sm" type="submit" disabled={!typed.trim() || busy}>{busy ? "Entrando…" : "Entrar"}</button>
+            <button className="btn sec sm" type="button" onClick={() => { setAsking(false); setTyped(""); setError(false); }}>Cancelar</button>
+          </div>
+        </form>
+      ) : (
+        <div className="set-row">
+          <div><span className="muted small">Para a equipe: um jogador de teste com tudo liberado, fora do ranking.</span></div>
+          <button className="btn sec sm" onClick={() => setAsking(true)}>Ativar</button>
+        </div>
+      )}
+    </section>
   );
 }
 

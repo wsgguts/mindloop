@@ -1,4 +1,5 @@
 import TangoSymbol from "./TangoSymbol";
+import AstroSymbol from "./AstroSymbol";
 import type { JourneyGame } from "../lib/journey";
 import { PATCHES_EXAMPLE } from "../lib/patches";
 import PatchesTag, { KIND_HELP } from "./PatchesTag";
@@ -99,8 +100,45 @@ function PatchesRules() {
   );
 }
 
-// Regras provisórias (hipóteses a confirmar com a equipe MindLoop).
+function AstrosRules() {
+  const S = () => <AstroSymbol size={18} />;
+  return (
+    <div className="stack">
+      <p className="note info" role="note"><b aria-hidden="true">★</b><span><b>Jogo bônus.</b> O Astros é liberado quando você completa as 4 jornadas principais (Mini Sudoku, Zip, Tango e Patches).</span></p>
+      <p><b>Objetivo:</b> o céu está dividido em <b>constelações</b> (áreas coloridas, separadas por linhas grossas). Coloque um <b>astro</b> <S /> em cada uma, respeitando as regras abaixo.</p>
+      <h3>Regras</h3>
+      <ol className="list">
+        <li><b>Um por linha.</b> Cada linha tem exatamente um astro.</li>
+        <li><b>Um por coluna.</b> Cada coluna tem exatamente um astro.</li>
+        <li><b>Um por constelação.</b> Cada área colorida tem exatamente um astro.</li>
+        <li><b>Ninguém se encosta.</b> Dois astros nunca ficam lado a lado, um em cima do outro ou na diagonal.</li>
+      </ol>
+      <p className="muted">Cada céu tem uma única solução e pode ser resolvido só com lógica, sem chutar. As grades vão de 5×5 a 9×9.</p>
+
+      <h3>Como jogar</h3>
+      <ul className="list">
+        <li>Toque numa casa: vazia → × → astro → vazia. O × é só uma anotação sua (“aqui não vai astro”) e nunca conta como erro.</li>
+        <li>Ou selecione a casa e use os botões Astro, Marcar e Apagar.</li>
+        <li>“Marcar × em volta dos astros” marca de uma vez todas as casas que os astros já colocados eliminam.</li>
+        <li>Se dois astros quebrarem uma regra, as casas ganham um “!” e uma mensagem explica o motivo.</li>
+        <li>Desfazer volta a última jogada. Dica mostra o próximo passo lógico e explica o porquê.</li>
+        <li>No teclado: setas movem, A (ou 1) coloca astro, X (ou 2) marca e Backspace apaga.</li>
+      </ul>
+
+      <h3>Dicas para resolver</h3>
+      <ul className="list tips">
+        <li><b>Comece pelas pequenas:</b> constelações de poucas casas quase não têm escolha.</li>
+        <li><b>Casa única:</b> se uma linha, coluna ou constelação só tem uma casa livre, o astro vai nela.</li>
+        <li><b>Constelação presa:</b> se uma constelação cabe inteira numa linha (ou coluna), o resto dessa linha não tem astro.</li>
+        <li><b>Bloqueio:</b> se um astro numa casa apagaria todas as casas livres de outra constelação, essa casa recebe ×.</li>
+        <li><b>Faixas em dupla:</b> se duas constelações cabem juntas em duas linhas, essas duas linhas são delas — marque × no resto.</li>
+      </ul>
+    </div>
+  );
+}
+
 export function RulesContent({ game }: { game: RulesGame }) {
+  if (game === "astros") return <AstrosRules />;
   if (game === "tango") return <TangoRules />;
   if (game === "patches") return <PatchesRules />;
   return game === "zip" ? (

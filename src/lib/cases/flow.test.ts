@@ -2,7 +2,7 @@
 // vitória (markDone) → tela de parabéns → Continuar → convite (afterContinue) → investigar ou pular → próxima fase.
 import { describe, expect, it } from "vitest";
 import { evaluate } from "../achievements";
-import { ALL_GAMES } from "../games";
+import { EVERY_GAME } from "../games";
 import { emptyLog } from "../history";
 import { LEVELS_PER_GAME, type JourneyGame, doneCount, emptyProgress, isUnlocked, markDone } from "../journey";
 import { afterContinue, casesOf, isCorrect } from "./catalog";
@@ -34,7 +34,7 @@ function playJourney(game: JourneyGame, choose: (caseIdx: number) => boolean, st
 }
 
 describe("investigações dentro das jornadas (4 jogos)", () => {
-  for (const game of ALL_GAMES) {
+  for (const game of EVERY_GAME) {
     it(`${game}: convites nas fases agendadas, nunca seguidos, sem bloquear a jornada`, () => {
       const { progress, log, offered } = playJourney(game, (i) => i % 2 === 0);
       expect(doneCount(progress)).toBe(LEVELS_PER_GAME); // as 100 fases continuam todas jogáveis
@@ -64,12 +64,12 @@ describe("investigações dentro das jornadas (4 jogos)", () => {
     const c = casesOf("patches")[0];
     expect(isCorrect(c, c.answer)).toBe(true);
     const after = recordSolve(log, c, 30_000, 0, 999).log;
-    const ev = evaluate({ log: emptyLog(), progress: { sudoku: emptyProgress(), zip: emptyProgress(), tango: emptyProgress(), patches: emptyProgress() }, cases: after }, {}, 1);
+    const ev = evaluate({ log: emptyLog(), progress: { sudoku: emptyProgress(), zip: emptyProgress(), tango: emptyProgress(), patches: emptyProgress(), astros: emptyProgress() }, cases: after }, {}, 1);
     expect(ev.fresh.map((a) => a.id)).toContain("inv-primeira-pista");
   });
 
   it("fases sem agenda seguem direto para a próxima, sem convite", () => {
-    for (const g of ALL_GAMES) {
+    for (const g of EVERY_GAME) {
       const scheduled = new Set(caseLevels(g));
       for (let l = 1; l < LEVELS_PER_GAME; l++) if (!scheduled.has(l)) expect(afterContinue(g, l, () => true).case).toBeUndefined();
     }

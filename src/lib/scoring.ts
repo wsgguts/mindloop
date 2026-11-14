@@ -16,6 +16,7 @@ import { SUDOKU_RAW } from "./data/sudokuLevels";
 import { ZIP_RAW } from "./data/zipLevels";
 import { TANGO_RAW } from "./data/tangoLevels";
 import { PATCHES_RAW } from "./data/patchesLevels";
+import { ASTROS_RAW } from "./data/astrosLevels";
 import type { JourneyGame } from "./journey";
 
 /** Lado da grade de cada nível, lido dos próprios dados dos níveis. */
@@ -24,10 +25,11 @@ const SIDE: Record<JourneyGame, number[]> = {
   zip: ZIP_RAW.map((r) => r.split("/").length),
   tango: TANGO_RAW.map((r) => Number(r.split("|")[0])),
   patches: PATCHES_RAW.map((r) => Number(r.split("|")[0])),
+  astros: ASTROS_RAW.map((r) => Number(r.split("|")[0])),
 };
 
 /** Segundos de referência por casa da grade, conforme a natureza de cada jogo. */
-export const SECONDS_PER_CELL: Record<JourneyGame, number> = { sudoku: 3, zip: 2, tango: 2.5, patches: 2 };
+export const SECONDS_PER_CELL: Record<JourneyGame, number> = { sudoku: 3, zip: 2, tango: 2.5, patches: 2, astros: 2 };
 
 export const cellsOf = (game: JourneyGame, level: number): number => SIDE[game][level - 1] ** 2;
 

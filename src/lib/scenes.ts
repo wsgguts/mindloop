@@ -28,6 +28,8 @@ export const GAME_LOOK: Record<JourneyGame, GameLook> = {
   zip: { main: "#12CFE0", light: "#A6F6FF", deep: "#762CEB", particles: ["#12CFE0", "#A6F6FF", "#F05BC8"] },
   tango: { main: "#FFB020", light: "#FFE08A", deep: "#8E52F5", particles: ["#FFB020", "#FFE08A", "#8E52F5"] },
   patches: { main: "#9A6BFF", light: "#C9B8EC", deep: "#4A16A8", particles: ["#F05BC8", "#12CFE0", "#FFD23F", "#4FD6B1", "#9A6BFF"] },
+  // Astros (bônus): dourado dos astros sobre o céu noturno, com faíscas rosadas.
+  astros: { main: "#FFC93C", light: "#FFF1B8", deep: "#26104D", particles: ["#FFC93C", "#FFF1B8", "#F05BC8", "#A6F6FF"] },
 };
 
 /** Cristais da pintura da trilha: recebem a cor do jogo (mesma composição, brilho do jogo). */

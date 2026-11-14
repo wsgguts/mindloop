@@ -16,7 +16,7 @@ export const CASE_PATTERNS: number[][] = [
   [3, 5, 8],
   [2, 5, 7, 9],
 ];
-const GAME_SHIFT: Record<JourneyGame, number> = { sudoku: 0, tango: 1, zip: 2, patches: 3 };
+const GAME_SHIFT: Record<JourneyGame, number> = { sudoku: 0, tango: 1, zip: 2, patches: 3, astros: 4 };
 
 /** Fases (1–99) após as quais o jogo oferece uma investigação. A fase 100 não tem "próxima": nunca oferece. */
 export function caseLevels(game: JourneyGame): number[] {

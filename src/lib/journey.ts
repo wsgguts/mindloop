@@ -1,7 +1,8 @@
 // Jornada de níveis: 100 níveis por jogo, em 10 capítulos de 10 níveis.
 // Funções simples e puras (fáceis de testar). O progresso é uma string de 100 caracteres ("0" ou "1").
 
-export type JourneyGame = "sudoku" | "zip" | "tango" | "patches";
+/** Os 4 jogos principais e o jogo bônus (Astros, liberado ao completar as 4 jornadas principais). */
+export type JourneyGame = "sudoku" | "zip" | "tango" | "patches" | "astros";
 export const LEVELS_PER_GAME = 100;
 export const LEVELS_PER_CHAPTER = 10;
 
@@ -58,6 +59,18 @@ export const CHAPTERS: Record<JourneyGame, Chapter[]> = {
     ["Casas reservadas", "Quando todo encaixe de um número usa a mesma casa, ela é dele."],
     ["Grade 9×9", "O maior tabuleiro da jornada."],
     ["Mestre do encaixe", "Os desafios mais difíceis do Patches."],
+  ]),
+  astros: make([
+    ["Primeiro brilho", "Grade 5×5: um astro por linha, coluna e constelação."],
+    ["Céu aberto", "Ainda 5×5, agora com constelações de formatos mais soltos."],
+    ["Seis constelações", "Chega a grade 6×6: mais regiões para equilibrar."],
+    ["Vizinhança", "Astros nunca se encostam, nem na diagonal: use isso para eliminar casas."],
+    ["Sete estrelas", "Grade 7×7, com constelações compridas e estreitas."],
+    ["Faixas presas", "Quando uma constelação cabe numa só linha, a linha é dela."],
+    ["Céu de oito", "Grade 8×8: planeje antes de marcar."],
+    ["Pares de faixas", "Duas constelações presas em duas linhas tomam as duas linhas inteiras."],
+    ["Nove constelações", "O maior céu da jornada: grade 9×9."],
+    ["Mestre dos astros", "Os céus mais difíceis do MindLoop."],
   ]),
 };
 

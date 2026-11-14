@@ -4,6 +4,7 @@
 //   Tango       → "pattern" : uma fileira em equilíbrio entre dois valores (metade de cada, nunca três iguais seguidos).
 //   Zip         → "route"   : a ordem de um percurso que passa uma vez por cada lugar, seguindo as ligações do mapa.
 //   Patches     → "layout"  : onde cada elemento fica numa grade.
+//   Astros      → "layout"  : também espacial (jogo bônus), com histórias próprias.
 // As histórias (uma por caso, todas diferentes) ficam em stories/*.ts.
 
 import type { JourneyGame } from "../journey";
@@ -13,14 +14,15 @@ import { PATCHES_STORIES } from "./stories/patches";
 import { SUDOKU_STORIES } from "./stories/sudoku";
 import { TANGO_STORIES } from "./stories/tango";
 import { ZIP_STORIES } from "./stories/zip";
+import { ASTROS_STORIES } from "./stories/astros";
 
-export const KIND_OF: Record<JourneyGame, CaseKind> = { sudoku: "code", tango: "pattern", zip: "route", patches: "layout" };
+export const KIND_OF: Record<JourneyGame, CaseKind> = { sudoku: "code", tango: "pattern", zip: "route", patches: "layout", astros: "layout" };
 export const KIND_NAME: Record<CaseKind, string> = {
   code: "Investigação numérica", pattern: "Investigação de padrões", route: "Investigação de caminhos", layout: "Investigação espacial",
 };
 
 /** Histórias de cada jogo, na ordem da jornada (a história i é a do i-ésimo caso do jogo). */
-export const STORIES: Record<JourneyGame, Story[]> = { sudoku: SUDOKU_STORIES, tango: TANGO_STORIES, zip: ZIP_STORIES, patches: PATCHES_STORIES };
+export const STORIES: Record<JourneyGame, Story[]> = { sudoku: SUDOKU_STORIES, tango: TANGO_STORIES, zip: ZIP_STORIES, patches: PATCHES_STORIES, astros: ASTROS_STORIES };
 const BY_KEY = new Map(Object.values(STORIES).flat().map((s) => [s.key, s]));
 export const storyByKey = (key: string): Story | undefined => BY_KEY.get(key);
 

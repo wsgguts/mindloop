@@ -3,7 +3,7 @@
 // Para criar uma conquista nova basta acrescentar um item em ACHIEVEMENTS (o id nunca deve mudar depois de
 // publicado, pois é ele que fica salvo no aparelho com a data de obtenção).
 
-import { ALL_GAMES, GAME_META } from "./games";
+import { ALL_GAMES, BONUS_GAME, EVERY_GAME, GAME_META } from "./games";
 import { type Match, type PlayerLog, bestSession, distinctDays } from "./history";
 import { LEVELS_PER_CHAPTER, LEVELS_PER_GAME, doneCount, type JourneyGame } from "./journey";
 import { refMs } from "./scoring";
@@ -68,6 +68,8 @@ export const INDEPENDENT_FROM_LEVEL = 21;
 export const FINAL_FROM_LEVEL = 91;
 /** "Lupa Relâmpago": mistério Avançado ou Mestre resolvido sem dicas neste tempo. */
 export const QUICK_HARD_CASE_MS = 120_000;
+/** Primeiro nível com céu 9×9 no Astros (capítulos 9–10). */
+export const ASTROS_NINE_FROM = 81;
 /** Fases diferentes (jogo + nível) concluídas sem nenhuma dica, a partir de um nível. */
 const noHintLevels = (c: AchCtx, from: number) => new Set(c.log.matches.filter((m) => m.hints === 0 && m.level >= from).map((m) => `${m.game}-${m.level}`)).size;
 const journeysWith = (c: AchCtx, n: number) => ALL_GAMES.filter((g) => doneCount(c.progress[g]) >= n).length;
@@ -81,7 +83,7 @@ const fullBooks = (c: AchCtx) => ALL_GAMES.filter((g) => cases(c, g) >= CASES_DA
 const quickHardCase = (c: AchCtx) => (c.cases?.history.some((s) => s.hints === 0 && s.ms <= QUICK_HARD_CASE_MS && (CASE_META.get(s.id)?.difficulty ?? 0) >= 3) ? 1 : 0);
 const caseXp = (c: AchCtx) => (c.cases ? xpTotal(c.cases) : 0);
 
-const perGame: Achievement[] = ALL_GAMES.flatMap((g): Achievement[] => {
+const perGame: Achievement[] = EVERY_GAME.flatMap((g): Achievement[] => {
   const n = GAME_META[g].name;
   return [
     { id: `${g}-primeiro`, title: "Primeiro Desafio", desc: `Conclua sua primeira partida de ${n}.`, category: "jogo", rarity: "bronze", game: g, target: 1, unit: "partida", value: (c) => wins(c, g) },
@@ -109,7 +111,7 @@ export const ACHIEVEMENTS: Achievement[] = [
   { id: "lenda-mindloop", title: "Lenda MindLoop", desc: "Conclua 100 fases.", category: "jornada", rarity: "diamante", target: 100, unit: "fases", value: totalDone },
   { id: "explorador-versatil", title: "Explorador Versátil", desc: `Conclua o primeiro capítulo (${LEVELS_PER_CHAPTER} níveis) das 4 jornadas.`, category: "jornada", rarity: "prata", target: ALL_GAMES.length, unit: "jornadas", value: (c) => journeysWith(c, LEVELS_PER_CHAPTER) },
   { id: "meio-caminho", title: "Meio Caminho em Tudo", desc: "Chegue à metade das 4 jornadas: 50 níveis em cada uma.", category: "jornada", rarity: "ouro", target: ALL_GAMES.length, unit: "jornadas", value: (c) => journeysWith(c, LEVELS_PER_GAME / 2) },
-  { id: "quatro-jornadas", title: "Senhor dos Quatro Mundos", desc: `Conclua as 4 jornadas inteiras: todos os ${LEVELS_PER_GAME * ALL_GAMES.length} níveis.`, category: "jornada", rarity: "diamante", target: LEVELS_PER_GAME * ALL_GAMES.length, unit: "níveis", value: totalDone },
+  { id: "quatro-jornadas", title: "Senhor dos Quatro Mundos", desc: `Conclua as 4 jornadas inteiras: todos os ${LEVELS_PER_GAME * ALL_GAMES.length} níveis. Libera o jogo bônus ${GAME_META[BONUS_GAME].name}.`, category: "jornada", rarity: "diamante", target: LEVELS_PER_GAME * ALL_GAMES.length, unit: "níveis", value: totalDone },
   // C) Por jogo (4 por jogo)
   ...perGame,
   // D) Constância
@@ -136,13 +138,17 @@ export const ACHIEVEMENTS: Achievement[] = [
   { id: "inv-caderno-completo", title: "Caderno Completo", desc: "Resolva todos os mistérios de um dos jogos.", category: "investigacao", rarity: "ouro", target: 1, unit: "caderno", value: fullBooks },
   { id: "inv-elite", title: "Detetive de Elite", desc: "Resolva 5 mistérios de dificuldade Mestre sem pedir nenhuma dica.", category: "investigacao", rarity: "diamante", target: 5, unit: "mistérios", value: eliteGolds },
   { id: "inv-todos", title: "Nenhum Mistério Sem Solução", desc: `Resolva todos os ${CASES_DATA.length} mistérios do Mindloop Investigação.`, category: "investigacao", rarity: "diamante", target: CASES_DATA.length, unit: "mistérios", value: (c) => cases(c) },
-  ...ALL_GAMES.map((g): Achievement => ({ id: `inv-${g}`, title: "Caso Encerrado", desc: `Resolva 5 mistérios de ${GAME_META[g].name}.`, category: "investigacao", rarity: "prata", game: g, target: 5, unit: "mistérios", value: (c) => cases(c, g) })),
+  ...EVERY_GAME.map((g): Achievement => ({ id: `inv-${g}`, title: "Caso Encerrado", desc: `Resolva 5 mistérios de ${GAME_META[g].name}.`, category: "investigacao", rarity: "prata", game: g, target: 5, unit: "mistérios", value: (c) => cases(c, g) })),
   // F) Especiais
   { id: "sem-dicas", title: "Por Conta Própria", desc: "Conclua uma fase sem pedir nenhuma dica.", category: "especial", rarity: "bronze", target: 1, unit: "fase", value: (c) => any(c, (m) => m.hints === 0 && m.level >= NO_HINT_FROM_LEVEL) },
   { id: "mente-independente", title: "Mente Independente", desc: `Conclua 25 fases diferentes a partir do nível ${INDEPENDENT_FROM_LEVEL} sem pedir nenhuma dica.`, category: "especial", rarity: "ouro", target: 25, unit: "fases", value: (c) => noHintLevels(c, INDEPENDENT_FROM_LEVEL) },
   { id: "todos-os-jogos", title: "Mente Versátil", desc: "Conclua pelo menos uma partida de cada um dos 4 jogos.", category: "especial", rarity: "prata", target: ALL_GAMES.length, unit: "jogos", value: (c) => ALL_GAMES.filter((g) => wins(c, g) > 0).length },
   { id: "cacador-recordes", title: "Caçador de Recordes", desc: "Bata 10 recordes pessoais.", category: "especial", rarity: "ouro", target: 10, unit: "recordes", value: records },
   { id: "jornada-completa", title: "Jornada Completa", desc: `Conclua todos os ${LEVELS_PER_GAME} níveis de uma jornada.`, category: "especial", rarity: "diamante", target: LEVELS_PER_GAME, unit: "níveis", value: maxDone },
+  // Jogo bônus (Astros): liberado depois das 4 jornadas principais.
+  { id: "astros-ceu-nove", title: "Céu de Nove Constelações", desc: `Conclua um céu 9×9 do ${GAME_META[BONUS_GAME].name} (nível ${ASTROS_NINE_FROM}+).`, category: "especial", rarity: "ouro", game: BONUS_GAME, target: 1, unit: "fase", value: (c) => any(c, (m) => m.game === BONUS_GAME && m.level >= ASTROS_NINE_FROM) },
+  { id: "astros-completo", title: "Guardião das Estrelas", desc: `Conclua todos os ${LEVELS_PER_GAME} níveis do ${GAME_META[BONUS_GAME].name}.`, category: "especial", rarity: "diamante", game: BONUS_GAME, target: LEVELS_PER_GAME, unit: "níveis", value: (c) => doneCount(c.progress[BONUS_GAME]) },
+  { id: "lenda-absoluta", title: "Lenda Absoluta", desc: `Conclua as 5 jornadas, incluindo o bônus: todos os ${LEVELS_PER_GAME * EVERY_GAME.length} níveis.`, category: "especial", rarity: "diamante", target: LEVELS_PER_GAME * EVERY_GAME.length, unit: "níveis", value: (c) => EVERY_GAME.reduce((a, g) => a + doneCount(c.progress[g]), 0) },
   { id: "colecionador", title: "Colecionador", desc: "Conquiste 10 medalhas.", category: "especial", rarity: "ouro", target: 10, unit: "medalhas", value: (c) => c.medals, meta: true },
   { id: "galeria-lendaria", title: "Galeria Lendária", desc: "Conquiste 25 medalhas.", category: "especial", rarity: "diamante", target: 25, unit: "medalhas", value: (c) => c.medals, meta: true },
   { id: "lenda-das-medalhas", title: "Lenda das Medalhas", desc: "Conquiste 50 medalhas.", category: "especial", rarity: "diamante", target: 50, unit: "medalhas", value: (c) => c.medals, meta: true },

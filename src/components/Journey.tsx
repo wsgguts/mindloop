@@ -28,6 +28,8 @@ interface Props {
   onCases?: () => void;
   /** Por onde a jornada abre: a visão geral (capítulos) ou direto no mapa do capítulo do nível destacado. */
   start?: "overview" | "map";
+  /** Modo Administrador (testes): todos os níveis e capítulos liberados. */
+  admin?: boolean;
 }
 
 const HelpIcon = () => (
@@ -40,7 +42,8 @@ const HelpIcon = () => (
  *  • mapa — só uma barra compacta (voltar aos capítulos, mundo, capítulo anterior/seguinte) e a trilha inteira.
  * Ao voltar de uma partida, a jornada abre direto no mapa (com a animação de chegada).
  */
-export default function Journey({ game, done, focus, justDone, justUnlocked, onPlay, onBack, onHelp, cases, onCases, start = "overview" }: Props) {
+export default function Journey({ game, done, focus, justDone, justUnlocked, onPlay, onBack, onHelp, cases, onCases, start = "overview", admin = false }: Props) {
+  const canPlay = (n: number) => admin || isUnlocked(done, n);
   const { name, color, cur: curColor } = GAME_META[game];
   const next = currentLevel(done); // primeiro nível ainda não concluído
   const cur = focus; // nível destacado ("JOGAR")
@@ -118,7 +121,7 @@ export default function Journey({ game, done, focus, justDone, justUnlocked, onP
   }, []);
 
   function tap(n: number) {
-    if (isUnlocked(done, n)) { sfx("ui"); onPlay(n); }
+    if (canPlay(n)) { sfx("ui"); onPlay(n); }
     else { sfx("block"); setToast(`Conclua o nível ${n - 1} para desbloquear o nível ${n}.`); }
   }
   function jump() {
@@ -148,6 +151,9 @@ export default function Journey({ game, done, focus, justDone, justUnlocked, onP
             <Gem kind={game} size={52} />
             <div><h1>{name}</h1><p>{count} de {LEVELS_PER_GAME} níveis concluídos</p></div>
           </div>
+          {admin && (
+            <p className="jdone" role="note"><b aria-hidden="true">🔓</b> Modo Administrador ligado: todos os níveis estão liberados para teste.</p>
+          )}
           {complete && (
             <p className="jdone" role="note"><b aria-hidden="true">★</b> Jornada completa! Todos os níveis estão liberados — escolha qualquer um para jogar de novo.</p>
           )}
@@ -175,7 +181,7 @@ export default function Journey({ game, done, focus, justDone, justUnlocked, onP
             {CHAPTERS[game].map((c) => {
               const n = chapterDone(done, c);
               const full = n === LEVELS_PER_CHAPTER;
-              const open = isUnlocked(done, c.from);
+              const open = canPlay(c.from);
               const here = c.id === curChapter && !complete;
               const w = sceneOf(c.id);
               return (
@@ -223,9 +229,9 @@ export default function Journey({ game, done, focus, justDone, justUnlocked, onP
             {points.map((p, j) => {
               const n = ch.from + j;
               const boss = j === LEVELS_PER_CHAPTER - 1;
-              const state = isDone(done, n) ? "done" : n === next ? "current" : "locked";
+              const state = isDone(done, n) ? "done" : n === next ? "current" : admin ? "open" : "locked";
               const sel = n === cur;
-              const label = `Nível ${n}, ${state === "done" ? "concluído" : state === "current" ? "disponível para jogar" : "bloqueado"}${boss ? ", desafio do capítulo" : ""}${sel ? ", selecionado" : ""}${n === justDone ? ", acabou de ser concluído" : ""}`;
+              const label = `Nível ${n}, ${state === "done" ? "concluído" : state === "current" ? "disponível para jogar" : state === "open" ? "liberado pelo modo administrador" : "bloqueado"}${boss ? ", desafio do capítulo" : ""}${sel ? ", selecionado" : ""}${n === justDone ? ", acabou de ser concluído" : ""}`;
               const cls = ["tnode", state, boss && "boss", sel && "sel", n === justDone && "just", n === unlockedNow && "fresh"].filter(Boolean).join(" ");
               return (
                 <li key={n} ref={sel ? curRef : undefined} style={{ left: `${p.x}%`, top: `${p.y}%`, "--k": p.k } as React.CSSProperties}>

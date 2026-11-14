@@ -5,7 +5,7 @@ import { mk } from "./history.test";
 import { emptyProgress, markDone } from "./journey";
 
 const prog = (n: number) => { let p = emptyProgress(); for (let i = 1; i <= n; i++) p = markDone(p, i); return p; };
-const P = (s = 0, z = 0, t = 0, p = 0) => ({ sudoku: prog(s), zip: prog(z), tango: prog(t), patches: prog(p) });
+const P = (s = 0, z = 0, t = 0, p = 0, a = 0) => ({ sudoku: prog(s), zip: prog(z), tango: prog(t), patches: prog(p), astros: prog(a) });
 
 describe("conquistas", () => {
   it("ids únicos e todas as categorias/raridades preenchidas", () => {
