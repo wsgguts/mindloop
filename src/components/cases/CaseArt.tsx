@@ -80,7 +80,7 @@ export function CaseScene({ kind, look, className }: { kind: CaseKind; look: Loo
       )}
       {kind === "ceu" && (
         <g>
-          {/* céu 4×4: um astro por linha e coluna; o "raio" de 8 casas em volta de um deles mostra o que é encostar */}
+          {/* céu 4×4: um astro por linha, coluna e região, nenhum encostado em outro (como no jogo), na estrela verde do Astros */}
           <rect x="32" y="8" width="96" height="96" rx="8" fill="#140838" stroke={light} strokeOpacity=".5" strokeWidth="2" />
           {[0, 1, 2, 3].map((r) => [0, 1, 2, 3].map((c) => (
             <rect key={`${r}${c}`} x={36 + c * 22.5} y={12 + r * 22.5} width="20" height="20" rx="3" fill="#24104F" stroke={light} strokeOpacity=".18" />
@@ -88,7 +88,7 @@ export function CaseScene({ kind, look, className }: { kind: CaseKind; look: Loo
           <rect x={36 + 0 * 22.5 - 1} y={12 + 1 * 22.5 - 1} width="45" height="67.5" rx="5" fill={main} fillOpacity=".12" stroke={main} strokeWidth="1.5" strokeDasharray="4 3" />
           {[[0, 1], [1, 3], [2, 0], [3, 2]].map(([r, c], i) => (
             <path key={i} transform={`translate(${46 + c * 22.5} ${22 + r * 22.5}) scale(${i === 2 ? 0.95 : 0.75})`}
-              d="M0-9c1 5 3 7 9 9-6 2-8 4-9 9-1-5-3-7-9-9 6-2 8-4 9-9z" fill={i === 2 ? "#FFE58A" : "#FFC93C"} stroke="#9A5A00" strokeWidth="1" />
+              d="M0-9c1 5 3 7 9 9-6 2-8 4-9 9-1-5-3-7-9-9 6-2 8-4 9-9z" fill={i === 2 ? "#D8FFB0" : "#3DDC5A"} stroke="#0B5A33" strokeWidth="1" />
           ))}
           <circle cx="140" cy="20" r="1.6" fill="#fff" opacity=".8" /><circle cx="20" cy="96" r="1.3" fill="#fff" opacity=".6" /><circle cx="146" cy="88" r="1" fill={light} />
         </g>

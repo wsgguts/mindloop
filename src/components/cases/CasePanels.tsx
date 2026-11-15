@@ -1,71 +1,20 @@
 "use client";
-// Painéis da investigação (os mesmos para os 5 jogos):
-//   Personagens · Objetos (à esquerda) — retratos e ícones; tocar acende as pistas e casas ligadas;
-//   Pistas (sob o cenário)           — a regra do lugar, lembretes e as pistas numeradas;
-//   Dedução (à direita)              — dois quadros só de X: "Onde?" (mini-mapa por pessoa) e "O quê?" (objetos);
-//   Sua resposta (à direita)         — para cada pessoa, o local e o objeto escolhidos (seletores), e o Verificar.
-// Nada no quadro de dedução é marcado sozinho: é a ferramenta de raciocínio da pessoa.
+// Painéis da investigação (os mesmos para os 5 jogos), ao lado do tabuleiro do cenário:
+//   Quadro de decisões — anotações da pessoa: "Onde?" (um mapa só; cada casa: vazio → ✕ → personagem) e "O quê?"
+//                        (personagens × objetos; cada casa: vazio → ✕ → ✓). Nada aqui é preenchido sozinho nem conta
+//                        como resposta;
+//   Pistas             — a regra do lugar, lembretes e as pistas numeradas (tocar acende quem e o que a pista cita);
+//   Sua resposta       — para cada pessoa, o local e o objeto escolhidos (seletores), e o Verificar.
 import type { Case } from "../../lib/cases/catalog";
 import { type Model, allowedCells, blockedCells, cellName, objectsOf, peopleOf, propAt, roomOf, stopOf } from "../../lib/cases/model";
-import { type Focus, type Pick, markKey, objMarkKey } from "../../lib/cases/relations";
-import { ROOM_TINTS } from "./CaseBoard";
-
-const TINTS = ["#F05BC8", "#12CFE0", "#FFB020", "#9A6BFF", "#4FD6B1", "#FF7A59"];
+import { type Focus, type Notes, type Pick, GRID_NO, GRID_YES, gridKey } from "../../lib/cases/relations";
+import Art from "../Art";
+import { floorOf } from "./CaseBoard";
 
 /** Nome de uma casa na resposta: "B2 · Cozinha" (no Zip, com a parada). */
 export function placeName(m: Model, v: number): string {
   const room = m.scene.rooms[roomOf(m, v)].label;
   return m.trail ? `Parada ${stopOf(m, v) + 1} · ${room}` : `${cellName(m, v)} · ${room}`;
-}
-
-// ---------------------------------------------------------------- Personagens e objetos
-
-interface CastProps { m: Model; a: number[]; focus: Focus; pick: Pick; sel: number | null; onPick: (p: Pick) => void }
-export function PeoplePanel({ m, a, focus, pick, sel, onPick }: CastProps) {
-  const n = m.people.length;
-  return (
-    <ul className="cx-portraits" aria-label="Personagens">
-      {m.people.map((p, i) => {
-        const isPick = pick?.t === "person" && pick.i === i;
-        const where = a[i] >= 0 ? cellName(m, a[i]) : "?";
-        const what = a[n + i] >= 0 ? m.objects[a[n + i]].icon : "";
-        return (
-          <li key={i}>
-            <button className={`cx-face${isPick || sel === i ? " pick" : ""}${!isPick && focus.people.has(i) ? " lit" : ""}${a[i] >= 0 ? " placed" : ""}`}
-              style={{ "--tint": TINTS[i % TINTS.length] } as React.CSSProperties} aria-pressed={isPick}
-              onClick={() => onPick(isPick ? null : { t: "person", i })}
-              aria-label={`${p.label}: ${a[i] >= 0 ? `em ${placeName(m, a[i])}` : "sem lugar"}${a[n + i] >= 0 ? `, com ${m.objects[a[n + i]].label}` : ""}. Toque para destacar as pistas e escolher a casa.`}>
-              <span className="cx-face-pic" aria-hidden="true">{p.icon ?? "🙂"}</span>
-              <span className="cx-face-name">{p.label}</span>
-              <span className="cx-face-ans" aria-hidden="true">{where}{what && <i>{what}</i>}</span>
-            </button>
-          </li>
-        );
-      })}
-    </ul>
-  );
-}
-
-export function ObjectsPanel({ m, a, focus, pick, onPick }: Omit<CastProps, "sel">) {
-  const n = m.people.length;
-  return (
-    <ul className="cx-items" aria-label="Objetos">
-      {m.objects.map((o, i) => {
-        const isPick = pick?.t === "object" && pick.i === i;
-        const owner = a.slice(n).indexOf(i);
-        return (
-          <li key={i}>
-            <button className={`cx-item${isPick ? " pick" : ""}${!isPick && focus.objects.has(i) ? " lit" : ""}${owner >= 0 ? " owned" : ""}`} aria-pressed={isPick}
-              onClick={() => onPick(isPick ? null : { t: "object", i })}
-              aria-label={`${o.label}${owner >= 0 ? `, com ${m.people[owner].label} na sua resposta` : ""}. Toque para destacar as pistas que falam dele.`}>
-              <span className="cx-item-pic" aria-hidden="true">{o.icon}</span>
-              <span className="cx-item-name">{o.label}</span>
-            </button>
-          </li>
-        );
-      })}
-    </ul>
-  );
 }
 
 // ---------------------------------------------------------------- Pistas
@@ -88,13 +37,13 @@ export function CluesPanel({ c, states, ruleState, crossed, fresh, broken, hints
           const st = states[k];
           const isP = pick?.t === "clue" && pick.i === k;
           const cls = [crossed.has(k) && "x", st === true && "ok", (st === false || broken === k) && "bad", fresh.has(k) && "fresh", isP && "pick", !isP && focus.clues.has(k) && "lit"].filter(Boolean).join(" ");
-          const icons = [...peopleOf(c.model, c.clues[k]).map((i) => c.model.people[i].icon), ...objectsOf(c.clues[k]).map((o) => c.model.objects[o].icon)];
+          const icons = [...peopleOf(c.model, c.clues[k]).map((i) => c.model.people[i]), ...objectsOf(c.clues[k]).map((o) => c.model.objects[o])];
           return (
             <li key={k} className={cls}>
               <button className="cx-say" onClick={() => onPick(isP ? null : { t: "clue", i: k })} aria-pressed={isP}
                 aria-label={`Pista ${k + 1}: ${t}${st === true ? " — confere com sua resposta" : st === false ? " — contrariada" : ""}. Toque para destacar quem e o que ela cita.`}>
                 <b className="cx-n">{k + 1}</b>
-                <span className="cx-t">{t}<span className="cx-icons" aria-hidden="true">{icons.join(" ")}</span></span>
+                <span className="cx-t">{t}<span className="cx-icons" aria-hidden="true">{icons.map((e, j) => <Art key={j} e={e} />)}</span></span>
                 <span className="cx-st" aria-hidden="true">{st === true ? "✓" : st === false ? "✗" : ""}</span>
               </button>
               <button className="cx-cross" onClick={() => onCross(k)} aria-pressed={crossed.has(k)} aria-label={crossed.has(k) ? `Desmarcar a pista ${k + 1}` : `Riscar a pista ${k + 1} (já usei)`} title={crossed.has(k) ? "Desmarcar" : "Já usei"}>{crossed.has(k) ? "↺" : "✓"}</button>
@@ -111,71 +60,72 @@ export function CluesPanel({ c, states, ruleState, crossed, fresh, broken, hints
   );
 }
 
-// ---------------------------------------------------------------- Dedução (só X)
+// ---------------------------------------------------------------- Quadro de decisões
 
-interface DedProps { m: Model; marks: Set<number>; focus: Focus; done: boolean; onToggle: (key: number) => void }
+interface DecideProps {
+  m: Model; cells: Notes; grid: Notes; focus: Focus; done: boolean;
+  onCell: (v: number) => void; onGrid: (s: number, o: number) => void;
+}
+const noteText = (m: Model, w: number | undefined) => (w === undefined ? "vazio" : w < 0 ? "X" : m.people[w].label);
 
-/** "Onde?": um mini-mapa do cenário por personagem; X nas casas descartadas. */
-export function WhereGrid({ m, marks, focus, done, onToggle }: DedProps) {
+/** "Onde?": um mapa só (cada casa: vazio → ✕ → personagem). "O quê?": personagens × objetos (vazio → ✕ → ✓). */
+export function DecisionBoard({ m, cells, grid, focus, done, onCell, onGrid }: DecideProps) {
   const blocked = blockedCells(m);
   const allowed = new Set(allowedCells(m));
   return (
-    <ul className="cx-minimaps">
-      {m.people.map((p, s) => {
-        const left = [...allowed].filter((v) => !marks.has(markKey(m, s, v))).length;
-        return (
-          <li key={s} className={focus.people.has(s) ? "lit" : ""}>
-            <p className="cx-mm-name"><span aria-hidden="true">{p.icon}</span><b>{p.label}</b><small className={left === 1 ? "one" : ""}>{left}</small></p>
-            <div className="cx-mm" style={{ gridTemplateColumns: `repeat(${m.cols}, 1fr)` }} role="group" aria-label={`Onde pode estar ${p.label}. Toque para marcar ou tirar um X.`}>
-              {Array.from({ length: m.rows * m.cols }, (_, v) => {
-                const no = marks.has(markKey(m, s, v));
-                const bl = blocked.has(v), off = !allowed.has(v) && !bl;
-                const prop = propAt(m, v);
-                return (
-                  <button key={v} disabled={done || bl || off} onClick={() => onToggle(markKey(m, s, v))} aria-pressed={no}
-                    className={`${bl ? "block" : off ? "offtrail" : no ? "no" : ""}${focus.cells.has(v) ? " lit" : ""}`}
-                    style={{ "--floor": ROOM_TINTS[roomOf(m, v) % ROOM_TINTS.length] } as React.CSSProperties}
-                    aria-label={`${p.label} em ${cellName(m, v)}: ${bl ? `bloqueada (${prop?.label})` : off ? "fora da trilha" : no ? "descartada" : "possível"}`}>
-                    {bl ? <span aria-hidden="true">{prop?.icon}</span> : no ? "✕" : null}
-                  </button>
-                );
-              })}
-            </div>
-          </li>
-        );
-      })}
-    </ul>
-  );
-}
-
-/** "O quê?": tabela personagens × objetos; X nas combinações descartadas. */
-export function WhatGrid({ m, marks, focus, done, onToggle }: DedProps) {
-  return (
-    <div className="cx-dgrid-wrap">
-      <table className="cx-dgrid" aria-label="Quem tinha o quê: personagens nas linhas, objetos nas colunas. Toque para marcar ou tirar um X.">
-        <thead>
-          <tr>
-            <th scope="col"><span className="sr">Personagem</span></th>
-            {m.objects.map((o, i) => <th key={i} scope="col" className={focus.objects.has(i) ? "lit" : ""} title={o.label}><span aria-hidden="true">{o.icon}</span><span className="sr">{o.label}</span></th>)}
-          </tr>
-        </thead>
-        <tbody>
-          {m.people.map((p, s) => (
-            <tr key={s} className={focus.people.has(s) ? "lit" : ""}>
-              <th scope="row"><span aria-hidden="true">{p.icon}</span> {p.label}</th>
-              {m.objects.map((o, i) => {
-                const no = marks.has(objMarkKey(m, s, i));
-                return (
-                  <td key={i} className={`${no ? "no" : ""}${focus.objects.has(i) && focus.people.has(s) ? " both" : ""}`}>
-                    <button disabled={done} onClick={() => onToggle(objMarkKey(m, s, i))} aria-pressed={no}
-                      aria-label={`${p.label} — ${o.label}: ${no ? "descartado (toque para tirar o X)" : "possível (toque para marcar X)"}`}>{no ? "✕" : ""}</button>
-                  </td>
-                );
-              })}
+    <div className="dx">
+      <p className="cx-area-lead">Anote o que você já descobriu. Nada aqui é preenchido sozinho nem conta como resposta.</p>
+      <h3 className="cx-sub">Onde? <small>cada toque: vazio → ✕ → personagem</small></h3>
+      <div className="dx-map" style={{ gridTemplateColumns: `repeat(${m.cols}, 1fr)`, "--cols": m.cols } as React.CSSProperties} role="group" aria-label="Onde: anotações em cada casa do lugar">
+        {Array.from({ length: m.rows * m.cols }, (_, v) => {
+          const bl = blocked.has(v), off = !allowed.has(v) && !bl, w = cells.get(v), prop = propAt(m, v);
+          return (
+            <button key={v} disabled={done || bl || off} onClick={() => onCell(v)}
+              className={`dx-c${bl ? " block" : off ? " offtrail" : w === undefined ? "" : w < 0 ? " no" : " who"}${focus.cells.has(v) ? " lit" : ""}`}
+              style={{ "--floor": floorOf(m, v) } as React.CSSProperties}
+              aria-label={`Casa ${cellName(m, v)}: ${bl ? `bloqueada (${prop?.label})` : off ? "fora da trilha" : `${noteText(m, w)}. Toque para trocar.`}`}>
+              {bl ? <span className="dx-prop" aria-hidden="true">{prop && <Art e={prop} className="fill" />}</span>
+                : w === undefined ? <small aria-hidden="true">{m.trail ? stopOf(m, v) + 1 : cellName(m, v)}</small>
+                : w < 0 ? <span className="dx-x" aria-hidden="true">✕</span>
+                : <span className="dx-face" aria-hidden="true"><Art e={m.people[w]} className="fill" /></span>}
+            </button>
+          );
+        })}
+      </div>
+      <h3 className="cx-sub">O quê? <small>cada toque: vazio → ✕ (não tinha) → ✓ (tinha)</small></h3>
+      <div className="dx-grid-wrap">
+        <table className="dx-grid" aria-label="Quem tinha o quê: personagens nas linhas, objetos nas colunas. Toque para alternar entre vazio, X e ✓.">
+          <thead>
+            <tr>
+              <th scope="col"><span className="sr">Personagem</span></th>
+              {m.objects.map((o, i) => (
+                <th key={i} scope="col" className={focus.objects.has(i) ? "lit" : ""}>
+                  <span className="dx-th-pic" aria-hidden="true"><Art e={o} className="fill" /></span>
+                  <span className="dx-th-name">{o.label}</span>
+                </th>
+              ))}
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {m.people.map((p, sIdx) => (
+              <tr key={sIdx} className={focus.people.has(sIdx) ? "lit" : ""}>
+                <th scope="row"><span className="dx-row"><span className="dx-row-pic" aria-hidden="true"><Art e={p} className="fill" /></span><span className="dx-row-name">{p.label}</span></span></th>
+                {m.objects.map((o, i) => {
+                  const st = grid.get(gridKey(sIdx, i));
+                  return (
+                    <td key={i} className={`${st === GRID_NO ? "no" : st === GRID_YES ? "yes" : ""}${focus.objects.has(i) && focus.people.has(sIdx) ? " both" : ""}`}>
+                      <button disabled={done} onClick={() => onGrid(sIdx, i)}
+                        aria-label={`${p.label} — ${o.label}: ${st === GRID_NO ? "não tinha (X)" : st === GRID_YES ? "tinha (✓)" : "vazio"}. Toque para trocar.`}>
+                        {st === GRID_NO ? <span className="dx-x" aria-hidden="true">✕</span> : st === GRID_YES ? <span className="dx-ok" aria-hidden="true">✓</span> : null}
+                      </button>
+                    </td>
+                  );
+                })}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }
@@ -194,7 +144,7 @@ export function AnswerPanel({ m, a, done, onPlace, onGive }: AnswerProps) {
     <ul className="cx-answers">
       {m.people.map((p, s) => (
         <li key={s} className={a[s] >= 0 && a[n + s] >= 0 ? "set" : ""}>
-          <span className="cx-ans-who"><span aria-hidden="true">{p.icon}</span>{p.label}</span>
+          <span className="cx-ans-who"><span aria-hidden="true"><Art e={p} /></span>{p.label}</span>
           <label className="cx-ans-field">
             <span>Local</span>
             <select value={a[s]} disabled={done} onChange={(e) => onPlace(s, Number(e.target.value))} aria-label={`Local de ${p.label}`}>

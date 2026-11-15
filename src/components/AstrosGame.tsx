@@ -62,6 +62,26 @@ function hintText(s: Step): string {
   }
 }
 
+/** Ícone de "Apagar": borracha. */
+function EraseIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" strokeLinecap="round">
+      <path d="m14.5 4.5 5 5-9 9H6l-2.5-2.5a1.5 1.5 0 0 1 0-2.1z" /><path d="m9 10 5 5" /><path d="M10.5 18.5H20" />
+    </svg>
+  );
+}
+/** Ícone de "Marcar × em volta": um astro com marcas × nas casas vizinhas. */
+function AroundIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
+      <path d="M12 7.6 13 11l3.4 1-3.4 1-1 3.4-1-3.4-3.4-1 3.4-1z" fill="#3DDC5A" stroke="#0B5A33" strokeWidth=".8" strokeLinejoin="round" />
+      <g stroke="currentColor" strokeWidth="1.7" strokeLinecap="round">
+        <path d="M2.5 2.5l3 3M5.5 2.5l-3 3" /><path d="M18.5 2.5l3 3M21.5 2.5l-3 3" /><path d="M2.5 18.5l3 3M5.5 18.5l-3 3" /><path d="M18.5 18.5l3 3M21.5 18.5l-3 3" />
+      </g>
+    </svg>
+  );
+}
+
 export default function AstrosGame({ puzzle, active, onMenu, onRules, onFeedback, onWin, onCelebrated, onHint }: Props) {
   const board = useMemo(() => parseAstros(puzzle.raw), [puzzle]);
   const { n, regions } = board;
@@ -256,12 +276,13 @@ export default function AstrosGame({ puzzle, active, onMenu, onRules, onFeedback
       </ZoomBoard>
 
       <div className="gctrl">
-        <div className={`tpad${won ? " off" : ""}`} role="group" aria-label="Escolher o que colocar na casa selecionada">
+        {/* Os 4 controles numa linha só (ícone em cima, nome embaixo): a altura economizada vai para o céu. */}
+        <div className={`tpad apad${won ? " off" : ""}`} role="group" aria-label="Escolher o que colocar na casa selecionada">
           <button className="btn sec" onClick={() => enter(STAR)} disabled={won}><AstroSymbol size={24} />Astro</button>
-          <button className="btn sec" onClick={() => enter(MARK)} disabled={won}><MarkSymbol size={16} />Marcar</button>
-          <button className="btn sec" onClick={() => enter(EMPTY)} disabled={won}>Apagar</button>
+          <button className="btn sec" onClick={() => enter(MARK)} disabled={won}><MarkSymbol size={18} />Marcar</button>
+          <button className="btn sec" onClick={() => enter(EMPTY)} disabled={won}><EraseIcon />Apagar</button>
+          <button className="btn sec" onClick={markAround} disabled={won} aria-label="Marcar × em volta dos astros" title="Marcar × em volta dos astros"><AroundIcon />Em volta</button>
         </div>
-        <button className="btn sec sm amark-all" onClick={markAround} disabled={won}>Marcar × em volta dos astros</button>
 
         <div className={`note ${msg.tone}`} role="status" aria-live="polite"><b aria-hidden="true">{ICON[msg.tone]}</b><span>{msg.text}</span></div>
 

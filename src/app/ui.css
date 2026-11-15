@@ -131,9 +131,8 @@
 .cx-sym { width: min(36px, 100%); height: auto; aspect-ratio: 1; }
 .cx-name { font-size: clamp(10px, 2.8vw, 13px); }
 
-/* Celular em pé: tudo da investigação numa tela, sem rolar a página — as pistas rolam dentro do painel. */
+/* Celular em pé: a investigação é uma página que rola (o painel de detetive fica em uma coluna). */
 @media (max-width: 899px) and (orientation: portrait) {
-  .wrap.cx-play { min-height: 0; height: calc(100svh - 16px - env(safe-area-inset-bottom, 0px)); display: grid; grid-template-rows: auto minmax(0, 1fr); margin-top: 8px; }
   .cx-play .cx-grid { display: grid; grid-template-rows: auto minmax(0, 1fr); grid-template-columns: minmax(0, 1fr); gap: 8px; min-height: 0; }
   .cx-play .cx-clues { min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 2px 2px 8px; align-content: start;
     border-top: 1px solid #E4D6F5; -webkit-mask-image: linear-gradient(#000 calc(100% - 14px), transparent); mask-image: linear-gradient(#000 calc(100% - 14px), transparent); }
@@ -158,7 +157,6 @@
   .cx-play .cx-grid { grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); align-items: start; }
 }
 @media (orientation: landscape) and (max-height: 540px) {
-  .wrap.cx-play { height: calc(100svh - 18px); display: grid; grid-template-rows: auto minmax(0, 1fr); margin-top: 6px; }
   .cx-play .cx-grid { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); align-items: stretch; min-height: 0; }
   .wrap.cx-play { padding-bottom: 10px; }
   .cx-play .cx-board { position: static; overflow-y: auto; min-height: 0; max-height: 100%; align-content: start; }

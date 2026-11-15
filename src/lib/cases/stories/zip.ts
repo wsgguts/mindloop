@@ -8,13 +8,12 @@ import type { Story } from "../story";
 const F = "f" as const, M = "m" as const;
 const e = (label: string, g: "m" | "f", icon?: string): Ent => (icon ? { label, g, icon } : { label, g });
 
-export const ZIP_STORIES: Story[] = [
+const ZIP_A: Story[] = [
   {
     key: "trilha-nuvens", title: "A corrida das nuvens saltitantes", universe: "esporte", tone: "humor",
     intro: "No Reino Celestial, nuvens saltitantes formam uma trilha entre dois castelos. Na corrida de saltos, cada atleta parou numa nuvem diferente quando o sino tocou, e o árbitro quer o resultado oficial.",
     goal: "Em que parada da trilha estava cada atleta, e com o quê?",
     ending: "Resultado oficial! {com:Medalha} levou a medalha para casa e prometeu revanche no ano seguinte.",
-    people: [e("Lina", F, "👧"), e("Bento", M, "👦"), e("Cacau", F, "🧒"), e("Davi", M, "🧑")],
     objects: [e("Medalha", F, "🏅"), e("Bandeirinha", F, "🚩"), e("Garrafinha", F, "🧴"), e("Viseira", F, "🧢")],
     rooms: [e("Castelo Rosado", M), e("Céu Aberto", M), e("Castelo Lilás", M), e("Arco-Íris", M)],
     blocks: [e("Torre de Nuvem", F, "☁️"), e("Águia Gigante", F, "🦅"), e("Raio", M, "⚡")],
@@ -25,7 +24,6 @@ export const ZIP_STORIES: Story[] = [
     intro: "Uma trilha de cogumelos luminosos cruza a Floresta dos Cristais. Alunos em excursão pararam em pontos diferentes para fazer anotações, e a professora quer refazer o percurso no mapa da turma.",
     goal: "Em que parada estava cada aluno, e o que levava?",
     ending: "Percurso refeito. A turma descobriu que {com:Pote de Amostras} guardou o cogumelo mais brilhante da excursão.",
-    people: [e("Professora Clara", F, "👩‍🏫"), e("Joca", M, "👦"), e("Mel", F, "👧"), e("Tom", M, "🧒")],
     objects: [e("Lupa", F, "🔍"), e("Caderno de Campo", M, "📓"), e("Pote de Amostras", M, "🫙"), e("Binóculo", M, "🔭")],
     rooms: [e("Bosque das Gemas", M), e("Riacho", M), e("Clareira dos Cogumelos", F), e("Toca da Coruja", F)],
     blocks: [e("Árvore de Cristal", F, "💎"), e("Tronco Caído", M, "🪵"), e("Formigueiro", M, "🐜")],
@@ -36,7 +34,6 @@ export const ZIP_STORIES: Story[] = [
     intro: "No Vale das Águas, as canoas descem um rio cheio de curvas e param em prainhas ao longo do caminho. O salva-vidas anotou onde cada remador parou, mas a prancheta molhou.",
     goal: "Em que parada do rio estava cada remador, e com o quê?",
     ending: "Prancheta refeita. No fim do rio, {com:Colete} foi elogiado por ajudar quem virou a canoa.",
-    people: [e("Iná", F, "🚣‍♀️"), e("Otto", M, "🚣"), e("Pri", F, "👩"), e("Zeca", M, "🧔")],
     objects: [e("Remo Extra", M, "🛶"), e("Colete", M, "🦺"), e("Apito", M, "📯"), e("Boné", M, "🧢")],
     rooms: [e("Corredeira", F), e("Remanso", M), e("Prainha", F), e("Cachoeira", F)],
     blocks: [e("Pedra Grande", F, "🪨"), e("Tronco Boiando", M, "🪵"), e("Cisne", M, "🦢")],
@@ -47,7 +44,6 @@ export const ZIP_STORIES: Story[] = [
     intro: "No Templo das Estrelas, uma procissão percorre corredores escuros levando objetos sagrados. Na noite da cerimônia, cada participante parou num ponto do caminho para acender as tochas.",
     goal: "Em que ponto do caminho estava cada um, e o que levava?",
     ending: "Todas as tochas acenderam, e {com:Lanterna de Papel} soltou a lanterna para o céu estrelado.",
-    people: [e("Sacerdotisa Nalu", F, "👩‍🦳"), e("Noviço Jonas", M, "👦"), e("Ester", F, "👩"), e("Mestre Caetano", M, "🧙")],
     objects: [e("Lanterna de Papel", F, "🏮"), e("Tocha", F, "🔥"), e("Sino Pequeno", M, "🔔"), e("Rolo Sagrado", M, "📜")],
     rooms: [e("Corredor das Velas", M), e("Pátio Estrelado", M), e("Escadaria", F), e("Santuário", M)],
     blocks: [e("Estátua de Pedra", F, "🗿"), e("Coluna", F, "🏛️"), e("Braseiro", M, "♨️")],
@@ -58,7 +54,6 @@ export const ZIP_STORIES: Story[] = [
     intro: "No Deserto dos Segredos, pegadas formam um caminho entre ruínas, um oásis e um acampamento. Ao amanhecer, o vento começou a apagar as marcas, e a rastreadora precisa reconstruir quem passou por cada ponto.",
     goal: "Em que ponto da trilha estava cada viajante, e com o quê?",
     ending: "Caminho reconstruído. O vento apagou as pegadas logo depois — ainda bem que {com:Bússola} anotou tudo.",
-    people: [e("Rastreadora Yara", F, "👩‍🦱"), e("Hamid", M, "👳"), e("Sofia", F, "👱‍♀️"), e("Tariq", M, "👦")],
     objects: [e("Lenço", M, "🧣"), e("Bastão", M, "🦯"), e("Bússola", F, "🧭"), e("Cabaça", F, "🍶")],
     rooms: [e("Ruínas", F), e("Oásis", M), e("Acampamento", M), e("Duna Alta", F)],
     blocks: [e("Cacto", M, "🌵"), e("Esqueleto de Camelo", M, "🦴"), e("Palmeira", F, "🌴")],
@@ -69,7 +64,6 @@ export const ZIP_STORIES: Story[] = [
     intro: "Mineiros exploram túneis antigos nas Montanhas do Dragão seguindo os trilhos de um carrinho de mina. Um tremor fez todos pararem, e o capataz precisa saber em que ponto dos trilhos cada um estava.",
     goal: "Em que ponto dos trilhos estava cada mineiro, e com o quê?",
     ending: "Todos localizados. Depois do tremor, {com:Detector} encontrou um veio de cristal que ninguém tinha visto.",
-    people: [e("Capataz Moreira", M, "👷"), e("Tânia", F, "👷‍♀️"), e("Fred", M, "🧑"), e("Engenheira Lúcia", F, "👩‍🔧")],
     objects: [e("Lampião", M, "🏮"), e("Picareta", F, "⛏️"), e("Mapa da Mina", M, "🗺️"), e("Detector", M, "📡")],
     rooms: [e("Galeria Norte", F), e("Câmara do Eco", F), e("Trilho Velho", M), e("Poço de Ar", M)],
     blocks: [e("Vagonete", M, "🛒"), e("Pilha de Carvão", F, "⚫"), e("Escora", F, "🪵")],
@@ -80,7 +74,6 @@ export const ZIP_STORIES: Story[] = [
     intro: "No Reino das Auroras, trenós puxados por raposas brancas seguem uma pista que serpenteia entre iglus. No meio da corrida, a aurora ofuscou a todos, e cada equipe parou num ponto diferente.",
     goal: "Em que ponto da pista estava cada corredor, e com o quê?",
     ending: "Classificação refeita. {com:Petisco de Raposa} venceu — as raposas correram atrás do petisco a pista inteira.",
-    people: [e("Ártica", F, "👩"), e("Nilo", M, "👨"), e("Mia", F, "👧"), e("Gus", M, "🧑")],
     objects: [e("Óculos de Neve", M, "🥽"), e("Luvas", F, "🧤"), e("Mapa da Pista", M, "🗺️"), e("Petisco de Raposa", M, "🍖")],
     rooms: [e("Pista do Iglu", F), e("Lago Gelado", M), e("Floresta Nevada", F), e("Rampa", F)],
     blocks: [e("Iglu", M, "🛖"), e("Boneco de Neve", M, "⛄"), e("Pinheiro", M, "🌲")],
@@ -91,7 +84,6 @@ export const ZIP_STORIES: Story[] = [
     intro: "Um grupo fez o tour noturno pela Cidade Perdida seguindo setas pintadas no chão. No fim, uma estatueta apareceu fora do pedestal, e a guia quer saber em que parada cada visitante estava e com o quê.",
     goal: "Em que parada do tour estava cada visitante, e o que levava?",
     ending: "Tudo esclarecido: a estatueta só tinha sido emprestada por {com:Câmera} para uma foto melhor.",
-    people: [e("Guia Rebeca", F, "👩‍🦰"), e("Hugo", M, "🧔"), e("Ana Lu", F, "👩"), e("Pipo", M, "👦")],
     objects: [e("Audioguia", M, "🎧"), e("Folheto", M, "📄"), e("Câmera", F, "📷"), e("Lanterna", F, "🔦")],
     rooms: [e("Praça das Colunas", F), e("Templo Afundado", M), e("Mercado Antigo", M), e("Arena", F)],
     blocks: [e("Coluna Partida", F, "🏛️"), e("Fonte Seca", F, "⛲"), e("Estátua", F, "🗿")],
@@ -102,7 +94,6 @@ export const ZIP_STORIES: Story[] = [
     intro: "Na Dimensão do Tempo, um labirinto de relógios só deixa passar quem segue o caminho certo. Os aventureiros entraram juntos e se espalharam pelas paradas; o guardião quer saber quem chegou mais longe.",
     goal: "Em que parada do labirinto estava cada um, e com o quê?",
     ending: "Percurso conferido. {com:Chave de Bronze} abriu a última porta, e o labirinto devolveu um minuto a cada visitante.",
-    people: [e("Lia", F, "👧"), e("Ben", M, "👦"), e("Cientista Olga", F, "👩‍🔬"), e("Inventor Dito", M, "🧓")],
     objects: [e("Ampulheta", F, "⏳"), e("Bússola do Tempo", F, "🧭"), e("Chave de Bronze", F, "🗝️"), e("Mapa Rasgado", M, "🗺️")],
     rooms: [e("Ala do Ontem", F), e("Ala do Amanhã", F), e("Corredor dos Ponteiros", M), e("Sala do Agora", F)],
     blocks: [e("Relógio Gigante", M, "🕰️"), e("Espelho", M, "🪞"), e("Engrenagem Parada", F, "⚙️")],
@@ -113,10 +104,14 @@ export const ZIP_STORIES: Story[] = [
     intro: "Para celebrar o fim das jornadas, um cortejo sobe a escadaria até o Trono do Infinito. Cada campeão carrega um troféu e para num patamar para acenar; o mestre de cerimônias quer a ordem para o livro de história.",
     goal: "Em que patamar estava cada campeão, e com que troféu?",
     ending: "Ordem registrada no livro. {com:Troféu} ergueu o troféu no alto do Trono, e o céu inteiro brilhou.",
-    people: [e("Leo", M, "🧑"), e("Bia", F, "👧"), e("Raí", M, "👦"), e("Nayra", F, "👩")],
     objects: [e("Troféu", M, "🏆"), e("Coroa de Louros", F, "🌿"), e("Flâmula", F, "🚩"), e("Medalhão", M, "🏅")],
     rooms: [e("Patamar dos Ventos", M), e("Patamar das Luzes", M), e("Ponte de Cristal", F), e("Portal do Trono", M)],
     blocks: [e("Estátua Alada", F, "🗿"), e("Pilar", M, "🏛️"), e("Fonte Eterna", F, "⛲")],
     seats: [e("Tapete Real", M, "🟥"), e("Degrau de Ouro", M, "🟨")],
   },
 ];
+
+import { ZIP_B } from "./zip-b";
+
+/** Duas investigações por capítulo: a história A e a história B do mesmo mundo, intercaladas. */
+export const ZIP_STORIES: Story[] = ZIP_A.flatMap((s, i) => [s, ZIP_B[i]]);

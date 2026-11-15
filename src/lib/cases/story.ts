@@ -29,8 +29,6 @@ export interface Story {
   goal: string;
   /** Desfecho mostrado ao resolver. Pode citar quem tinha cada objeto: {com:Nome do Objeto} → "a Ana". */
   ending: string;
-  /** Personagens (4; os casos iniciais usam os 3 primeiros). */
-  people: Ent[];
   /** Objetos (4; um por personagem). */
   objects: Ent[];
   /** O lugar: cômodos (4), móveis que bloqueiam (3) e assentos (2). No Tango, os 2 primeiros cômodos são os lados. */

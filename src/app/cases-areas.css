@@ -1,15 +1,8 @@
 /* =====================================================================================================
-   Investigação — painel de detetive (importado depois de cases.css).
-   Computador (≥ 1100px): três colunas — Personagens e Objetos | Cenário e Pistas | Dedução e Sua resposta —,
-   com o narrador contando a história num balão embaixo.
-   Celular: uma coluna, na ordem narrador → personagens e objetos → cenário → pistas → dedução → resposta.
+   Investigação — peças da tela (painéis, tabuleiro, pistas, resposta, narrador da história).
+   O layout final, a leitura no celular e as cores de cada jogo ficam em cases-theme.css (importado por último).
    ===================================================================================================== */
-.wrap.cx-play { max-width: 860px; gap: 12px; }
 .cx-head-t b { display: inline-flex; align-items: center; gap: 6px; }
-
-.cx-desk { display: grid; gap: 12px; min-width: 0; grid-template-areas: "story" "left" "mid" "right"; }
-.cx-col-left { grid-area: left; } .cx-col-mid { grid-area: mid; } .cx-col-right { grid-area: right; } .cx-col-story { grid-area: story; }
-.cx-col-left, .cx-col-mid, .cx-col-right { display: grid; gap: 12px; align-content: start; min-width: 0; }
 
 /* Painéis: cartão branco com faixa de título na cor do jogo. */
 .cx-panel { display: grid; gap: 10px; align-content: start; min-width: 0; padding: 0 12px 12px; border-radius: 16px; background: #fff; border: 2px solid color-mix(in srgb, var(--gc) 30%, #E4D6F5); box-shadow: 0 4px 12px rgba(38, 16, 77, .08); overflow: hidden; }
@@ -39,9 +32,14 @@
 
 /* ---------- Cenário ---------- */
 .cx-scenebox { display: grid; gap: 8px; }
-.cx-sceneframe { display: grid; grid-template-columns: 1fr; gap: 6px; }
-.cx-sceneframe.rule-equilibrio { grid-template-columns: auto 1fr; align-items: stretch; }
-.cx-sides { display: grid; grid-template-rows: 1fr 1fr; gap: 6px; }
+/* O cenário nunca passa de ~86px por casa: no celular cabe inteiro na tela, no computador não vira um tabuleiro gigante. */
+.cx-sceneframe { --cell: 86px; display: grid; grid-template-columns: 1fr; gap: 6px; width: 100%; max-width: calc(var(--cols, 4) * var(--cell) + 18px); margin-inline: auto; }
+.cx-sceneframe.rule-equilibrio { max-width: calc(var(--cols, 4) * var(--cell) + 50px); }
+.cx-sceneframe.rule-equilibrio { grid-template-columns: auto minmax(0, 1fr); align-items: stretch; }
+.cx-sceneboard { min-width: 0; width: 100%; box-sizing: border-box; }
+/* Os rótulos dos lados nunca esticam o tabuleiro: altura 0 no cálculo da linha, e esticam até a altura dele. */
+.cx-sides { display: grid; grid-template-rows: 1fr 1fr; gap: 6px; height: 0; min-height: 100%; }
+.cx-sides span { min-height: 0; overflow: hidden; white-space: normal; line-height: 1.1; text-align: center; font-size: 10.5px; }
 .cx-sides span { display: grid; place-items: center; writing-mode: vertical-rl; transform: rotate(180deg); padding: 6px 4px; border-radius: 8px; font: 700 11px var(--font-body); color: #26104D; border: 2px solid #26104D; }
 .cx-sceneboard { position: relative; display: grid; gap: 0; padding: 6px; border-radius: 16px; background: #3A2652; border: 3px solid #26104D; box-shadow: inset 0 0 0 2px rgba(255, 255, 255, .06), 0 8px 18px rgba(38, 16, 77, .25); }
 .rule-ceu .cx-sceneboard { background: #1B0B3F; }
@@ -152,17 +150,79 @@
 .cx-solution li { display: grid; grid-template-columns: 24px auto 1fr 24px auto; gap: 6px; align-items: center; padding: 6px 10px; border-radius: 10px; background: #F6FDF9; border: 1px solid #BFEBD5; font-size: 13.5px; }
 .cx-solution li span:nth-child(3) { color: #5A4A78; }
 
-/* Computador: três colunas, com o narrador embaixo ocupando a largura toda. */
-@media (min-width: 1100px) {
-  .wrap.cx-play { max-width: 1380px; }
-  .cx-desk { grid-template-columns: minmax(200px, .75fr) minmax(0, 1.5fr) minmax(300px, 1fr); grid-template-areas: "left mid right" "story story story"; align-items: start; }
-  .cx-portraits, .cx-items { grid-template-columns: 1fr 1fr; }
-  .cx-col-story .cx-narrator { max-width: 900px; }
-}
-@media (min-width: 700px) and (max-width: 1099px) {
-  .cx-desk { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); grid-template-areas: "story story" "left left" "mid mid" "right right"; }
-}
 @media (prefers-reduced-motion: reduce) {
   .cx-sc, .cx-face { transition: none; }
   .cx-sc.full, .cx-dgrid td.no button, .cx-mm button.no, .cx-says li.fresh .cx-say { animation: none; }
 }
+
+/* ---------- Ilustrações do elenco e dos objetos (componente Art) ---------- */
+img.art { display: inline-block; width: 1.35em; height: 1.35em; object-fit: cover; vertical-align: -.35em; border-radius: 50%; }
+img.art.is-item { border-radius: 24%; }
+img.art.fill { width: 100%; height: 100%; vertical-align: top; }
+.cx-face-pic:has(.art) { width: 64px; height: 64px; border-radius: 50%; padding: 2px; background: linear-gradient(135deg, var(--tint), #26104D); box-shadow: 0 0 0 2px #fff, 0 0 10px color-mix(in srgb, var(--tint) 60%, transparent); }
+.cx-item-pic:has(.art) { width: 52px; height: 52px; border-radius: 12px; overflow: hidden; padding: 0; }
+.cx-face-ans i img.art { width: 1.25em; height: 1.25em; }
+.cx-who:has(.art) { width: 62%; aspect-ratio: 1; border-radius: 50%; box-shadow: 0 2px 6px rgba(38, 16, 77, .35), 0 0 0 2px #fff; }
+.cx-hold:has(.art) { width: 34%; max-width: 26px; aspect-ratio: 1; filter: none; }
+.cx-hold .art { border-radius: 24%; box-shadow: 0 1px 3px rgba(0, 0, 0, .35); }
+.cx-icons { display: inline-flex; gap: 3px; vertical-align: middle; margin-left: 4px; }
+.cx-icons img.art { width: 20px; height: 20px; }
+.cx-narrator-pic:has(.art) { padding: 0; overflow: hidden; border-radius: 50%; }
+.cx-piece .cx-obj img.art { width: 24px; height: 24px; }
+.cx-solution img.art { width: 22px; height: 22px; }
+
+/* ---------- Patches: cômodos = peças coloridas, com a etiqueta do tamanho (como no jogo) ---------- */
+.rule-comodos .cx-sc { border-color: color-mix(in srgb, var(--piece, #26104D) 40%, transparent); }
+.rule-comodos .cx-sc.bt { border-top-color: color-mix(in srgb, var(--piece) 55%, #26104D); }
+.rule-comodos .cx-sc.bb { border-bottom-color: color-mix(in srgb, var(--piece) 55%, #26104D); }
+.rule-comodos .cx-sc.bl { border-left-color: color-mix(in srgb, var(--piece) 55%, #26104D); }
+.rule-comodos .cx-sc.br { border-right-color: color-mix(in srgb, var(--piece) 55%, #26104D); }
+.cx-ptag { position: absolute; left: 3px; bottom: 3px; width: 30%; max-width: 30px; aspect-ratio: 1; z-index: 2; pointer-events: none; }
+.cx-ptag .ptag { box-shadow: inset 0 2px 0 rgba(255, 255, 255, .55), inset 0 -2px 0 rgba(38, 16, 77, .22), 0 2px 4px rgba(38, 16, 77, .3); border-width: 1.5px; }
+.rule-comodos .cx-room { background: color-mix(in srgb, var(--piece) 22%, #fff); }
+@media (max-width: 520px) { .cx-ptag { max-width: 20px; left: 2px; bottom: 2px; } .cx-sc.full:has(.cx-ptag) small { padding-left: 14px; } }
+
+/* =====================================================================================================
+   Itens no visual do MindLoop: cada objeto, móvel e assento vira um "cristal" — fundo cósmico, borda neon na
+   cor da categoria e brilho no desenho (ilustração recortada ou emoji). Objetos: ciano · móveis: violeta ·
+   assentos: dourado.
+   ===================================================================================================== */
+:root { --neo-obj: #2EE6D6; --neo-blk: #A77BFF; --neo-seat: #FFC93C; --cosmos: radial-gradient(circle at 50% 32%, #3D1C80 0%, #24104F 55%, #140838 100%); }
+img.art.is-item { object-fit: contain; border-radius: 0; filter: drop-shadow(0 0 3px rgba(255, 255, 255, .35)) drop-shadow(0 0 6px color-mix(in srgb, var(--neo, var(--neo-obj)) 70%, transparent)); }
+.art-emo { display: inline-grid; place-items: center; line-height: 1; filter: drop-shadow(0 0 4px color-mix(in srgb, var(--neo, var(--neo-obj)) 80%, transparent)); }
+.art-emo.fill { width: 100%; height: 100%; }
+
+/* Cartões de objeto (painel Objetos) */
+.cx-item-pic, .cx-item-pic:has(.art) { --neo: var(--neo-obj); width: 52px; height: 52px; padding: 6px; border-radius: 14px; background: var(--cosmos);
+  box-shadow: 0 0 0 1.5px color-mix(in srgb, var(--neo) 75%, transparent), 0 0 12px color-mix(in srgb, var(--neo) 35%, transparent), inset 0 1px 0 rgba(255, 255, 255, .18); overflow: visible; font-size: 26px; }
+.cx-item.owned .cx-item-pic { --neo: #6BFFB0; background: var(--cosmos); }
+.cx-item.pick .cx-item-pic { --neo: #FF5FCB; }
+
+/* Objeto na mão de quem está no cenário */
+.cx-hold, .cx-hold:has(.art) { --neo: var(--neo-obj); width: 34%; max-width: 28px; aspect-ratio: 1; padding: 2px; border-radius: 8px; background: var(--cosmos); font-size: 13px;
+  display: grid; place-items: center; box-shadow: 0 0 0 1.5px color-mix(in srgb, var(--neo) 80%, transparent), 0 0 8px color-mix(in srgb, var(--neo) 45%, transparent); filter: none; }
+.cx-hold .art { box-shadow: none; border-radius: 0; }
+
+/* Móveis: a casa vira um bloco de cristal escuro (ninguém fica ali) */
+.cx-sc.block { --neo: var(--neo-blk); background: linear-gradient(135deg, rgba(255, 255, 255, .08) 0 25%, transparent 25% 50%, rgba(255, 255, 255, .05) 50% 75%, transparent 75%) 0 0 / 14px 14px, var(--cosmos);
+  border-color: color-mix(in srgb, var(--neo-blk) 55%, #140838); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--neo-blk) 45%, transparent), inset 0 0 14px color-mix(in srgb, var(--neo-blk) 35%, transparent); }
+.cx-sc.block .cx-prop { width: 64%; aspect-ratio: 1; display: grid; place-items: center; font-size: clamp(20px, 6vw, 30px); filter: none; }
+.cx-sc.block .cx-prop .art-emo { font-size: inherit; }
+.cx-sc.block .cx-room { background: rgba(255, 255, 255, .92); }
+
+/* Assentos: medalhão dourado no canto da casa */
+.cx-seat { --neo: var(--neo-seat); display: grid; place-items: center; width: 24%; max-width: 22px; aspect-ratio: 1; padding: 2px; border-radius: 50%; background: var(--cosmos); font-size: 11px; opacity: 1;
+  box-shadow: 0 0 0 1.5px color-mix(in srgb, var(--neo) 85%, transparent), 0 0 7px color-mix(in srgb, var(--neo) 45%, transparent); }
+
+/* Ícones pequenos: pistas, tabela "O quê?", resposta e solução */
+.cx-icons .art-emo, .cx-icons img.art.is-item, .cx-dgrid th .art-emo, .cx-dgrid th img.art.is-item, .cx-solution .art-emo, .cx-solution img.art.is-item, .cx-face-ans i .art-emo, .cx-face-ans i img.art.is-item {
+  width: 22px; height: 22px; padding: 2px; border-radius: 6px; background: var(--cosmos); font-size: 13px; box-sizing: border-box;
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--neo-obj) 70%, transparent), 0 0 6px color-mix(in srgb, var(--neo-obj) 35%, transparent); vertical-align: middle; }
+.cx-face-ans i .art-emo, .cx-face-ans i img.art.is-item { width: 18px; height: 18px; font-size: 11px; }
+
+/* Mini-mapas "Onde?": casa com móvel também em cristal escuro */
+.cx-mm-prop { display: grid; place-items: center; width: 100%; height: 100%; font-size: 12px; }
+.cx-mm button.block { --neo: var(--neo-blk); background: var(--cosmos); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--neo-blk) 50%, transparent); }
+/* As ilustrações recortadas têm margem: um pouco maiores dentro dos cristais. */
+.cx-item-pic img.art.is-item, .cx-hold img.art.is-item, .cx-icons img.art.is-item, .cx-dgrid th img.art.is-item, .cx-solution img.art.is-item, .cx-face-ans i img.art.is-item { transform: scale(1.22); }
+.cx-icons img.art.is-item, .cx-dgrid th img.art.is-item, .cx-solution img.art.is-item { padding: 1px; }

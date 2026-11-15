@@ -92,7 +92,7 @@ export const STRUCTURES: Record<StructureId, Structure> = {
   },
   proximidade: {
     id: "proximidade", name: "Mapa de proximidade", maxDirect: 1, favor: { near: 4, far: 3, alone: 4, nearN: 4, diag: 2 },
-    hint: "Como no Astros: o que importa é quem encosta em quem (as 8 casas em volta, inclusive na diagonal). Quem não encosta em ninguém precisa de espaço; quem encosta só cabe perto.",
+    hint: "Como no Astros: primeiro a regra (uma pessoa por linha, coluna e região, sem ninguém se encostar) mostra quais casas podem estar ocupadas; depois as distâncias em passos dizem quem está em cada uma.",
     need: (x) => count(x, "near", "far", "alone", "nearN") + viaOf(x, "near", "far", "alone", "nearN") >= 2,
   },
 };

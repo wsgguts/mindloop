@@ -76,6 +76,11 @@ export const blockedCells = (m: Model): Set<number> => new Set(m.scene.props.fil
 export const propAt = (m: Model, v: number) => m.scene.props.find((p) => p.cell === v);
 export const roomOf = (m: Model, v: number) => m.scene.room[v];
 export const kingDist = (m: Model, v: number, w: number) => { const [r1, c1] = rcOf(m, v), [r2, c2] = rcOf(m, w); return Math.max(Math.abs(r1 - r2), Math.abs(c1 - c2)); };
+/**
+ * Astros ("ceu"): ninguém encosta em ninguém (1 passo, inclusive na diagonal, é proibido), então a proximidade
+ * se mede em PASSOS: "perto" = a 2 passos (o mais perto permitido); "longe" = a 3 passos ou mais.
+ */
+export const NEAR_STEPS = 2;
 export const sideNeighbors = (m: Model, v: number): number[] => {
   const [r, c] = rcOf(m, v);
   return [[r - 1, c], [r + 1, c], [r, c - 1], [r, c + 1]].filter(([y, x]) => y >= 0 && y < m.rows && x >= 0 && x < m.cols).map(([y, x]) => y * m.cols + x);
@@ -114,7 +119,7 @@ function posOk(m: Model, c: PosClue, pos: (i: number) => number): boolean {
       case "notStop": return stopOf(m, v) !== c.n;
       case "alone": case "nearN": {
         let k = 0;
-        for (let j = 0; j < N(m); j++) { const w = pos(j); if (w !== v && w >= 0 && kingDist(m, v, w) === 1) k++; }
+        for (let j = 0; j < N(m); j++) { const w = pos(j); if (w !== v && w >= 0 && kingDist(m, v, w) === NEAR_STEPS) k++; }
         return c.k === "alone" ? k === 0 : k === (c as { n: number }).n;
       }
     }
@@ -124,8 +129,8 @@ function posOk(m: Model, c: PosClue, pos: (i: number) => number): boolean {
   switch (c.k) {
     case "left": return c1 < c2;
     case "above": return r1 < r2;
-    case "near": return kingDist(m, x, y) === 1;
-    case "far": return kingDist(m, x, y) > 1;
+    case "near": return kingDist(m, x, y) === NEAR_STEPS;
+    case "far": return kingDist(m, x, y) > NEAR_STEPS;
     case "diag": return Math.abs(r1 - r2) === Math.abs(c1 - c2);
     case "touch": return Math.abs(r1 - r2) + Math.abs(c1 - c2) === 1;
     case "apart": return Math.abs(r1 - r2) + Math.abs(c1 - c2) !== 1;
@@ -146,7 +151,7 @@ export function ruleOk(m: Model, cells: number[]): boolean {
   const uniq = (xs: number[]) => new Set(xs).size === xs.length;
   switch (m.rule) {
     case "regioes": return uniq(rows) && uniq(cols) && uniq(rooms);
-    case "ceu": return uniq(rows) && uniq(cols);
+    case "ceu": return uniq(rows) && uniq(cols) && uniq(rooms) && rooms.length === m.scene.rooms.length && cells.every((v, i) => cells.every((w, j) => j <= i || kingDist(m, v, w) > 1));
     case "comodos": return uniq(rooms) && rooms.length === m.scene.rooms.length;
     case "trilha": return true;
     case "equilibrio": return uniq(cols) && rows.filter((r) => r === 0).length === cells.length / 2;
@@ -217,12 +222,14 @@ export function posList(m: Model): number[][] {
   const usedR = new Set<number>(), usedC = new Set<number>(), usedRoom = new Set<number>(), usedCell = new Set<number>();
   const uniqRow = m.rule === "regioes" || m.rule === "ceu";
   const uniqCol = uniqRow || m.rule === "equilibrio";
-  const uniqRoom = m.rule === "regioes" || m.rule === "comodos";
+  const uniqRoom = m.rule === "regioes" || m.rule === "comodos" || m.rule === "ceu";
+  const noTouch = m.rule === "ceu";
   const rec = (i: number) => {
     if (i === n) { if (ruleOk(m, cur)) out.push(cur.slice()); return; }
     for (const v of cells) {
       const [r, c] = rcOf(m, v), room = roomOf(m, v);
       if (usedCell.has(v) || (uniqRow && usedR.has(r)) || (uniqCol && usedC.has(c)) || (uniqRoom && usedRoom.has(room))) continue;
+      if (noTouch && cur.slice(0, i).some((w) => kingDist(m, v, w) === 1)) continue;
       cur[i] = v;
       usedCell.add(v); if (uniqRow) usedR.add(r); if (uniqCol) usedC.add(c); if (uniqRoom) usedRoom.add(room);
       rec(i + 1);
@@ -266,7 +273,8 @@ export function solveAll(m: Model, clues: Clue[], limit = Infinity): number[][] 
 export type Reason = number | "rule" | "objetos";
 /** Uma descoberta: a pessoa s estava na casa v (cat "p") ou tinha o objeto v (cat "o"). */
 export interface Step { cat: "p" | "o"; s: number; v: number; by: Reason; uses: number[] }
-export interface Deduction { solved: boolean; steps: Step[]; rounds: number; P: boolean[][]; O: boolean[][] }
+/** pairs: quantas vezes foi preciso cruzar duas pistas ao mesmo tempo (o passo mais difícil). */
+export interface Deduction { solved: boolean; steps: Step[]; rounds: number; pairs: number; P: boolean[][]; O: boolean[][] }
 
 /**
  * Raciocínio de uma pessoa, simulado: cada pista, junto com a regra do lugar, elimina casas e objetos que ela torna
@@ -301,7 +309,7 @@ export function deduce(m: Model, clues: Clue[]): Deduction {
     return ch;
   };
   const order = clues.map((_, i) => i).filter((i) => !isRule(clues[i])).sort((i, j) => peopleOf(m, clues[i]).length - peopleOf(m, clues[j]).length);
-  let rounds = 0;
+  let rounds = 0, pairs = 0;
   for (let changed = true; changed && rounds < 60;) {
     changed = false; rounds++;
     for (const i of order) {
@@ -349,12 +357,12 @@ export function deduce(m: Model, clues: Clue[]): Deduction {
           for (let v = 0; v < V; v++) if (P[s][v] && !keepP[s][v]) { P[s][v] = false; usesP[s].add(order[x]); usesP[s].add(order[y]); changed = true; }
           for (let o = 0; o < n; o++) if (O[s][o] && !keepO[s][o]) { O[s][o] = false; usesO[s].add(order[x]); usesO[s].add(order[y]); changed = true; }
         }
-        if (changed) { mark(order[y]); break outer; }
+        if (changed) { pairs++; mark(order[y]); break outer; }
       }
     }
   }
   const solved = P.every((r) => size(r) === 1) && O.every((r) => size(r) === 1);
-  return { solved, steps, rounds, P, O };
+  return { solved, steps, rounds, pairs, P, O };
 }
 
 // ---------------------------------------------------------------- texto
@@ -390,15 +398,15 @@ function posText(m: Model, c: PosClue, o?: number): string {
     case "row": return `${S(c.s)} estava na linha ${c.r + 1}`;
     case "col": return `${S(c.s)} estava na coluna ${"ABCDEF"[c.c]}`;
     case "corner": return `${S(c.s)} estava num dos cantos`;
-    case "alone": return `ninguém encostava ${whoEm(m, c.s, o)}`;
-    case "nearN": return `${S(c.s)} encostava em exatamente ${c.n === 1 ? "uma pessoa" : `${c.n === 2 ? "duas" : c.n} pessoas`}`;
+    case "alone": return `ninguém estava a 2 passos ${whoDe(m, c.s, o)}`;
+    case "nearN": return `exatamente ${c.n === 1 ? "uma pessoa estava" : `${c.n === 2 ? "duas" : c.n} pessoas estavam`} a 2 passos ${whoDe(m, c.s, o)}`;
     case "stop": return `${S(c.s)} estava na ${ord(c.n + 1)} parada da trilha`;
     case "notStop": return `${S(c.s)} não estava na ${ord(c.n + 1)} parada da trilha`;
     case "side": return `${S(c.s)} estava ${em(m.scene.rooms[c.r])}`;
     case "left": return `${S(c.a)} estava numa coluna à esquerda ${whoDe(m, c.b, o)}`;
     case "above": return `${S(c.a)} estava numa linha acima ${whoDe(m, c.b, o)}`;
-    case "near": return `${S(c.a)} encostava ${whoEm(m, c.b, o)}`;
-    case "far": return `${S(c.a)} e ${S(c.b)} não se encostavam`;
+    case "near": return `${S(c.a)} estava a 2 passos ${whoDe(m, c.b, o)}`;
+    case "far": return `${S(c.a)} e ${S(c.b)} estavam a 3 passos ou mais um do outro`;
     case "diag": return `${S(c.a)} e ${S(c.b)} estavam na mesma diagonal`;
     case "touch": return `${S(c.a)} e ${S(c.b)} estavam em casas vizinhas (lado a lado ou uma em cima da outra)`;
     case "apart": return `${S(c.a)} e ${S(c.b)} não estavam em casas vizinhas`;
@@ -423,16 +431,17 @@ export function clueText(m: Model, c: Clue): string {
 
 /** A regra do lugar, em palavras (uma por jogo). */
 export const RULE_TEXT: Record<Rule, (m: Model) => string> = {
-  regioes: () => "Havia exatamente uma pessoa em cada linha, em cada coluna e em cada cômodo.",
-  equilibrio: (m) => `Havia uma pessoa em cada coluna, e metade delas ${em(m.scene.rooms[0])}, a outra metade ${em(m.scene.rooms[1])}.`,
-  trilha: () => "Cada pessoa estava numa parada diferente da trilha numerada.",
-  comodos: () => "Havia exatamente uma pessoa em cada cômodo.",
-  ceu: () => "Havia exatamente uma pessoa em cada linha e em cada coluna.",
+  regioes: () => "Como no Mini Sudoku: havia exatamente uma pessoa em cada linha, em cada coluna e em cada cômodo (os quatro quadrados 2×2).",
+  equilibrio: (m) => `Como no Tango, tudo equilibrado: havia uma pessoa em cada coluna, e metade delas ${em(m.scene.rooms[0])}, a outra metade ${em(m.scene.rooms[1])}.`,
+  trilha: () => "Como no Zip: a trilha numerada passa por todas as casas livres, uma vez cada, e cada pessoa estava numa parada diferente.",
+  comodos: () => "Como as peças do Patches: cada cômodo é um retângulo, e havia exatamente uma pessoa em cada cômodo.",
+  ceu: () => "Como os astros: havia exatamente uma pessoa em cada linha, em cada coluna e em cada região, e ninguém encostava em ninguém (nem ao lado, nem na diagonal).",
 };
 /** Lembretes que valem para todo caso (★). */
 export function ruleNotes(m: Model): string[] {
   const out = ["Cada pessoa estava numa casa livre (ninguém fica em cima de um móvel) e tinha um objeto diferente."];
-  if (m.rule === "ceu") out.push("Encostar = estar numa das 8 casas em volta: ao lado, em cima, embaixo ou na diagonal.");
+  if (m.rule === "comodos") out.push("Cada cômodo é uma peça colorida; o número no canto é o tamanho dele (quantas casas tem), como no Patches.");
+  if (m.rule === "ceu") out.push("Passos: andando uma casa por vez em qualquer direção, inclusive na diagonal. A 1 passo seria encostar, o que a regra proíbe; então “perto” é a 2 passos.");
   return out;
 }
 

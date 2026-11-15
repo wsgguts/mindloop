@@ -45,7 +45,7 @@ p { margin: 0; }
 .home .art { position: relative; flex: none; width: min(104vw, calc((100vh - var(--nav-h)) * .5619)); width: min(104vw, calc((100svh - var(--nav-h)) * .5619)); }
 .home .art img { display: block; width: 100%; height: auto;
   -webkit-mask-image: linear-gradient(180deg, transparent 0, #000 5%); mask-image: linear-gradient(180deg, transparent 0, #000 5%); }
-.hotspot { position: absolute; left: 50%; top: 55.9%; width: 38%; height: max(5.4%, 44px); transform: translate(-50%, -50%);
+.hotspot { position: absolute; left: 50.4%; top: 48.9%; width: 36%; height: max(5.4%, 44px); transform: translate(-50%, -50%);
   background: transparent; border: 0; border-radius: 6px; cursor: pointer; color: transparent; -webkit-tap-highlight-color: transparent; }
 .hotspot span { opacity: 0; }
 .hotspot:hover { box-shadow: 0 0 0 3px var(--cyan), 0 0 22px rgba(255,210,63,.7); }
@@ -743,6 +743,8 @@ label { font-weight: 600; display: block; margin-bottom: 4px; }
 .gtool { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; min-height: 52px; padding: 4px 2px; border-radius: 12px;
   border: 2px solid #CDB8F5; background: #fff; color: var(--violet); font: 600 12px/1.15 var(--font-body); cursor: pointer; -webkit-tap-highlight-color: transparent; }
 .gtool span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+/* Telas estreitas (≤ 380 px): rótulos menores para "Desfazer" e "Reiniciar" caberem inteiros, sem reticências. */
+@media (max-width: 380px) { .gtools { gap: 4px; } .gtool { font-size: 11px; letter-spacing: -.01em; padding-inline: 1px; } }
 .gtool:hover:not(:disabled) { background: #F3EBFD; }
 .gtool:active:not(:disabled) { transform: scale(.96); }
 .gtool:disabled { opacity: .4; cursor: default; }

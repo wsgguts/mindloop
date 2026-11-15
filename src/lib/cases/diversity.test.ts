@@ -2,6 +2,7 @@
 // Se alguém acrescentar ou reescrever histórias (stories/*.ts) copiando uma antiga, ou se o gerador voltar a
 // produzir casos vizinhos parecidos, estes testes falham e dizem onde.
 import { describe, expect, it } from "vitest";
+import { castByName } from "../cast";
 import { EVERY_GAME } from "../games";
 import { allCases, casesOf } from "./catalog";
 import { caseLevels } from "./config";
@@ -44,24 +45,27 @@ describe("histórias: originalidade", () => {
     }
   });
 
-  it("personagens não são reciclados entre histórias do mesmo jogo", () => {
+  it("elenco do MindLoop: 4 personagens diferentes por mistério, sem narradores, e os dois mistérios do capítulo não repetem ninguém", () => {
     for (const g of EVERY_GAME) {
-      const ss = STORIES[g];
-      for (let i = 0; i < ss.length; i++) for (let j = i + 1; j < ss.length; j++) {
-        const A = new Set(ss[i].people.map((e) => e.label));
-        expect(ss[j].people.filter((e) => A.has(e.label)).length, `${ss[i].key} × ${ss[j].key}`).toBeLessThanOrEqual(1);
-      }
+      const list = CASES_DATA.filter((c) => c.game === g);
+      const seen = new Set<string>();
+      list.forEach((c, i) => {
+        const names = c.model.people.map((p) => p.label);
+        expect(new Set(names).size, c.id).toBe(names.length);
+        for (const n of names) { const m = castByName(n); expect(m, `${c.id}: ${n}`).toBeTruthy(); expect(m!.narrator, n).toBeUndefined(); seen.add(n); }
+        if (i % 2 === 1) expect(names.filter((n) => list[i - 1].model.people.some((p) => p.label === n)), c.id).toEqual([]);
+      });
+      expect(seen.size, g).toBeGreaterThanOrEqual(40);
     }
   });
 
   it("toda história tem elenco, objetos e um lugar completo (cômodos, móveis e assentos com ícone)", () => {
     for (const s of stories) {
-      expect(s.people.length, s.key).toBeGreaterThanOrEqual(4);
       expect(s.objects.length, s.key).toBeGreaterThanOrEqual(4);
       expect(s.rooms.length, s.key).toBeGreaterThanOrEqual(4);
       expect(s.blocks.length, s.key).toBeGreaterThanOrEqual(3);
       expect(s.seats.length, s.key).toBeGreaterThanOrEqual(2);
-      for (const e of [...s.people, ...s.objects, ...s.blocks, ...s.seats]) expect(e.icon, `${s.key}: ${e.label}`).toBeTruthy();
+      for (const e of [...s.objects, ...s.blocks, ...s.seats]) expect(e.icon, `${s.key}: ${e.label}`).toBeTruthy();
       expect(new Set(s.objects.map((o) => o.label)).size, s.key).toBe(s.objects.length);
       // O desfecho só cita objetos que existem.
       const inCase = CASES_DATA.find((c) => c.story === s.key)!.model.objects.map((o) => o.label);

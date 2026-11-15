@@ -9,7 +9,7 @@ export const GAME_META: Record<JourneyGame, GameMeta> = {
   zip: { name: "Zip", text: "Ligue os números em ordem, passando por todas as casas.", color: "#12CFE0" },
   tango: { name: "Tango", text: "Equilibre Cristais e Orbes em cada linha e coluna.", color: "#FFB020", cur: "#8CF0FF" },
   patches: { name: "Patches", text: "Encaixe peças retangulares até cobrir toda a grade.", color: "#9A6BFF" },
-  astros: { name: "Astros", text: "Um astro por linha, coluna e constelação — sem nenhum se encostar.", color: "#FFC93C", cur: "#F05BC8" },
+  astros: { name: "Astros", text: "Um astro por linha, coluna e constelação — sem nenhum se encostar.", color: "#3DDC5A", cur: "#FFE45C" },
 };
 
 /** Os 4 jogos principais (ranking e as conquistas "dos 4 jogos"). */

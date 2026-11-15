@@ -8,13 +8,12 @@ import type { Story } from "../story";
 const F = "f" as const, M = "m" as const;
 const e = (label: string, g: "m" | "f", icon?: string): Ent => (icon ? { label, g, icon } : { label, g });
 
-export const SUDOKU_STORIES: Story[] = [
+const SUDOKU_A: Story[] = [
   {
     key: "biblioteca-nuvens", title: "A biblioteca entre as nuvens", universe: "biblioteca", tone: "curiosidade",
     intro: "No Reino Celestial, uma biblioteca flutua presa a balões de cristal, e os livros mudam de estante quando venta. Um vendaval bagunçou tudo bem na hora da leitura, e a bibliotecária quer refazer o registro da tarde.",
     goal: "Onde estava cada leitor e o que segurava?",
     ending: "Registro refeito, estantes no lugar. {com:Pena de Nuvem} devolveu a pena ao arquivo — e o vento nunca mais levou um livro.",
-    people: [e("Lumi", F, "🧚"), e("Tito", M, "🧒"), e("Vó Zélia", F, "👵"), e("Kaio", M, "👦")],
     objects: [e("Pena de Nuvem", F, "🪶"), e("Atlas do Céu", M, "📘"), e("Lupa Dourada", F, "🔍"), e("Marcador de Cristal", M, "🔖")],
     rooms: [e("Sala de Leitura", F), e("Torre dos Mapas", F), e("Varanda das Nuvens", F), e("Arquivo", M)],
     blocks: [e("Estante Flutuante", F, "📚"), e("Globo Celeste", M, "🌐"), e("Pilar de Nuvem", M, "☁️")],
@@ -25,7 +24,6 @@ export const SUDOKU_STORIES: Story[] = [
     intro: "Os gnomos da Floresta dos Cristais lapidam pedras numa oficina escavada no tronco de uma árvore antiga. Na troca de turno, ferramentas e aprendizes se misturaram, e o mestre quer o relatório do dia antes do jantar.",
     goal: "Em que canto estava cada aprendiz, e com que ferramenta?",
     ending: "Relatório entregue. O mestre descobriu que {com:Lente} achava os cristais mais bonitos — e lhe deu um avental novo.",
-    people: [e("Pipo", M, "🧔"), e("Faísca", F, "👩‍🦰"), e("Musgo", M, "🧑‍🦱"), e("Tília", F, "👧")],
     objects: [e("Cinzel", M, "🪛"), e("Martelinho", M, "🔨"), e("Lente", F, "🔎"), e("Lixa", F, "🟫")],
     rooms: [e("Bancada de Corte", F), e("Forno de Cristal", M), e("Depósito de Gemas", M), e("Janela de Musgo", F)],
     blocks: [e("Bigorna", F, "⚒️"), e("Pilha de Gemas", F, "💎"), e("Barril de Água", M, "🛢️")],
@@ -36,7 +34,6 @@ export const SUDOKU_STORIES: Story[] = [
     intro: "No Vale das Águas, a casa de banhos termais recebe viajantes cansados. Um hóspede esqueceu o roupão favorito e o recepcionista quer devolvê-lo, mas antes precisa entender quem relaxava em cada canto e com o quê.",
     goal: "Onde estava cada hóspede e o que levava?",
     ending: "O roupão voltou ao dono. Como agradecimento, a casa deu um pato de borracha novo para {com:Pato de Borracha}.",
-    people: [e("Dona Aurora", F, "👵"), e("Capitão Brás", M, "🧔‍♂️"), e("Iara", F, "🧜‍♀️"), e("Pedrinho", M, "👦")],
     objects: [e("Roupão", M, "🥋"), e("Pato de Borracha", M, "🦆"), e("Chinelo", M, "🩴"), e("Livro de Receitas", M, "📕")],
     rooms: [e("Tanque Quente", M), e("Tanque Morno", M), e("Sala do Vapor", F), e("Jardim de Pedras", M)],
     blocks: [e("Fonte de Bambu", F, "🎋"), e("Rocha Lisa", F, "🪨"), e("Cesto de Toalhas", M, "🧺")],
@@ -47,7 +44,6 @@ export const SUDOKU_STORIES: Story[] = [
     intro: "No Templo das Estrelas, os guardiões vigiam a noite com objetos sagrados. Um eclipse escureceu tudo por um minuto e, quando a luz voltou, o sumo-sacerdote precisou registrar a posição de cada um.",
     goal: "Onde estava cada guardião e que objeto sagrado tinha?",
     ending: "Registro completo. O eclipse passou, e {com:Sino de Prata} tocou o sino para avisar que as estrelas tinham voltado.",
-    people: [e("Irmã Lua", F, "👩‍🦳"), e("Mestre Órion", M, "🧙"), e("Noviça Vega", F, "👧"), e("Guarda Altair", M, "💂")],
     objects: [e("Sino de Prata", M, "🔔"), e("Pergaminho", M, "📜"), e("Incensário", M, "🪔"), e("Cajado", M, "🦯")],
     rooms: [e("Nave Estelar", F), e("Altar da Lua", M), e("Claustro", M), e("Torre do Sino", F)],
     blocks: [e("Coluna de Mármore", F, "🏛️"), e("Estátua Antiga", F, "🗿"), e("Fonte Sagrada", F, "⛲")],
@@ -58,7 +54,6 @@ export const SUDOKU_STORIES: Story[] = [
     intro: "Uma caravana parou para dormir num oásis do Deserto dos Segredos. De manhã, o guia viu pegadas misturadas na areia e quer reconstruir a noite antes de seguir viagem pelas dunas.",
     goal: "Onde passou a noite cada viajante e com o quê?",
     ending: "A noite foi refeita passo a passo. Graças a {com:Bússola}, a caravana achou o caminho para a próxima cidade.",
-    people: [e("Guia Samira", F, "🧕"), e("Mercador Omar", M, "👳"), e("Cartógrafa Lis", F, "👩‍🦱"), e("Zaki", M, "👦")],
     objects: [e("Bússola", F, "🧭"), e("Cantil", M, "🫗"), e("Mapa Estelar", M, "🗺️"), e("Lampião", M, "🏮")],
     rooms: [e("Tenda Grande", F), e("Beira do Oásis", F), e("Duna Alta", F), e("Curral dos Camelos", M)],
     blocks: [e("Palmeira", F, "🌴"), e("Poço", M, "🕳️"), e("Pilha de Sacas", F, "🌾")],
@@ -69,7 +64,6 @@ export const SUDOKU_STORIES: Story[] = [
     intro: "Montanhistas se abrigaram num refúgio de pedra enquanto um dragão sonolento roncava no pico. O ronco fez a lareira apagar, e o chefe da expedição precisa saber quem estava em cada cômodo para reacendê-la com segurança.",
     goal: "Onde estava cada montanhista e que equipamento tinha?",
     ending: "Lareira acesa de novo, e o dragão nem acordou. Pelo rádio, {com:Rádio} avisou a vila que todos estavam bem.",
-    people: [e("Nádia", F, "🧗‍♀️"), e("Tenzin", M, "🧔"), e("Doutor Elias", M, "👨‍⚕️"), e("Bel", F, "👩")],
     objects: [e("Corda", F, "🪢"), e("Picareta", F, "⛏️"), e("Rádio", M, "📻"), e("Bule", M, "🫖")],
     rooms: [e("Sala da Lareira", F), e("Dormitório", M), e("Despensa", F), e("Varanda de Pedra", F)],
     blocks: [e("Lareira", F, "🔥"), e("Pilha de Lenha", F, "🪵"), e("Armário de Mantimentos", M, "🗄️")],
@@ -80,7 +74,6 @@ export const SUDOKU_STORIES: Story[] = [
     intro: "No Reino das Auroras, certas flores só desabrocham quando a luz colorida dança no céu. Na noite da grande aurora, os jardineiros se espalharam pela estufa, e a rainha quer saber quem cuidou de cada canteiro.",
     goal: "Onde estava cada jardineiro e com que ferramenta?",
     ending: "Cada canteiro tinha seu cuidador. {com:Semente Rara} plantou a semente, que brotou cintilante na aurora seguinte.",
-    people: [e("Flora", F, "👩‍🌾"), e("Tio Bento", M, "👨‍🌾"), e("Neve", F, "👱‍♀️"), e("Rúben", M, "🧑")],
     objects: [e("Regador", M, "💧"), e("Tesoura de Poda", F, "✂️"), e("Semente Rara", F, "🌰"), e("Lamparina", F, "🪔")],
     rooms: [e("Canteiro das Rosas", M), e("Canteiro dos Lírios", M), e("Viveiro", M), e("Corredor de Vidro", M)],
     blocks: [e("Árvore de Gelo", F, "🌲"), e("Vaso Gigante", M, "🏺"), e("Fonte Gelada", F, "⛲")],
@@ -91,7 +84,6 @@ export const SUDOKU_STORIES: Story[] = [
     intro: "Arqueólogos encontraram a casa de um escriba na Cidade Perdida, com paredes cobertas de símbolos. Ao fim do dia, cada pesquisador estava num cômodo com um achado, e o diário de campo precisa registrar tudo.",
     goal: "Onde estava cada pesquisador e o que tinha encontrado?",
     ending: "Diário completo. {com:Tabuleta de Argila} decifrou a primeira palavra do escriba: “bem-vindo”.",
-    people: [e("Dra. Helena", F, "👩‍🔬"), e("Professor Ravi", M, "👨‍🏫"), e("Cléo", F, "👩‍🎓"), e("Davi", M, "🧑")],
     objects: [e("Tabuleta de Argila", F, "🟫"), e("Selo de Cera", M, "🏵️"), e("Pincel", M, "🖌️"), e("Ânfora", F, "🏺")],
     rooms: [e("Sala dos Símbolos", F), e("Cozinha Antiga", F), e("Pátio", M), e("Escritório do Escriba", M)],
     blocks: [e("Pilar Tombado", M, "🧱"), e("Mesa de Pedra", F, "🪨"), e("Monte de Entulho", M, "🟤")],
@@ -102,7 +94,6 @@ export const SUDOKU_STORIES: Story[] = [
     intro: "Na Dimensão do Tempo, há uma relojoaria onde os ponteiros andam para trás. Um relógio adiantou um segundo e congelou a loja inteira; para destravá-la, o relojoeiro precisa saber onde cada visitante parou.",
     goal: "Onde parou cada visitante e o que tinha nas mãos?",
     ending: "Um segundo devolvido, e a loja voltou a andar para trás, como deve. {com:Ampulheta} virou a ampulheta para comemorar.",
-    people: [e("Relojoeiro Tic", M, "🧓"), e("Viajante Cora", F, "🧑‍🚀"), e("Nico", M, "👦"), e("Lia", F, "👧")],
     objects: [e("Ampulheta", F, "⏳"), e("Engrenagem", F, "⚙️"), e("Chave de Corda", F, "🗝️"), e("Cuco", M, "🐦")],
     rooms: [e("Balcão", M), e("Oficina dos Ponteiros", F), e("Sala dos Cucos", F), e("Vitrine", F)],
     blocks: [e("Relógio de Pêndulo", M, "🕰️"), e("Bancada de Molas", F, "🔩"), e("Torre de Ponteiros", F, "🗼")],
@@ -113,10 +104,14 @@ export const SUDOKU_STORIES: Story[] = [
     intro: "No topo do Trono do Infinito, os campeões das jornadas foram convidados para um banquete. Antes do brinde, a coroa de cristal precisa passar por todos, e o mestre de cerimônias quer o mapa exato do salão.",
     goal: "Onde estava cada campeão e o que segurava?",
     ending: "O brinde aconteceu no lugar certo: {com:Coroa de Cristal} ergueu a coroa, e o salão inteiro aplaudiu.",
-    people: [e("Ísis", F, "👸"), e("Cavaleiro Rui", M, "🤺"), e("Maga Selene", F, "🧙‍♀️"), e("Bardo Teco", M, "🧑‍🎤")],
     objects: [e("Coroa de Cristal", F, "👑"), e("Taça", F, "🏆"), e("Harpa", F, "🪕"), e("Estandarte", M, "🚩")],
     rooms: [e("Salão do Trono", M), e("Galeria dos Heróis", F), e("Sacada", F), e("Antessala", F)],
     blocks: [e("Trono de Cristal", M, "💎"), e("Candelabro", M, "🕯️"), e("Mesa do Banquete", F, "🍽️")],
     seats: [e("Almofada Real", F, "🟥"), e("Tapete Dourado", M, "🟨")],
   },
 ];
+
+import { SUDOKU_B } from "./sudoku-b";
+
+/** Duas investigações por capítulo: a história A e a história B do mesmo mundo, intercaladas. */
+export const SUDOKU_STORIES: Story[] = SUDOKU_A.flatMap((s, i) => [s, SUDOKU_B[i]]);

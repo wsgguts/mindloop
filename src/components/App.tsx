@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import BottomNav, { type Tab } from "./BottomNav";
 import Game from "./Game";
 import Gem, { type GemKind } from "./Gem";
@@ -21,7 +21,6 @@ import { initSound } from "../lib/sound/engine";
 import TangoGame from "./TangoGame";
 import ZipGame from "./ZipGame";
 import AstrosGame from "./AstrosGame";
-import { AstrosGem } from "./AstroSymbol";
 import { ASTROS_PUZZLES } from "../lib/astros";
 import { COMMENT_MAX, submitFeedback, validateFeedback } from "../lib/feedback";
 import { ALL_GAMES, BONUS_GAME, EVERY_GAME, GAME_META, bonusUnlocked, isMainGame, visibleGames } from "../lib/games";
@@ -31,6 +30,8 @@ import { type Times, parseTimes, recordTime } from "../lib/records";
 import type { Grid } from "../lib/sudoku";
 import { validateNick } from "../lib/nick";
 import { KEYS, clearStore, onStoreWrite, readStore, writeStore } from "../lib/storage";
+import { AVATAR_KEY, AVATARS_SEEN_KEY, parseSeen } from "../lib/cast";
+import { AvatarPic, AvatarsPanel, avatarStats, currentAvatar, newAvatars } from "./account/Avatars";
 import { enterAdmin, isAdmin, leaveAdmin } from "../lib/admin";
 import { PATCHES_PUZZLES } from "../lib/patches";
 import { TANGO_PUZZLES } from "../lib/tango";
@@ -73,18 +74,21 @@ const TIMES_KEY = (g: RulesGame) => `mindloop:times:${g}`; // melhor tempo de ca
 const LAST_KEY = (g: RulesGame) => `mindloop:last:${g}`; // último nível jogado (referência de retorno)
 const perGame = <T,>(f: (g: RulesGame) => T): PerGame<T> => ({ sudoku: f("sudoku"), zip: f("zip"), tango: f("tango"), patches: f("patches"), astros: f("astros") });
 
-// Áreas clicáveis sobre os cristais da arte do Início (em % da imagem home-art.webp; original em home-art.jpg).
+// Áreas clicáveis sobre os cristais da arte do Início (em % da imagem home-art.webp, 944 × 1680; original em home-art.jpg).
+// Cada área cobre o cristal e a etiqueta com o nome do jogo.
 const ART_SPOTS: { id: RulesGame; left: number; top: number; width: number; height: number }[] = [
-  { id: "sudoku", left: 2, top: 33.5, width: 28, height: 13 },
-  { id: "zip", left: 72.5, top: 34, width: 26.5, height: 13 },
-  { id: "tango", left: 3, top: 53.5, width: 27, height: 14.5 },
-  { id: "patches", left: 68.5, top: 55, width: 29, height: 13 },
+  { id: "sudoku", left: 2, top: 21.5, width: 26, height: 12 },
+  { id: "zip", left: 72.5, top: 23.5, width: 26.5, height: 12 },
+  { id: "tango", left: 1.5, top: 39.5, width: 22, height: 12 },
+  { id: "patches", left: 76, top: 40.5, width: 23, height: 12 },
 ];
 
 export default function App() {
   const [ready, setReady] = useState(false);
   const [view, setView] = useState<View>("home");
   const [nick, setNick] = useState("");
+  const [avatarId, setAvatarId] = useState<string | null>(null); // avatar escolhido (validado contra o progresso)
+  const [avSeen, setAvSeen] = useState<Set<string>>(() => new Set()); // avatares liberados que já apareceram na coleção
   const [nickModal, setNickModal] = useState<null | { then: () => void }>(null); // o que fazer depois de salvar
   const [seen, setSeen] = useState<PerGame<boolean>>(() => perGame(() => false)); // tutorial já concluído ou pulado
   /** Tutorial aberto: primeiro acesso (mostra "Pular") ou aberto pela pessoa (mostra "Fechar"). */
@@ -120,7 +124,7 @@ export default function App() {
   const [cloudIssue, setCloudIssue] = useState<null | "taken" | "offline">(null);
   const [codeModal, setCodeModal] = useState<string | null>(null);
   const [codeUnseen, setCodeUnseen] = useState(false);
-  const [profileTab, setProfileTab] = useState<"desempenho" | "ajustes">("desempenho");
+  const [profileTab, setProfileTab] = useState<"desempenho" | "avatares" | "ajustes">("desempenho");
   // Modo Administrador (testes): a conta real fica pausada e o app usa um jogador de teste numa área separada,
   // com tudo liberado e sem servidor (sem sincronização, ranking ou pontuação). Ver lib/admin.ts e lib/storage.ts.
   const [admin, setAdmin] = useState(false);
@@ -156,6 +160,8 @@ export default function App() {
   function hydrate() {
     const n = readStore(KEYS.nick) ?? "";
     setNick(n && !validateNick(n) ? n : "");
+    setAvatarId(readStore(AVATAR_KEY));
+    setAvSeen(parseSeen(readStore(AVATARS_SEEN_KEY)));
     setSeen(perGame((g) => !!readStore(TUTORIAL_KEY(g))));
     setAdmin(isAdmin());
     const prog = perGame((g) => parseProgress(readStore(PROGRESS_KEY(g))));
@@ -505,6 +511,20 @@ export default function App() {
     onHint: () => { hintsRef.current += 1; },
   });
   const achCtx = { log, progress, cases: caseLog };
+  const avStats = useMemo(() => avatarStats(progress, caseLog), [progress, caseLog]);
+  const avatar = currentAvatar(avatarId, avStats);
+  const avFresh = useMemo(() => new Set(newAvatars(avStats, avSeen).map((m) => m.id)), [avStats, avSeen]);
+  function pickAvatar(id: string) { writeStore(AVATAR_KEY, id); setAvatarId(id); }
+  function openAvatars() {
+    setProfileTab("avatares"); setView("profile");
+  }
+  // Ao abrir a coleção, as novidades passam a "vistas" (o selo Novo continua até sair da aba).
+  useEffect(() => {
+    if (view !== "profile" || profileTab !== "avatares" || avFresh.size === 0) return;
+    const all = new Set([...avSeen, ...avFresh]);
+    writeStore(AVATARS_SEEN_KEY, JSON.stringify([...all]));
+    return () => setAvSeen(all);
+  }, [view, profileTab, avFresh, avSeen]);
   const runCase = caseRun ? caseById(caseRun.id) : undefined;
   function openAchievements() { setToasts([]); setView("achievements"); }
 
@@ -515,7 +535,7 @@ export default function App() {
           <span className="brand"><img src="/cube.png" alt="" width={36} height={34} /><span className="wordmark">MindLoop</span></span>
           <span className="top-actions">
             {admin ? <span className="chip admin-chip" aria-label="Modo Administrador ligado: jogador de teste, fora do ranking">🔧 Admin</span>
-              : nick && <span className="chip" aria-label={`Apelido: ${nick}`}>{nick}</span>}
+              : nick && <button type="button" className="chip chip-avatar" onClick={openAvatars} aria-label={`Apelido: ${nick}. Avatar: ${avatar.name}${avFresh.size ? `. ${avFresh.size} novo(s) avatar(es) liberado(s)` : ""}`}><AvatarPic m={avatar} size={26} />{nick}{avFresh.size > 0 && <i className="dot" aria-hidden="true" />}</button>}
             {view !== "game" && view !== "feedback" && (
               <button type="button" className="icon-btn" onClick={openFeedback} aria-label="Dar opinião sobre o MindLoop" title="Dar opinião">
                 <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M4.5 5.5h15A1.5 1.5 0 0 1 21 7v8.5a1.5 1.5 0 0 1-1.5 1.5H10l-4.5 3.5V17h-1A1.5 1.5 0 0 1 3 15.5V7a1.5 1.5 0 0 1 1.5-1.5z" /></svg>
@@ -536,21 +556,19 @@ export default function App() {
                 <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M4.5 5.5h15A1.5 1.5 0 0 1 21 7v8.5a1.5 1.5 0 0 1-1.5 1.5H10l-4.5 3.5V17h-1A1.5 1.5 0 0 1 3 15.5V7a1.5 1.5 0 0 1 1.5-1.5z" /></svg>
               </button>
               <div className="art">
-                <img src="/home-art.webp" width={944} height={1680} decoding="async" alt="MindLoop — Desafie sua mente. Um cubo mágico de quebra-cabeça sobre ilhas flutuantes, com os cristais dos jogos Mini Sudoku, Zip, Tango e Patches." fetchPriority="high" />
+                <img src="/home-art.webp" width={944} height={1680} decoding="async" alt="MindLoop — Desafie sua mente. Um cubo mágico de quebra-cabeça sobre ilhas flutuantes, com os cristais dos jogos Mini Sudoku, Zip, Tango, Patches e, embaixo, o cristal verde do Astros." fetchPriority="high" />
                 {ART_SPOTS.map((s) => (
                   <button key={s.id} className="gspot" onClick={() => openGame(s.id)}
                     style={{ left: `${s.left}%`, top: `${s.top}%`, width: `${s.width}%`, height: `${s.height}%` }}
                     aria-label={`Jogar ${GAME_META[s.id].name}`} />
                 ))}
-                {/* Símbolo do jogo bônus na parte de baixo da arte, sob a logo: apagado e com cadeado até liberar; liberado, brilha e abre o jogo. */}
+                {/* Cristal verde do jogo bônus, pintado na arte sob a logo: apagado e com cadeado até liberar; liberado, brilha e abre o jogo. */}
                 <button type="button" className={`bonus-spot${bonusOpen ? " open" : ""}`}
                   onClick={() => (bonusOpen ? openGame(BONUS_GAME) : document.getElementById("bonus-card")?.scrollIntoView({ behavior: "smooth", block: "center" }))}
                   aria-label={bonusOpen ? `Jogar ${GAME_META[BONUS_GAME].name}, o jogo bônus` : `${GAME_META[BONUS_GAME].name}: jogo bônus bloqueado. Complete as 4 jornadas para liberar. Ver o que falta.`}>
-                  {bonusOpen && <><span className="bs-halo" aria-hidden="true" /><span className="bs-ring" aria-hidden="true" />
-                    {[0, 1, 2, 3, 4, 5].map((i) => <span key={i} className="bs-spark" style={{ "--i": i } as React.CSSProperties} aria-hidden="true" />)}</>}
-                  <span className="bs-gem"><AstrosGem size={64} /></span>
-                  {!bonusOpen && <span className="bs-lock" aria-hidden="true">🔒</span>}
-                  {bonusOpen && <span className="bs-tag" aria-hidden="true">Bônus</span>}
+                  {bonusOpen ? <><span className="bs-halo" aria-hidden="true" /><span className="bs-ring" aria-hidden="true" />
+                    {[0, 1, 2, 3, 4, 5].map((i) => <span key={i} className="bs-spark" style={{ "--i": i } as React.CSSProperties} aria-hidden="true" />)}</>
+                    : <><span className="bs-veil" aria-hidden="true" /><span className="bs-lock" aria-hidden="true">🔒</span></>}
                 </button>
                 <button className="hotspot" onClick={() => document.getElementById("jogos")?.scrollIntoView({ behavior: "smooth", block: "start" })} aria-label="Jogar agora: ver os jogos">
                   <span aria-hidden="true">Jogar agora</span>
@@ -664,14 +682,15 @@ export default function App() {
           </div>
         ) : view === "profile" ? (
           <div className="wrap">
-            <div className="page-head">
+            <div className="page-head profile-head">
+              <button type="button" className="profile-avatar" onClick={() => setProfileTab("avatares")} aria-label={`Avatar: ${avatar.name}. Trocar avatar`}><AvatarPic m={avatar} size={72} /><span aria-hidden="true">✎</span></button>
               <h1>{nick || "Perfil"}</h1>
               {nick && <span className="muted small">{EVERY_GAME.reduce((a, g) => a + doneCount(progress[g]), 0)} fases · {Object.keys(unlocked).length} medalhas</span>}
             </div>
             <div className="tabs" role="tablist" aria-label="Seções do perfil">
-              {([["desempenho", "Desempenho"], ["ajustes", "Ajustes"]] as const).map(([id, label]) => (
+              {([["desempenho", "Desempenho"], ["avatares", "Avatares"], ["ajustes", "Ajustes"]] as const).map(([id, label]) => (
                 <button key={id} role="tab" id={`tab-${id}`} aria-selected={profileTab === id} aria-controls={`panel-${id}`} className={profileTab === id ? "on" : ""} onClick={() => setProfileTab(id)}>
-                  {label}{id === "ajustes" && codeUnseen && <i className="dot" aria-label="(pendente)" />}
+                  {label}{id === "ajustes" && codeUnseen && <i className="dot" aria-label="(pendente)" />}{id === "avatares" && avFresh.size > 0 && <i className="dot" aria-label="(novos avatares)" />}
                 </button>
               ))}
             </div>
@@ -681,6 +700,8 @@ export default function App() {
                   <CaseSummary log={caseLog} onOpen={() => openCasebook(journeyGame)} />
                   <Stats log={log} progress={progress} games={visible} />
                 </>
+              ) : profileTab === "avatares" ? (
+                <AvatarsPanel stats={avStats} current={avatar.id} fresh={avFresh} onPick={pickAvatar} />
               ) : (
                 <Settings nick={nick} me={me} online={!!rankingConfig()} issue={cloudIssue} codeUnseen={codeUnseen}
                   onRename={() => openNick(() => {})} onShowCode={() => me?.recovery && setCodeModal(me.recovery)}

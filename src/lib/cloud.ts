@@ -24,7 +24,8 @@ export const PROGRESS_KEY = (g: JourneyGame) => `mindloop:progress:${g}`;
 export const TIMES_KEY = (g: JourneyGame) => `mindloop:times:${g}`;
 export const LAST_KEY = (g: JourneyGame) => `mindloop:last:${g}`;
 export const TUTORIAL_KEY = (g: JourneyGame) => `mindloop:tutorial:${g}`;
-const PREF_KEYS = ["mindloop:sound", "mindloop:tutorial-speed"];
+/** Preferências que viajam com a conta (inclui o avatar escolhido e os avatares já vistos). */
+const PREF_KEYS = ["mindloop:sound", "mindloop:tutorial-speed", "mindloop:avatar", "mindloop:avatars-seen"];
 /** Prefixo de TODOS os dados do MindLoop no aparelho (o reinício apaga tudo o que começa assim). */
 export const STORE_PREFIX = "mindloop:";
 

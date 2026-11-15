@@ -1,0 +1,180 @@
+/* =====================================================================================================
+   Investigação — visual final (importado por ÚLTIMO; vale por cima de cases.css, cases-areas.css e ui.css).
+
+   Layout
+     Celular em pé (foco principal): uma coluna — cabeçalho fixo no topo, tabuleiro, pistas, sua resposta.
+     Computador (≥ 1000px): tabuleiro à esquerda (fica parado enquanto a página rola) e, à direita, pistas e
+     resposta.
+   Leitura: nenhum texto abaixo de 10px nas casas, 14–16px nas pistas e na resposta (seletores com 16px para o
+     celular não dar zoom ao tocar).
+   Tema: cada jogo pinta a investigação com as próprias cores (as mesmas do jogo e da jornada):
+     --gc = cor do jogo · --gl = tom claro · --gd = tom profundo (vêm do CaseScreen, por GAME_META/GAME_LOOK).
+   ===================================================================================================== */
+
+/* ---------- Tema de cada jogo ---------- */
+.wrap.cx-play, .wrap.cx-story-stage, .wrap.cx-done {
+  --t-ink: color-mix(in srgb, var(--gc) 46%, #140838);          /* tom escuro DA COR DO JOGO (títulos, moldura do tabuleiro) */
+  --t-soft: color-mix(in srgb, var(--gl) 26%, #fff);            /* fundo suave */
+  --t-line: color-mix(in srgb, var(--gc) 38%, #E4D6F5);         /* bordas */
+  background: linear-gradient(180deg, var(--t-soft) 0, #FFFDFE 360px);
+  box-shadow: inset 0 4px 0 var(--gc);
+}
+.cx-play .cx-panel { border: 2px solid var(--t-line); box-shadow: 0 6px 18px color-mix(in srgb, var(--gd) 14%, transparent); }
+.cx-play .cx-panel-t, .cx-story-stage .cx-panel-t {
+  background: linear-gradient(100deg, var(--t-ink) 0%, color-mix(in srgb, var(--gc) 72%, var(--t-ink)) 100%);
+  font-size: 17px; letter-spacing: .01em; padding: 10px 14px; margin: 0 -14px;
+}
+.cx-play .cx-panel-t small { font-size: 12px; background: rgba(20, 8, 56, .38); color: #fff; padding: 3px 9px; }
+.cx-play .cx-sceneboard { background: var(--t-ink); border-color: color-mix(in srgb, var(--t-ink) 70%, #000); box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--gc) 35%, transparent), 0 8px 22px color-mix(in srgb, var(--gd) 35%, transparent); }
+.cx-play .cx-say .cx-n { background: var(--t-ink); color: #fff; font-size: 12px; }
+.cx-play .cx-says li.pick .cx-say { border-color: var(--gc); box-shadow: 0 0 0 3px color-mix(in srgb, var(--gc) 30%, transparent); }
+.cx-play .cx-timer { background: color-mix(in srgb, var(--gc) 16%, #fff); color: var(--t-ink); border: 1.5px solid var(--t-line); }
+.cx-play .cx-head-t b { color: var(--t-ink); }
+.cx-play .cx-piece.sel { border-color: var(--gc); background: color-mix(in srgb, var(--gc) 14%, #fff); box-shadow: 0 0 0 3px color-mix(in srgb, var(--gc) 30%, transparent); }
+.cx-story-stage .cx-eyebrow, .cx-done .cx-eyebrow { color: var(--t-ink); }
+.cx-story-stage h1, .cx-done h1 { color: var(--t-ink); }
+.cx-story-stage .cx-bubble { border-color: var(--t-line); }
+
+/* ---------- Layout ---------- */
+.wrap.cx-play { max-width: 760px; gap: 12px; padding-top: 0; }
+.cx-head { position: sticky; top: 0; z-index: 6; margin: 0 -16px; padding: 10px 16px 8px; background: color-mix(in srgb, var(--t-soft) 92%, transparent);
+  backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); border-bottom: 1px solid var(--t-line); border-radius: 22px 22px 0 0; }
+.cx-head-t b { font-size: 17px; }
+.cx-head-t small { font-size: 13px; color: #5E4E7A; }
+.cx-desk { display: grid; gap: 14px; min-width: 0; grid-template-columns: minmax(0, 1fr); grid-template-areas: none; }
+.cx-side { display: grid; gap: 14px; align-content: start; min-width: 0; }
+.cx-play .cx-panel { padding: 0 14px 14px; gap: 12px; }
+.cx-panel-board { justify-items: stretch; }
+.cx-tools { justify-content: center; }
+.cx-tools .btn { min-height: 40px; font-size: 14px; }
+
+@media (min-width: 1000px) {
+  .wrap.cx-play { max-width: 1240px; }
+  .cx-desk { grid-template-columns: minmax(0, 1.08fr) minmax(380px, .92fr); align-items: start; gap: 18px; }
+  .cx-main { align-self: start; }
+  .cx-sceneframe { --cell: 108px; }
+}
+@media (min-width: 640px) {
+  .cx-head { margin: 0 -32px; padding: 12px 32px 10px; }
+}
+
+/* Celular em pé: aproveitar a largura toda para o tabuleiro */
+@media (max-width: 520px) {
+  .wrap.cx-play { width: calc(100% - 12px); padding-left: 10px; padding-right: 10px; }
+  .cx-head { margin: 0 -10px; padding: 8px 10px; border-radius: 20px 20px 0 0; }
+  .cx-head-t b { font-size: 16px; }
+  .cx-play .cx-panel { padding: 0 10px 12px; }
+  .cx-play .cx-panel-t { margin: 0 -10px; padding: 9px 12px; font-size: 16px; }
+  .cx-sceneboard { padding: 4px; }
+}
+
+/* ---------- Tabuleiro: leitura ---------- */
+.cx-room { font: 700 clamp(9.5px, 2.7vw, 11px)/1.35 var(--font-body); padding: 1px 5px; background: rgba(255, 255, 255, .94); top: 3px; left: 3px; box-shadow: 0 1px 2px rgba(38, 16, 77, .15); }
+.cx-sc small { font: 700 clamp(10px, 2.8vw, 12px)/1.2 var(--font-body); color: #26104D; }
+.cx-sc .cx-cell { color: rgba(38, 16, 77, .6); font-size: clamp(10px, 2.8vw, 12px); }
+.cx-stop { min-width: 18px; height: 18px; font: 800 11px/18px var(--font-title); }
+.cx-sides span { font: 700 12px/1.15 var(--font-body); }
+
+/* ✕ = ninguém estava aqui */
+.cx-x { position: relative; z-index: 2; font: 900 clamp(24px, 7.5vw, 38px)/1 var(--font-title); color: #D81E5B; text-shadow: 0 1px 0 #fff, 0 0 8px rgba(216, 30, 91, .35); animation: cx-pop .18s ease-out; }
+.cx-sc.xed { box-shadow: inset 0 0 0 2px rgba(216, 30, 91, .35); }
+
+/* Fileira de personagens sob o tabuleiro */
+.cx-tray { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px; }
+.cx-piece { justify-content: flex-start; min-height: 48px; padding: 4px 10px 4px 5px; gap: 8px; border-radius: 999px; font: 700 14px var(--font-body); color: #26104D; background: #fff; border: 2px solid var(--t-line, #CDB8F5); }
+.cx-piece .cx-obj img.art { width: 34px; height: 34px; }
+.cx-piece-name { flex: 1; min-width: 0; text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cx-piece-at { flex: none; padding: 2px 8px; border-radius: 999px; background: #F1E8FF; color: #4B2C8A; font: 800 12px var(--font-title); }
+.cx-piece.placed .cx-piece-at { background: #E3F8EF; color: #12704F; }
+.cx-piece.rel { box-shadow: 0 0 0 3px #FFC93C; }
+.cx-piece.out { justify-self: center; min-height: 40px; font-size: 13px; }
+.cx-play .cx-help { margin: 0; font-size: 14px; line-height: 1.45; color: #4F4168; text-align: center; }
+
+/* ---------- Pistas: leitura ---------- */
+.cx-play .cx-rules li { font-size: 14.5px; line-height: 1.45; padding: 9px 11px; color: #2F2545; }
+.cx-play .cx-rules li.note { font-size: 13.5px; }
+.cx-play .cx-say { font: 500 15px/1.45 var(--font-body); color: #2A2140; padding: 10px 11px; grid-template-columns: 26px 1fr 16px; }
+.cx-play .cx-say .cx-n { width: 26px; height: 26px; }
+.cx-play .cx-cross { min-width: 40px; }
+.cx-play .cx-hints li { font-size: 14.5px; line-height: 1.45; }
+
+/* ---------- Sua resposta: leitura e toque ---------- */
+.cx-play .cx-answers li { padding: 10px; gap: 8px; }
+.cx-play .cx-ans-who { font-size: 15px; }
+.cx-play .cx-ans-who img.art { width: 30px; height: 30px; }
+.cx-play .cx-ans-field { font-size: 12.5px; color: #554573; }
+.cx-play .cx-ans-field select { min-height: 46px; font-size: 16px; padding: 6px 8px; }
+.cx-play .cx-verify { min-height: 54px; font-size: 18px; }
+.cx-play .cx-actions-bar .btn { min-height: 46px; font-size: 15px; }
+.cx-play .note { font-size: 14.5px; }
+@media (max-width: 380px) {
+  .cx-play .cx-answers li { grid-template-columns: 1fr; }
+}
+
+/* Tango: rótulos dos lados legíveis mesmo com nome longo */
+@media (max-width: 520px) { .cx-sides span { font-size: 11px; } }
+@media (prefers-reduced-motion: reduce) { .cx-x { animation: none; } }
+
+/* Nome do cômodo sempre por cima do retrato (o retrato desce um pouco quando a casa tem nome). */
+.cx-room { z-index: 4; }
+.cx-sc.full:has(.cx-room) .cx-who { margin-top: 12px; }
+/* Celular: Local e Objeto um embaixo do outro, cada um com a largura toda (nada cortado). */
+@media (max-width: 520px) {
+  .cx-play .cx-answers li { grid-template-columns: 1fr; }
+  .cx-play .cx-ans-field { grid-template-columns: 54px 1fr; align-items: center; gap: 8px; }
+}
+
+/* =====================================================================================================
+   Quadro de decisões: "Onde?" (um mapa só) e "O quê?" (um espaço por objeto); cada espaço alterna
+   vazio → ✕ → personagem. Mesmo visual do tabuleiro, em tamanho de caderno de anotações.
+   ===================================================================================================== */
+.cx-main { display: grid; gap: 14px; align-content: start; min-width: 0; }
+.dx { display: grid; gap: 10px; }
+.dx .cx-area-lead { font-size: 14px; line-height: 1.45; color: #4F4168; margin: 0; }
+.dx .cx-sub { font: 700 15px var(--font-title); color: var(--t-ink, #26104D); margin: 4px 0 0; }
+
+.dx-map { display: grid; gap: 4px; width: 100%; max-width: calc(var(--cols) * 64px + 12px); margin: 0 auto; padding: 5px; border-radius: 14px; background: var(--t-ink, #26104D); }
+.dx-c { position: relative; aspect-ratio: 1; min-width: 0; display: grid; place-items: center; padding: 0; border-radius: 8px; border: 0; cursor: pointer;
+  background: var(--floor); box-shadow: inset 0 0 0 1px rgba(38, 16, 77, .12); transition: transform .1s, box-shadow .15s; }
+.dx-c small { font: 700 clamp(10px, 2.8vw, 12px) var(--font-body); color: rgba(38, 16, 77, .5); }
+.dx-c.block { cursor: not-allowed; background: var(--cosmos); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--neo-blk) 50%, transparent); }
+.dx-c.offtrail { cursor: default; filter: saturate(.4) brightness(.85); }
+.dx-prop { display: grid; place-items: center; width: 62%; aspect-ratio: 1; font-size: clamp(14px, 4vw, 20px); }
+.dx-c.no { background: color-mix(in srgb, #D81E5B 10%, var(--floor)); }
+.dx-c.who { box-shadow: inset 0 0 0 2px var(--gc, #8A4DFF); }
+.dx-c.lit { box-shadow: inset 0 0 0 3px #FFC93C; }
+.dx-c:active { transform: scale(.95); }
+.dx-c:focus-visible { outline: 3px solid var(--cyan); outline-offset: 1px; }
+.dx-x { font: 900 clamp(20px, 6vw, 28px)/1 var(--font-title); color: #D81E5B; text-shadow: 0 1px 0 #fff; animation: cx-pop .16s ease-out; }
+.dx-face { display: block; width: 76%; aspect-ratio: 1; border-radius: 50%; box-shadow: 0 0 0 2px #fff, 0 2px 6px rgba(38, 16, 77, .35); animation: cx-pop .16s ease-out; }
+.dx-face img.art { border-radius: 50%; }
+
+/* "O quê?": tabela personagens × objetos — cada casa alterna vazio → ✕ (não tinha) → ✓ (tinha) */
+.dx .cx-sub small { font: 600 12.5px var(--font-body); color: #6A5A85; margin-left: 4px; }
+.dx-grid-wrap { overflow-x: auto; margin: 0 -2px; padding: 2px; }
+.dx-grid { width: 100%; border-collapse: separate; border-spacing: 4px; table-layout: fixed; }
+.dx-grid thead th { vertical-align: bottom; padding: 2px 0 4px; }
+.dx-grid thead th:first-child { width: 27%; }
+.dx-th-pic { display: grid; place-items: center; width: 38px; height: 38px; margin: 0 auto 4px; padding: 4px; border-radius: 11px; background: var(--cosmos); font-size: 20px;
+  box-shadow: 0 0 0 1.5px color-mix(in srgb, var(--neo-obj) 70%, transparent), 0 0 8px color-mix(in srgb, var(--neo-obj) 30%, transparent); }
+.dx-th-pic img.art.is-item { transform: scale(1.2); }
+.dx-th-name { display: block; font: 700 11px/1.15 var(--font-body); color: #26104D; text-align: center; overflow-wrap: break-word; -webkit-hyphens: auto; hyphens: auto; }
+.dx-grid thead th.lit .dx-th-pic { box-shadow: 0 0 0 2.5px #FFC93C, 0 0 10px rgba(255, 201, 60, .6); }
+.dx-grid tbody th { text-align: left; padding: 0; }
+.dx-row { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.dx-row-pic { flex: none; width: 30px; height: 30px; border-radius: 50%; box-shadow: 0 0 0 2px #fff, 0 1px 4px rgba(38, 16, 77, .3); }
+.dx-row-pic img.art { border-radius: 50%; }
+.dx-row-name { font: 700 13.5px/1.15 var(--font-body); color: #26104D; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dx-grid tr.lit .dx-row-name { color: var(--t-ink, #26104D); text-decoration: underline 2px #FFC93C; text-underline-offset: 3px; }
+.dx-grid td { padding: 0; }
+.dx-grid td button { width: 100%; aspect-ratio: 1; max-height: 52px; display: grid; place-items: center; border-radius: 10px; border: 2px solid var(--t-line, #E4D6F5);
+  background: #fff; cursor: pointer; transition: transform .1s, background .15s; }
+.dx-grid td button:active { transform: scale(.94); }
+.dx-grid td button:focus-visible { outline: 3px solid var(--cyan); outline-offset: 1px; }
+.dx-grid td.no button { background: color-mix(in srgb, #D81E5B 9%, #fff); border-color: color-mix(in srgb, #D81E5B 45%, #E4D6F5); }
+.dx-grid td.yes button { background: #E3F8EF; border-color: #1FAE7A; }
+.dx-grid td.both button { box-shadow: 0 0 0 2px #FFC93C; }
+.dx-grid .dx-x { font-size: clamp(18px, 5vw, 24px); }
+.dx-ok { font: 900 clamp(18px, 5vw, 24px)/1 var(--font-title); color: #12875E; animation: cx-pop .16s ease-out; }
+@media (prefers-reduced-motion: reduce) { .dx-ok { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .dx-x, .dx-face { animation: none; } }

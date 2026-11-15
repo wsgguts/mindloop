@@ -1,11 +1,11 @@
 "use client";
 // Tela da investigação. Três etapas: a história (contada pelo narrador do jogo), a investigação e o caso resolvido.
-// A investigação segue um layout de painel de detetive:
-//   esquerda — Personagens e Objetos (retratos e ícones);
-//   centro   — o cenário (tabuleiro) e as pistas;
-//   direita  — Dedução (quadros de X "Onde?" e "O quê?") e Sua resposta (local + objeto de cada um) com Verificar;
-//   embaixo  — o narrador com a história num balão.
-// No celular, tudo vira uma coluna, na ordem: narrador, personagens e objetos, cenário, pistas, dedução e resposta.
+// A investigação (a história fica na etapa anterior e no botão 📖):
+//   Tabuleiro          — o cenário, onde os personagens são encaixados (fileira de personagens embaixo);
+//   Quadro de decisões — anotações: "Onde?" (um mapa só; vazio → ✕ → personagem) e "O quê?" (personagens × objetos;
+//                        vazio → ✕ → ✓); com Desfazer e Limpar quadro;
+//   Pistas e Sua resposta (local + objeto) com Verificar.
+// Computador: tabuleiro e quadro à esquerda, pistas e resposta à direita. Celular em pé: uma coluna, nessa ordem.
 import { useEffect, useMemo, useRef, useState } from "react";
 import Celebration from "../Celebration";
 import Gem from "../Gem";
@@ -18,14 +18,15 @@ import { type Case, firstBroken, isComplete, isCorrect } from "../../lib/cases/c
 import { MAX_HINTS, MEDAL_LABEL, medalFor, xpFor } from "../../lib/cases/config";
 import { allowedCells, clueState } from "../../lib/cases/model";
 import type { CaseRecord, Draft, Solve } from "../../lib/cases/progress";
-import { type Pick, focusOf, validMark } from "../../lib/cases/relations";
+import { type Notes, type Pick, cellNote, focusOf, gridKey, gridNote, nextGrid, nextNote, readNote, validMark } from "../../lib/cases/relations";
 import { KIND_NAME } from "../../lib/cases/themes";
 import { GAME_META } from "../../lib/games";
 import { formatTime } from "../../lib/records";
 import { GAME_LOOK } from "../../lib/scenes";
 import { CaseMedalIcon, CaseScene } from "./CaseArt";
 import CaseBoard from "./CaseBoard";
-import { AnswerPanel, CluesPanel, ObjectsPanel, PeoplePanel, WhatGrid, WhereGrid } from "./CasePanels";
+import { AnswerPanel, CluesPanel, DecisionBoard } from "./CasePanels";
+import Art from "../Art";
 
 /** Uma jogada que pode ser desfeita (respostas + marcações). */
 type Snap = { a: number[]; x: number[] };
@@ -74,13 +75,25 @@ export default function CaseScreen({ c, record, active, continueLabel, onContinu
   const sfx = useSfx(c.game);
   const doneRef = useRef<HTMLButtonElement>(null);
   const say = (tone: Tone, text: string) => setMsg({ tone, text });
-  // Quadro de dedução (só X), seleção que acende as ligações e desfazer.
-  const [marks, setMarks] = useState<Set<number>>(() => new Set((draft?.x ?? []).filter((k) => validMark(m, k))));
+  // Quadro de decisões (anotações de casa e de objeto), seleção que acende as ligações e desfazer.
+  const notesOf = (keys: number[], t: "cell" | "grid"): Notes => {
+    const out: Notes = new Map();
+    for (const k of keys) {
+      if (!validMark(m, k)) continue;
+      const x = readNote(k)!;
+      if (x.t === "cell" && t === "cell") out.set(x.i, x.who); else if (x.t === "grid" && t === "grid") out.set(x.i, x.state);
+    }
+    return out;
+  };
+  const [cellNotes, setCellNotes] = useState<Notes>(() => notesOf(draft?.x ?? [], "cell"));
+  const [gridNotes, setGridNotes] = useState<Notes>(() => notesOf(draft?.x ?? [], "grid"));
+  const xKeys = () => [...[...cellNotes].map(([v, w]) => cellNote(v, w)), ...[...gridNotes].map(([k, st]) => gridNote(Math.floor(k / 16), k % 16, st))];
+  const noteCount = cellNotes.size + gridNotes.size;
   const [pick, setPick] = useState<Pick>(null);
   const [undoStack, setUndoStack] = useState<Snap[]>([]);
   const [askClear, setAskClear] = useState(false);
   const focus = useMemo(() => focusOf(m, c.clues, pick), [m, c.clues, pick]);
-  const remember = () => setUndoStack((u) => [...u.slice(-59), { a: a.slice(), x: [...marks] }]);
+  const remember = () => setUndoStack((u) => [...u.slice(-59), { a: a.slice(), x: xKeys() }]);
 
   function choosePick(p: Pick) {
     setPick(p);
@@ -122,9 +135,9 @@ export default function CaseScreen({ c, record, active, continueLabel, onContinu
   const first = useRef(true);
   useEffect(() => {
     if (first.current) { first.current = false; return; }
-    if (!result) onDraft({ a, hints, ms: Math.round(clock.read()), k: c.storyKey, x: [...marks] });
+    if (!result) onDraft({ a, hints, ms: Math.round(clock.read()), k: c.storyKey, x: xKeys() });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [a, hints, marks]);
+  }, [a, hints, cellNotes, gridNotes]);
 
   const touched = () => { setBroken(null); if (msg.tone !== "hint") setMsg({ tone: "info", text: "" }); };
   /** Coloca a pessoa s na casa v (-1 = tira). Quem estava naquela casa sai dela. */
@@ -143,24 +156,37 @@ export default function CaseScreen({ c, record, active, continueLabel, onContinu
   }
   function select(s: number | null) { if (!result) { if (s !== null) sfx("select"); setSel(s); } }
 
-  function toggleMark(k: number) {
+  /** "Onde?": a casa alterna vazio → ✕ → cada personagem (que ainda não está anotado em outra casa) → vazio. */
+  function cycleCell(v: number) {
     if (result) return;
+    const nx = nextNote(cellNotes, v, n);
     remember();
-    const had = marks.has(k);
-    setMarks((cur) => { const x = new Set(cur); if (had) x.delete(k); else x.add(k); return x; });
-    sfx(had ? "erase" : "select");
+    const next = new Map(cellNotes);
+    if (nx === undefined) next.delete(v); else next.set(v, nx);
+    setCellNotes(next);
+    sfx(nx === undefined ? "erase" : "select");
+  }
+  /** "O quê?": a casa (personagem, objeto) alterna vazio → ✕ → ✓ → vazio. */
+  function cycleGrid(sIdx: number, o: number) {
+    if (result) return;
+    const k = gridKey(sIdx, o), nx = nextGrid(gridNotes.get(k));
+    remember();
+    const next = new Map(gridNotes);
+    if (nx === undefined) next.delete(k); else next.set(k, nx);
+    setGridNotes(next);
+    sfx(nx === undefined ? "erase" : "select");
   }
   function clearMarks() {
-    if (result || !marks.size) return;
+    if (result || !noteCount) return;
     remember(); sfx("undo");
-    setMarks(new Set()); setAskClear(false);
-    say("info", "Marcações X apagadas. Suas respostas continuam no lugar.");
+    setCellNotes(new Map()); setGridNotes(new Map()); setAskClear(false);
+    say("info", "Quadro de decisões apagado. Os personagens no tabuleiro e a resposta continuam como estavam.");
   }
   function undo() {
     if (result || !undoStack.length) { sfx("block"); return; }
     const last = undoStack[undoStack.length - 1];
     setUndoStack(undoStack.slice(0, -1));
-    setA(last.a); setMarks(new Set(last.x)); setBroken(null);
+    setA(last.a); setCellNotes(notesOf(last.x, "cell")); setGridNotes(notesOf(last.x, "grid")); setBroken(null);
     sfx("undo");
     say("info", "Última ação desfeita.");
   }
@@ -174,7 +200,7 @@ export default function CaseScreen({ c, record, active, continueLabel, onContinu
     if (result || a.every((v) => v < 0)) return;
     remember(); sfx("undo");
     setA(new Array(2 * n).fill(-1)); setSel(null); setBroken(null);
-    say("info", "Respostas apagadas. As marcações X, as pistas riscadas e as dicas continuam como estavam.");
+    say("info", "Respostas apagadas. O quadro de decisões, as pistas riscadas e as dicas continuam como estavam.");
   }
   function verify() {
     if (result) return;
@@ -205,7 +231,7 @@ export default function CaseScreen({ c, record, active, continueLabel, onContinu
   const style = { "--gc": GAME_META[c.game].color, "--gl": look.light, "--gd": look.deep } as React.CSSProperties;
   const narrator = (
     <aside className="cx-narrator" aria-label={`História, contada por ${c.narrator.name}`}>
-      <span className="cx-narrator-pic" aria-hidden="true">{c.narrator.icon}</span>
+      <span className="cx-narrator-pic" aria-hidden="true"><img className="art is-cast fill" src={c.narrator.img} alt="" width={96} height={96} /></span>
       <div className="cx-bubble">
         <p>{c.story}</p>
         <p className="cx-bubble-goal"><b>🔍 {c.goal}</b></p>
@@ -218,7 +244,7 @@ export default function CaseScreen({ c, record, active, continueLabel, onContinu
     const medal = medalFor(hints);
     const s = result.solve;
     return (
-      <div className="wrap cx-done" style={style}>
+      <div className="wrap cx-done" data-game={c.game} style={style}>
         <Celebration accent={GAME_META[c.game].color} onBurst={() => sfx("burst")} />
         <div className="cx-stamp" aria-hidden="true">CASO RESOLVIDO</div>
         <div className="cx-done-hero">
@@ -230,12 +256,12 @@ export default function CaseScreen({ c, record, active, continueLabel, onContinu
           </div>
         </div>
         <div className="cx-narrator done">
-          <span className="cx-narrator-pic" aria-hidden="true">{c.narrator.icon}</span>
+          <span className="cx-narrator-pic" aria-hidden="true"><img className="art is-cast fill" src={c.narrator.img} alt="" width={96} height={96} /></span>
           <div className="cx-bubble"><p className="cx-ending">{c.ending}</p><small>— {c.narrator.name}</small></div>
         </div>
         <ul className="cx-solution" aria-label="Solução">
           {m.people.map((p, i) => (
-            <li key={i}><span aria-hidden="true">{p.icon}</span><b>{p.label}</b><span>{m.scene.rooms[m.scene.room[a[i]]].label}</span><span aria-hidden="true">{m.objects[a[n + i]].icon}</span><span>{m.objects[a[n + i]].label}</span></li>
+            <li key={i}><span aria-hidden="true"><Art e={p} /></span><b>{p.label}</b><span>{m.scene.rooms[m.scene.room[a[i]]].label}</span><span aria-hidden="true"><Art e={m.objects[a[n + i]]} /></span><span>{m.objects[a[n + i]].label}</span></li>
           ))}
         </ul>
         <dl className="cx-kpis">
@@ -266,7 +292,7 @@ export default function CaseScreen({ c, record, active, continueLabel, onContinu
   const started = a.some((v) => v >= 0) || hints > 0 || clock.ms > 0;
   if (stage === "story") {
     return (
-      <div className="wrap cx-story-stage" style={style}>
+      <div className="wrap cx-story-stage" data-game={c.game} style={style}>
         <button className="cx-back" onClick={() => (started ? setStage("play") : onExit())}>‹ {started ? "Voltar à investigação" : exitLabel}</button>
         <div className="cx-story-art" aria-hidden="true">
           <img src={c.art} alt="" decoding="async" />
@@ -290,55 +316,41 @@ export default function CaseScreen({ c, record, active, continueLabel, onContinu
   }
 
   return (
-    <div className="wrap cx-play" style={style}>
+    <div className="wrap cx-play" data-game={c.game} style={style}>
       <header className="cx-head">
-        <button className="cx-back icon" onClick={() => { onDraft({ a, hints, ms: Math.round(clock.read()), k: c.storyKey, x: [...marks] }); onExit(); }} aria-label={exitLabel} title={exitLabel}>‹</button>
+        <button className="cx-back icon" onClick={() => { onDraft({ a, hints, ms: Math.round(clock.read()), k: c.storyKey, x: xKeys() }); onExit(); }} aria-label={exitLabel} title={exitLabel}>‹</button>
         <div className="cx-head-t"><b id="cx-title"><Gem kind={c.game} size={20} /> {c.title}</b><small>{KIND_NAME[c.kind]} · {c.world}</small></div>
         <button className="cx-back icon" onClick={() => setStage("story")} aria-label="Reler a história" title="Reler a história">📖</button>
         <span className="cx-timer" aria-label={`Tempo: ${formatTime(clock.ms)}`}>{formatTime(clock.ms)}</span>
       </header>
 
       <div className="cx-desk">
-        <div className="cx-col-left">
-          <section className="cx-panel" aria-labelledby="cx-p-people">
-            <h2 className="cx-panel-t" id="cx-p-people">Personagens</h2>
-            <PeoplePanel m={m} a={a} focus={focus} pick={pick} sel={sel} onPick={choosePick} />
-          </section>
-          <section className="cx-panel" aria-labelledby="cx-p-items">
-            <h2 className="cx-panel-t" id="cx-p-items">Objetos</h2>
-            <ObjectsPanel m={m} a={a} focus={focus} pick={pick} onPick={choosePick} />
-          </section>
-        </div>
-
-        <div className="cx-col-mid">
+        <div className="cx-main">
           <section className="cx-panel cx-panel-board" aria-labelledby="cx-p-board">
-            <h2 className="cx-panel-t" id="cx-p-board">Cenário<small>{placed}/{n} no lugar</small></h2>
+            <h2 className="cx-panel-t" id="cx-p-board">Tabuleiro<small>{placed}/{n} no lugar</small></h2>
             <CaseBoard model={m} a={a} sel={sel} done={!!result} showErrors={ruleState === false} focus={focus} onSelect={select} onPlace={place} />
           </section>
-          <section className="cx-panel" aria-labelledby="cx-p-clues">
-            <h2 className="cx-panel-t" id="cx-p-clues">Pistas<small>{okClues}/{c.clues.length} ✓</small></h2>
-            <CluesPanel c={c} states={states} ruleState={ruleState} crossed={crossed} fresh={fresh} broken={broken} hints={hints} focus={focus} pick={pick} onPick={choosePick}
-              onCross={(i) => setCrossed((s) => { const x = new Set(s); if (x.has(i)) x.delete(i); else x.add(i); return x; })} />
-          </section>
-        </div>
 
-        <div className="cx-col-right">
-          <section className="cx-panel" aria-labelledby="cx-p-ded">
-            <h2 className="cx-panel-t" id="cx-p-ded">Dedução<small>{marks.size} X</small></h2>
-            <p className="cx-area-lead">Marque <b>X</b> no que as pistas descartam. Toque de novo para tirar. Nada aqui é preenchido sozinho.</p>
-            <h3 className="cx-sub">Onde?</h3>
-            <WhereGrid m={m} marks={marks} focus={focus} done={!!result} onToggle={toggleMark} />
-            <h3 className="cx-sub">O quê?</h3>
-            <WhatGrid m={m} marks={marks} focus={focus} done={!!result} onToggle={toggleMark} />
+          <section className="cx-panel cx-panel-decide" aria-labelledby="cx-p-ded">
+            <h2 className="cx-panel-t" id="cx-p-ded">Quadro de decisões<small>{noteCount} anotações</small></h2>
+            <DecisionBoard m={m} cells={cellNotes} grid={gridNotes} focus={focus} done={!!result} onCell={cycleCell} onGrid={cycleGrid} />
             <div className="cx-tools">
               <button className="btn sec sm" onClick={undo} disabled={!undoStack.length}>↶ Desfazer</button>
               {askClear ? (
-                <span className="cx-ask" role="alertdialog" aria-label="Confirmar limpeza">Apagar todos os X?
+                <span className="cx-ask" role="alertdialog" aria-label="Confirmar limpeza">Apagar o quadro todo?
                   <button className="btn danger sm" onClick={clearMarks}>Apagar</button>
                   <button className="btn sec sm" onClick={() => setAskClear(false)}>Cancelar</button>
                 </span>
-              ) : <button className="btn sec sm" onClick={() => setAskClear(true)} disabled={!marks.size}>Limpar X…</button>}
+              ) : <button className="btn sec sm" onClick={() => setAskClear(true)} disabled={!noteCount}>Limpar quadro…</button>}
             </div>
+          </section>
+        </div>
+
+        <div className="cx-side">
+          <section className="cx-panel" aria-labelledby="cx-p-clues">
+            <h2 className="cx-panel-t" id="cx-p-clues">Pistas<small>{okClues}/{c.clues.length} ✓</small></h2>
+            <CluesPanel c={c} states={states} ruleState={ruleState} crossed={crossed} fresh={fresh} broken={broken} hints={hints} focus={focus} pick={pick} onPick={choosePick}
+              onCross={(i) => setCrossed((cur) => { const x = new Set(cur); if (x.has(i)) x.delete(i); else x.add(i); return x; })} />
           </section>
 
           <section className="cx-panel cx-panel-answer" aria-labelledby="cx-p-ans">
@@ -355,8 +367,6 @@ export default function CaseScreen({ c, record, active, continueLabel, onContinu
             </div>
           </section>
         </div>
-
-        <div className="cx-col-story">{narrator}</div>
       </div>
     </div>
   );

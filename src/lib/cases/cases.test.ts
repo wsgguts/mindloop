@@ -14,12 +14,12 @@ import { RULE_OF } from "./themes";
 const progress = Object.fromEntries(EVERY_GAME.map((g) => [g, emptyProgress()])) as Record<(typeof EVERY_GAME)[number], string>;
 
 describe("banco de mistérios", () => {
-  it("uma investigação por capítulo em cada jogo (10 por jogo, 50 no total), na fase da agenda", () => {
-    expect(CASES_DATA).toHaveLength(50);
+  it("duas investigações por capítulo em cada jogo (20 por jogo, 100 no total), na fase da agenda", () => {
+    expect(CASES_DATA).toHaveLength(100);
     for (const g of EVERY_GAME) {
       const levels = caseLevels(g);
-      expect(levels).toHaveLength(10);
-      levels.forEach((l, i) => expect(Math.ceil(l / 10), `${g}`).toBe(i + 1));
+      expect(levels).toHaveLength(20);
+      levels.forEach((l, i) => expect(Math.ceil(l / 10), `${g}`).toBe(Math.floor(i / 2) + 1));
       expect(CASES_DATA.filter((c) => c.game === g).map((c) => c.level)).toEqual(levels);
     }
   });

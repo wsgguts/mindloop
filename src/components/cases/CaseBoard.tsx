@@ -1,23 +1,42 @@
 "use client";
-// Tabuleiro da investigação: o CENÁRIO do caso (o mesmo componente para os 5 jogos).
+// Tabuleiro da investigação: o CENÁRIO do caso, onde a pessoa encaixa os personagens (a resposta de "onde").
+// Tocar num personagem da fileira de baixo e depois na casa; tocar em quem já está no tabuleiro o seleciona para
+// mudar de lugar. (As anotações — ✕ e palpites — ficam no quadro de decisões, ao lado.)
 // Cômodos coloridos (com o nome no primeiro canto e paredes entre eles), móveis que bloqueiam a casa, assentos
 // que podem ser ocupados e os personagens posicionados (com o objeto que a pessoa escolheu para cada um).
 // A regra de cada jogo aparece por cima:
 //   Zip — a trilha numerada (as outras casas ficam fora do caminho);
 //   Tango — os dois lados nomeados à esquerda;
 //   Astros — com alguém selecionado, as linhas/colunas ocupadas apagam e as 8 casas em volta acendem;
-//   Sudoku — linhas, colunas e cômodos já ocupados apagam para quem está selecionado.
+//   Sudoku — linhas, colunas e cômodos já ocupados apagam para quem está selecionado;
+//   Patches — cada cômodo é uma peça colorida com a etiqueta do tamanho (como no jogo).
 import { type Model, allowedCells, cellName, propAt, rcOf, roomOf, stopOf } from "../../lib/cases/model";
 import type { Focus } from "../../lib/cases/relations";
+import Art from "../Art";
+import PatchesTag from "../PatchesTag";
 
 /** Cores de piso de cada cômodo (claras, para os ícones contrastarem). */
 export const ROOM_TINTS = ["#EDE2FB", "#D8F3F7", "#FDEBC8", "#DDF4E4", "#FFE0EC"];
+/** Patches: cada cômodo é uma peça com a cor do jogo (as mesmas cores das peças do Patches). */
+export const PATCH_COLORS = ["#F05BC8", "#12CFE0", "#FFD23F", "#9A6BFF", "#4FD6B1", "#FFB020"];
+/** Piso de uma casa: no Patches, um tom claro da cor da peça; nos outros jogos, os tons pastel de sempre. */
+export function floorOf(m: Model, v: number): string {
+  const k = roomOf(m, v);
+  return m.rule === "comodos" ? `color-mix(in srgb, ${PATCH_COLORS[k % PATCH_COLORS.length]} 34%, #fff)` : ROOM_TINTS[k % ROOM_TINTS.length];
+}
+/** Patches: tamanho (casas) e formato do cômodo k, para a etiqueta igual à do jogo. */
+export function roomShape(m: Model, k: number): { size: number; kind: "q" | "v" | "h" } {
+  const cells = m.scene.room.flatMap((r, v) => (r === k ? [v] : []));
+  const rs = cells.map((v) => rcOf(m, v)[0]), cs = cells.map((v) => rcOf(m, v)[1]);
+  const h = Math.max(...rs) - Math.min(...rs) + 1, w = Math.max(...cs) - Math.min(...cs) + 1;
+  return { size: cells.length, kind: h === w ? "q" : h > w ? "v" : "h" };
+}
 
 export interface BoardProps {
   model: Model;
   /** Resposta atual: casa de cada pessoa, depois objeto de cada pessoa (-1 = vazio). */
   a: number[];
-  /** Pessoa selecionada (para posicionar). */
+  /** Pessoa selecionada na fileira (o próximo toque numa casa a coloca ali). */
   sel: number | null;
   done: boolean;
   /** Marcas de erro da regra do lugar (só depois de reveladas, como no resto do jogo). */
@@ -43,7 +62,8 @@ export default function CaseBoard({ model: m, a, sel, done, showErrors, focus, o
       if (t === sel || w < 0) return false;
       const [r2, c2] = rcOf(m, w);
       if ((m.rule === "regioes" || m.rule === "ceu") && (r === r2 || c === c2)) return true;
-      if ((m.rule === "regioes" || m.rule === "comodos") && roomOf(m, v) === roomOf(m, w)) return true;
+      if ((m.rule === "regioes" || m.rule === "comodos" || m.rule === "ceu") && roomOf(m, v) === roomOf(m, w)) return true;
+      if (m.rule === "ceu" && Math.max(Math.abs(r - r2), Math.abs(c - c2)) === 1) return true; // encostaria
       if (m.rule === "equilibrio" && c === c2) return true;
       return false;
     });
@@ -57,7 +77,8 @@ export default function CaseBoard({ model: m, a, sel, done, showErrors, focus, o
     return pos.some((w, t) => {
       if (t === o || w < 0) return false;
       const [r2, c2] = rcOf(m, w);
-      return ((m.rule === "regioes" || m.rule === "ceu") && (r === r2 || c === c2)) || ((m.rule === "regioes" || m.rule === "comodos") && roomOf(m, v) === roomOf(m, w)) || (m.rule === "equilibrio" && c === c2);
+      return ((m.rule === "regioes" || m.rule === "ceu") && (r === r2 || c === c2)) || ((m.rule === "regioes" || m.rule === "comodos" || m.rule === "ceu") && roomOf(m, v) === roomOf(m, w))
+        || (m.rule === "ceu" && Math.max(Math.abs(r - r2), Math.abs(c - c2)) === 1) || (m.rule === "equilibrio" && c === c2);
     });
   };
   const edge = (v: number, dr: number, dc: number) => {
@@ -70,13 +91,12 @@ export default function CaseBoard({ model: m, a, sel, done, showErrors, focus, o
     if (sel !== null) { if (o === sel) onSelect(null); else { onPlace(sel, v); onSelect(null); } }
     else if (o >= 0) onSelect(o);
   }
-  const tray = m.people.map((_, i) => i).filter((i) => pos[i] < 0);
   // Trilha do Zip: linha que liga o centro das casas, em ordem.
   const center = (v: number) => { const [r, c] = rcOf(m, v); return [((c + 0.5) / cols) * 100, ((r + 0.5) / rows) * 100]; };
 
   return (
     <div className="cx-scenebox">
-      <div className={`cx-sceneframe rule-${m.rule}`}>
+      <div className={`cx-sceneframe rule-${m.rule}`} style={{ "--cols": cols } as React.CSSProperties}>
         {m.rule === "equilibrio" && (
           <div className="cx-sides" aria-hidden="true">{m.scene.rooms.slice(0, 2).map((r, k) => <span key={k} style={{ background: ROOM_TINTS[k] }}>{r.label}</span>)}</div>
         )}
@@ -97,37 +117,41 @@ export default function CaseBoard({ model: m, a, sel, done, showErrors, focus, o
               sel !== null && o < 0 && allowed.has(v) && !shut && "target", shut && "off", inRay(v) && "ray", clash(v) && "bad",
               focus?.cells.has(v) && "rel", o >= 0 && focus?.people.has(o) && "relp",
               edge(v, -1, 0) && "bt", edge(v, 0, 1) && "br", edge(v, 1, 0) && "bb", edge(v, 0, -1) && "bl"].filter(Boolean).join(" ");
-            const label = `Casa ${cellName(m, v)}, ${room.label}: ${blocked ? `${p!.label} (bloqueada)` : offTrail ? "fora da trilha" : o >= 0 ? `${m.people[o].label}${obj[o] >= 0 ? ` com ${m.objects[obj[o]].label}` : ""}` : shut ? "fechada pela regra do lugar" : p ? `${p.label}, livre` : "livre"}${m.trail && !offTrail ? `, parada ${stopOf(m, v) + 1}` : ""}`;
+            const label = `Casa ${cellName(m, v)}, ${room.label}${m.rule === "comodos" ? ` (${roomShape(m, roomOf(m, v)).size} casas)` : ""}: ${blocked ? `${p!.label} (bloqueada)` : offTrail ? "fora da trilha" : o >= 0 ? `${m.people[o].label}${obj[o] >= 0 ? ` com ${m.objects[obj[o]].label}` : ""}` : shut ? "fechada pela regra do lugar" : p ? `${p.label}, livre` : "livre"}${m.trail && !offTrail ? `, parada ${stopOf(m, v) + 1}` : ""}${sel !== null ? `. Toque para colocar ${m.people[sel].label} aqui.` : ""}`;
             return (
               <button key={v} role="gridcell" className={cls} disabled={done || blocked || offTrail} aria-label={label} onClick={() => tapCell(v)}
-                style={{ "--floor": ROOM_TINTS[roomOf(m, v) % ROOM_TINTS.length] } as React.CSSProperties}>
+                style={{ "--floor": floorOf(m, v), ...(m.rule === "comodos" ? { "--piece": PATCH_COLORS[roomOf(m, v) % PATCH_COLORS.length] } : {}) } as React.CSSProperties}>
                 {firstOfRoom(v) && m.rule !== "equilibrio" && <span className="cx-room" aria-hidden="true">{room.label}</span>}
+                {firstOfRoom(v) && m.rule === "comodos" && (() => { const sh = roomShape(m, roomOf(m, v)); return <span className="cx-ptag ptclue" aria-hidden="true"><PatchesTag v={sh.size} kind={sh.kind} color={PATCH_COLORS[roomOf(m, v) % PATCH_COLORS.length]} /></span>; })()}
                 {m.trail && !offTrail && <span className="cx-stop" aria-hidden="true">{stopOf(m, v) + 1}</span>}
-                {blocked ? <span className="cx-prop" aria-hidden="true">{p!.icon}</span>
+                {blocked ? <span className="cx-prop" aria-hidden="true"><Art e={p!} className="fill" /></span>
                   : o >= 0 ? <>
-                    <span className="cx-who" aria-hidden="true">{m.people[o].icon}</span>
-                    {obj[o] >= 0 && <span className="cx-hold" aria-hidden="true">{m.objects[obj[o]].icon}</span>}
+                    <span className="cx-who" aria-hidden="true"><Art e={m.people[o]} className="fill" /></span>
+                    {obj[o] >= 0 && <span className="cx-hold" aria-hidden="true"><Art e={m.objects[obj[o]]} className="fill" /></span>}
                     <small>{m.people[o].label}</small>
                   </>
-                  : <>{p && <span className="cx-seat" aria-hidden="true">{p.icon}</span>}{!offTrail && <small className="cx-cell">{cellName(m, v)}</small>}</>}
+                  : <>{p && <span className="cx-seat" aria-hidden="true"><Art e={p} className="fill" /></span>}{!offTrail && <small className="cx-cell">{cellName(m, v)}</small>}</>}
               </button>
             );
           })}
         </div>
       </div>
-      <div className="cx-tray" role="group" aria-label="Personagens ainda sem lugar">
-        {tray.length === 0 ? <span className="cx-help">Todos estão no cenário. Toque num deles para mudar de lugar.</span> : tray.map((i) => (
-          <button key={i} className={`cx-piece${sel === i ? " sel" : ""}${focus?.people.has(i) ? " rel" : ""}`} disabled={done} aria-pressed={sel === i} onClick={() => onSelect(sel === i ? null : i)}>
-            <span className="cx-obj">{m.people[i].icon}</span>{m.people[i].label}
+      <div className="cx-tray" role="group" aria-label="Personagens: toque num deles e depois na casa">
+        {m.people.map((p, i) => (
+          <button key={i} className={`cx-piece${sel === i ? " sel" : ""}${focus?.people.has(i) ? " rel" : ""}${pos[i] >= 0 ? " placed" : ""}`} disabled={done} aria-pressed={sel === i}
+            aria-label={`${p.label}: ${pos[i] >= 0 ? `na casa ${cellName(m, pos[i])}` : "sem lugar"}${obj[i] >= 0 ? `, com ${m.objects[obj[i]].label}` : ""}`}
+            onClick={() => onSelect(sel === i ? null : i)}>
+            <span className="cx-obj"><Art e={p} /></span><span className="cx-piece-name">{p.label}</span>
+            <small className="cx-piece-at">{pos[i] >= 0 ? (m.trail ? stopOf(m, pos[i]) + 1 : cellName(m, pos[i])) : "—"}</small>
           </button>
         ))}
-        {sel !== null && pos[sel] >= 0 && !done && (
-          <button className="cx-piece out" onClick={() => { onPlace(sel, -1); onSelect(null); }}>↩ Tirar {m.people[sel].label} do cenário</button>
-        )}
       </div>
+      {sel !== null && pos[sel] >= 0 && !done && (
+        <button className="cx-piece out" onClick={() => { onPlace(sel, -1); onSelect(null); }}>↩ Tirar {m.people[sel].label} do tabuleiro</button>
+      )}
       <p className="cx-help">{sel === null
-        ? "Escolha um personagem e depois a casa onde ele estava. Casas com móvel estão bloqueadas."
-        : `Onde estava ${m.people[sel].label}? ${m.rule === "ceu" ? "Casas apagadas já têm alguém na linha ou coluna; as douradas encostam nele." : m.rule === "trilha" ? "Só as paradas numeradas da trilha servem." : "Casas apagadas já estão fechadas pela regra do lugar."}`}</p>
+        ? <>Toque num <b>personagem</b> acima e depois na <b>casa</b> onde ele estava. Casas com móvel estão bloqueadas.</>
+        : <>Onde estava <b>{m.people[sel].label}</b>? {m.rule === "ceu" ? "Casas apagadas já estão fechadas (mesma linha, coluna ou região de alguém, ou encostadas em alguém)." : m.rule === "trilha" ? "Só as paradas numeradas da trilha servem." : "Casas apagadas já estão fechadas pela regra do lugar."}</>}</p>
     </div>
   );
 }

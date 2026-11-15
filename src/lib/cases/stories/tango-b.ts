@@ -1,0 +1,111 @@
+// Tango — segunda investigação de cada capítulo ("Equilíbrio": dois lados, uma pessoa por coluna, metade de cada lado).
+// Os dois primeiros cômodos são os dois lados.
+
+import type { Ent } from "../model";
+import type { Story } from "../story";
+
+const F = "f" as const, M = "m" as const;
+const e = (label: string, g: "m" | "f", icon?: string): Ent => (icon ? { label, g, icon } : { label, g });
+
+export const TANGO_B: Story[] = [
+  {
+    key: "torneio-pipas", title: "O torneio de pipas entre torres", universe: "competicao", tone: "humor",
+    intro: "Duas torres do Reino Celestial disputam um torneio de pipas todo verão. Os competidores ficam nas sacadas das duas torres, uma de frente para a outra, e o juiz quer conferir a posição de cada um antes do vento forte.",
+    goal: "Em que torre e sacada estava cada competidor, e com o quê?",
+    ending: "Torneio validado. {com:Pipa Dragão} fez a pipa dançar acima das nuvens e ganhou o troféu.",
+    objects: [e("Pipa Dragão", F, "🐉"), e("Pipa Coruja", F, "🦉"), e("Carretel", M, "🧵"), e("Rabiola", F, "🎀")],
+    rooms: [e("Torre Norte", F), e("Torre Sul", F), e("Ponte de Vento", F), e("Jardim", M)],
+    blocks: [e("Bandeira", F, "🚩"), e("Sino de Vento", M, "🎐"), e("Vaso de Nuvem", M, "☁️")],
+    seats: [e("Ameia", F, "🟦"), e("Banquinho", M, "🪑")],
+  },
+  {
+    key: "esquilos-acrobatas", title: "O espetáculo dos esquilos acrobatas", universe: "circo", tone: "humor",
+    intro: "Na Floresta dos Cristais, esquilos acrobatas fazem um show pendurados em dois galhos paralelos. O público aplaudiu tanto que a árvore balançou, e o apresentador quer saber quem ficou em cada galho e com o quê.",
+    goal: "Em que galho e posição estava cada acrobata, e com o quê?",
+    ending: "Show retomado. {com:Noz Dourada} terminou o número com um salto mortal perfeito.",
+    objects: [e("Noz Dourada", F, "🌰"), e("Pinha", F, "🌲"), e("Fita", F, "🎀"), e("Trapézio de Cipó", M, "🪢")],
+    rooms: [e("Galho Alto", M), e("Galho Baixo", M), e("Tronco", M), e("Ninho", M)],
+    blocks: [e("Colmeia", F, "🐝"), e("Ninho de Pica-Pau", M, "🪺"), e("Folhagem", F, "🌿")],
+    seats: [e("Cogumelo", M, "🍄"), e("Toco", M, "🪵")],
+  },
+  {
+    key: "varal-margens", title: "O varal das duas margens", universe: "cotidiano", tone: "humor",
+    intro: "No Vale das Águas, as famílias estendem roupas em varais nas duas margens de um riacho manso. Um vento forte trocou as roupas de lugar, e cada um precisa lembrar onde estava e o que pendurou.",
+    goal: "Em que margem e ponto estava cada um, e o que pendurou?",
+    ending: "Varais em ordem. {com:Lençol Bordado} pendurou o lençol de novo, agora com dois pregadores.",
+    objects: [e("Lençol Bordado", M, "🛏️"), e("Cesto de Roupa", M, "🧺"), e("Sabão de Coco", M, "🧼"), e("Pregador", M, "📎")],
+    rooms: [e("Margem Esquerda", F), e("Margem Direita", F), e("Pedras do Rio", F), e("Ponte", F)],
+    blocks: [e("Pedra Lisa", F, "🪨"), e("Canoa Virada", F, "🛶"), e("Árvore de Ingá", F, "🌳")],
+    seats: [e("Banco de Madeira", M, "🪑"), e("Tábua de Lavar", F, "🟫")],
+  },
+  {
+    key: "biblioteca-alas", title: "A biblioteca das duas alas", universe: "biblioteca", tone: "misterio",
+    intro: "No Templo das Estrelas, a biblioteca tem duas alas que se olham por um corredor de vidro. Um livro raro foi devolvido fora do lugar, e o bibliotecário quer reconstruir onde cada leitor estava e o que levava.",
+    goal: "Em que ala e mesa estava cada leitor, e o que levava?",
+    ending: "Livro raro no lugar certo. {com:Chave da Estante} trancou a estante para a noite.",
+    objects: [e("Livro das Constelações", M, "📘"), e("Castiçal", M, "🕯️"), e("Pena de Escrever", F, "🪶"), e("Chave da Estante", F, "🗝️")],
+    rooms: [e("Ala da Lua", F), e("Ala do Sol", F), e("Escada Espiral", F), e("Mesa Central", F)],
+    blocks: [e("Estante Alta", F, "📚"), e("Globo Antigo", M, "🌐"), e("Pilar Estrelado", M, "🏛️")],
+    seats: [e("Poltrona de Leitura", F, "💺"), e("Banqueta", F, "🪑")],
+  },
+  {
+    key: "corrida-camelos", title: "A largada da corrida de camelos", universe: "esporte", tone: "aventura",
+    intro: "No Deserto dos Segredos, a corrida de camelos larga de duas pistas paralelas. Antes do tiro de largada, o juiz precisa conferir a posição de cada competidor e o que cada um carrega.",
+    goal: "Em que pista e posição estava cada competidor, e com o quê?",
+    ending: "Largada perfeita. {com:Sela Bordada} chegou primeiro, levantando uma nuvem de areia.",
+    objects: [e("Sela Bordada", F, "🐪"), e("Bandeirola", F, "🚩"), e("Cantil de Couro", M, "🫗"), e("Lenço de Seda", M, "🧣")],
+    rooms: [e("Pista Norte", F), e("Pista Sul", F), e("Arquibancada", F), e("Bebedouro", M)],
+    blocks: [e("Duna Pequena", F, "🟤"), e("Palmeira", F, "🌴"), e("Barril de Água", M, "🛢️")],
+    seats: [e("Almofada de Couro", F, "🟫"), e("Banco de Pedra", M, "🪨")],
+  },
+  {
+    key: "cabines-teleferico", title: "As cabines do teleférico", universe: "transporte", tone: "suspense",
+    intro: "Nas Montanhas do Dragão, duas cabines de teleférico se cruzam no meio do caminho. Num dia de neblina, elas pararam lado a lado, e o operador quer saber quem estava em cada cabine e com o quê.",
+    goal: "Em que cabine e banco estava cada passageiro, e com o quê?",
+    ending: "Cabines em movimento de novo. {com:Binóculo} avistou um dragão bebê acenando da montanha.",
+    objects: [e("Mapa da Trilha", M, "🗺️"), e("Binóculo", M, "🔭"), e("Garrafa de Chá", F, "🫖"), e("Corda de Escalada", F, "🪢")],
+    rooms: [e("Cabine de Subida", F), e("Cabine de Descida", F), e("Estação do Topo", F), e("Mirante", M)],
+    blocks: [e("Roldana", F, "⚙️"), e("Caixa de Ferramentas", F, "🧰"), e("Ninho de Dragão Bebê", M, "🐉")],
+    seats: [e("Banco Dobrável", M, "🪑"), e("Janela Panorâmica", F, "🪟")],
+  },
+  {
+    key: "esculturas-galerias", title: "A exposição de esculturas de gelo", universe: "arte", tone: "encanto",
+    intro: "No Reino das Auroras, uma exposição de esculturas de gelo ocupa duas galerias frente a frente. Quando a aurora acendeu o teto, todos pararam para olhar, e a curadora quer o mapa de quem estava onde.",
+    goal: "Em que galeria e posição estava cada pessoa, e com o quê?",
+    ending: "Mapa pronto. {com:Lanterna Colorida} iluminou a escultura do cisne, e o reflexo pintou a sala inteira.",
+    objects: [e("Machadinha de Gelo", F, "🪓"), e("Lanterna Colorida", F, "🏮"), e("Luvas Térmicas", F, "🧤"), e("Catálogo", M, "📕")],
+    rooms: [e("Galeria Norte", F), e("Galeria Sul", F), e("Corredor Gelado", M), e("Entrada", F)],
+    blocks: [e("Escultura de Urso", F, "🐻‍❄️"), e("Escultura de Cisne", F, "🦢"), e("Bloco Bruto", M, "🧊")],
+    seats: [e("Banco de Gelo", M, "🪑"), e("Tapete de Pele", M, "🟫")],
+  },
+  {
+    key: "aqueduto-arcos", title: "A restauração do aqueduto", universe: "construcao", tone: "curiosidade",
+    intro: "Na Cidade Perdida, um aqueduto de dois andares de arcos está sendo restaurado. Na hora do almoço, cada trabalhador parou num arco com uma ferramenta, e o mestre de obras quer registrar tudo no diário.",
+    goal: "Em que andar e arco estava cada trabalhador, e com o quê?",
+    ending: "Diário em dia. {com:Nível de Bolha} conferiu que o último arco ficou perfeitamente reto.",
+    objects: [e("Nível de Bolha", M, "📏"), e("Colher de Pedreiro", F, "🥄"), e("Planta da Obra", F, "📐"), e("Capacete", M, "⛑️")],
+    rooms: [e("Arco de Cima", M), e("Arco de Baixo", M), e("Canteiro", M), e("Andaime", M)],
+    blocks: [e("Pilha de Tijolos", F, "🧱"), e("Betoneira", F, "🌀"), e("Pedra Talhada", F, "🪨")],
+    seats: [e("Balde Virado", M, "🪣"), e("Viga", F, "🟫")],
+  },
+  {
+    key: "corredor-epocas", title: "O corredor das duas épocas", universe: "museu", tone: "curiosidade",
+    intro: "Na Dimensão do Tempo, um museu tem um corredor com o passado de um lado e o futuro do outro. Os visitantes pararam diante das vitrines quando o relógio do museu tocou fora de hora.",
+    goal: "De que lado e diante de que vitrine estava cada visitante, e com o quê?",
+    ending: "Visita registrada. {com:Gramofone} fez o gramofone tocar, e o futuro inteiro dançou.",
+    objects: [e("Disco Voador de Brinquedo", M, "🛸"), e("Lamparina a Óleo", F, "🪔"), e("Gramofone", M, "📯"), e("Tablet", M, "📱")],
+    rooms: [e("Lado Antigo", M), e("Lado Moderno", M), e("Sala dos Relógios", F), e("Saída", F)],
+    blocks: [e("Carruagem", F, "🐴"), e("Foguete", M, "🚀"), e("Relógio de Sol", M, "☀️")],
+    seats: [e("Banco de Época", M, "🪑"), e("Pufe Futurista", M, "🟣")],
+  },
+  {
+    key: "mesa-banquete", title: "A mesa longa do brinde final", universe: "festa", tone: "encanto",
+    intro: "No Trono do Infinito, o banquete final acontece numa mesa tão longa que tem dois lados com nome. Antes do brinde, o mordomo precisa saber onde cada convidado sentou e o que segurava.",
+    goal: "De que lado e em que lugar sentou cada convidado, e com o quê?",
+    ending: "Brinde feito. {com:Pergaminho do Brinde} leu o discurso, e todos ergueram as taças.",
+    objects: [e("Taça de Cristal", F, "🥂"), e("Coroa de Flores", F, "💐"), e("Bandeja de Doces", F, "🍰"), e("Pergaminho do Brinde", M, "📜")],
+    rooms: [e("Lado do Rei", M), e("Lado da Rainha", M), e("Cabeceira", F), e("Varanda", F)],
+    blocks: [e("Candelabro de Ouro", M, "🕯️"), e("Bolo Gigante", M, "🎂"), e("Fonte de Suco", F, "⛲")],
+    seats: [e("Cadeira de Veludo", F, "🪑"), e("Almofada Dourada", F, "🟨")],
+  },
+];

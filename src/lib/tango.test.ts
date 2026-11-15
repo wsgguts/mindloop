@@ -1,8 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
   CRISTAL as C, ORBE as O, TANGO_PUZZLES, basicDeduction, countTangoSolutions, encodeTango, findProblems,
-  isTangoSolved, nextDeduction, parseTango, solveLogically, type Sign, type TGrid,
+  cloneT, isFullT, isTangoSolved, nextDeduction, parseTango, solveLogically, type Sign, type TGrid,
 } from "./tango";
+import { TANGO_CAP } from "./difficulty";
 
 const boards = TANGO_PUZZLES.map((p) => parseTango(p.raw));
 
@@ -25,6 +26,18 @@ describe("tango: níveis", () => {
       if (ch !== 7 && ch !== 10) expect(needsHypothesis(i), `nível ${i + 1}`).toBe(false);
     }
     for (const ch of [7, 10]) expect(Array.from({ length: 10 }, (_, k) => needsHypothesis((ch - 1) * 10 + k)).some(Boolean)).toBe(true);
+  });
+  it("o “E se…?” fica dentro do teto de cada capítulo e cresce ao longo do capítulo (sem saltos)", () => {
+    const hyps = boards.map((b) => {
+      const g = cloneT(b.givens); let h = 0;
+      while (!isFullT(g)) { const d = nextDeduction(g, b.signs, true)!; if (d.reason === "hipotese") h++; g[d.r][d.c] = d.v; }
+      return h;
+    });
+    for (let ch = 0; ch < 10; ch++) {
+      const part = hyps.slice(ch * 10, ch * 10 + 10);
+      part.forEach((h, j) => expect(h, `nível ${ch * 10 + j + 1}`).toBeLessThanOrEqual(TANGO_CAP[ch]));
+      for (let j = 1; j < 10; j++) expect(part[j], `nível ${ch * 10 + j + 1}`).toBeGreaterThanOrEqual(part[j - 1]);
+    }
   });
   it("a grade nunca diminui ao longo da jornada (4×4 → 6×6 → 8×8)", () => {
     for (let i = 1; i < boards.length; i++) expect(boards[i].n).toBeGreaterThanOrEqual(boards[i - 1].n);

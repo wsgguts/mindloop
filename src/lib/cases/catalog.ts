@@ -35,7 +35,7 @@ export interface Case {
   /** Cenário: o mundo do capítulo (nome e pintura). */
   world: string;
   art: string;
-  narrator: { name: string; icon: string };
+  narrator: { name: string; icon: string; img: string };
   model: Model;
   /** A regra do lugar (sem número). */
   rules: Clue[];
@@ -61,7 +61,7 @@ const TEASER: Record<CaseKind, string> = {
   equilibrio: "Dois lados, um equilíbrio perfeito.",
   trilha: "Uma trilha guarda a ordem dos acontecimentos.",
   comodos: "Um cômodo para cada um — mas qual?",
-  ceu: "Quem encosta em quem? O lugar guarda a resposta.",
+  ceu: "Ninguém se encosta. A quantos passos cada um estava do outro?",
 };
 const STRUCTURE_TEASER: Record<StructureId, string> = {
   progressiva: "Uma pista firme abre caminho para as outras.",
@@ -91,7 +91,7 @@ function endingOf(text: string, m: Model, sol: number[]): string {
     const s = o < 0 ? -1 : sol.slice(n).indexOf(o);
     return s < 0 ? `quem tinha ${label.toLowerCase()}` : the(m.people[s]);
   });
-  return t.charAt(0).toUpperCase() + t.slice(1);
+  return t.replace(/(^|[.!?] +)([a-zà-öø-ÿ])/g, (_, a: string, b: string) => a + b.toUpperCase());
 }
 
 export function buildCase(d: CaseData): Case {
@@ -138,7 +138,7 @@ export function buildCase(d: CaseData): Case {
   };
 }
 
-// Montados uma vez, sob demanda (o banco é pequeno: 50 mistérios).
+// Montados uma vez, sob demanda (o banco é pequeno: 100 mistérios).
 let cache: Case[] | null = null;
 export function allCases(): Case[] { return (cache ??= CASES_DATA.map(buildCase)); }
 export const caseById = (id: string): Case | undefined => allCases().find((c) => c.id === id);

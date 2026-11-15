@@ -119,7 +119,7 @@ function AstrosRules() {
       <ul className="list">
         <li>Toque numa casa: vazia → × → astro → vazia. O × é só uma anotação sua (“aqui não vai astro”) e nunca conta como erro.</li>
         <li>Ou selecione a casa e use os botões Astro, Marcar e Apagar.</li>
-        <li>“Marcar × em volta dos astros” marca de uma vez todas as casas que os astros já colocados eliminam.</li>
+        <li>“Em volta” marca × de uma vez em todas as casas que os astros já colocados eliminam.</li>
         <li>Se dois astros quebrarem uma regra, as casas ganham um “!” e uma mensagem explica o motivo.</li>
         <li>Desfazer volta a última jogada. Dica mostra o próximo passo lógico e explica o porquê.</li>
         <li>No teclado: setas movem, A (ou 1) coloca astro, X (ou 2) marca e Backspace apaga.</li>

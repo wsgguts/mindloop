@@ -41,13 +41,44 @@ export function focusOf(m: Model, clues: Clue[], pick: Pick): Focus {
   return f;
 }
 
-// ---------------------------------------------------------------- marcações X do quadro de dedução
+// ---------------------------------------------------------------- quadro de decisões (anotações)
 
-/** Base das marcas de objeto (as de casa usam s × casas + v, sempre menores). */
-export const OBJ_MARK = 100000;
-/** X em "a pessoa s não estava na casa v". */
-export const markKey = (m: Model, s: number, v: number) => s * m.rows * m.cols + v;
-/** X em "a pessoa s não tinha o objeto o". */
-export const objMarkKey = (m: Model, s: number, o: number) => OBJ_MARK + s * m.objects.length + o;
-/** Uma marca guardada ainda faz sentido neste caso? (rascunhos de versões antigas são descartados). */
-export const validMark = (m: Model, k: number) => (k >= OBJ_MARK ? k - OBJ_MARK < m.people.length * m.objects.length : k < m.people.length * m.rows * m.cols);
+/**
+ * O quadro de decisões tem duas partes (anotações da pessoa; não contam como resposta):
+ *   "Onde?"  — um mapa do lugar; cada casa alterna vazio → ✕ (ninguém aqui) → cada personagem → vazio;
+ *   "O quê?" — tabela personagens × objetos; cada casa alterna vazio → ✕ (não tinha) → ✓ (tinha) → vazio.
+ * Guardadas no rascunho como números:
+ *   NOTE_CELL + casa × 16 + (personagem + 1)            (personagem -1 = ✕)
+ *   NOTE_GRID + (personagem × 16 + objeto) × 4 + estado  (1 = ✕, 2 = ✓)
+ * Números de versões antigas ficam fora dessas faixas e são descartados ao abrir o rascunho.
+ */
+export const NOTE_CELL = 400000;
+export const NOTE_GRID = 600000;
+export const GRID_NO = 1, GRID_YES = 2;
+export type Notes = Map<number, number>;
+export const cellNote = (v: number, who: number) => NOTE_CELL + v * 16 + who + 1;
+/** Chave da casa (personagem s, objeto o) na tabela "O quê?". */
+export const gridKey = (s: number, o: number) => s * 16 + o;
+export const gridNote = (s: number, o: number, state: number) => NOTE_GRID + gridKey(s, o) * 4 + state;
+export function readNote(k: number): { t: "cell"; i: number; who: number } | { t: "grid"; i: number; s: number; o: number; state: number } | null {
+  if (k >= NOTE_CELL && k < NOTE_CELL + 100000) { const r = k - NOTE_CELL; return { t: "cell", i: Math.floor(r / 16), who: (r % 16) - 1 }; }
+  if (k >= NOTE_GRID && k < NOTE_GRID + 100000) { const r = k - NOTE_GRID, i = Math.floor(r / 4); return { t: "grid", i, s: Math.floor(i / 16), o: i % 16, state: r % 4 }; }
+  return null;
+}
+/** Uma anotação guardada ainda faz sentido neste caso? */
+export function validMark(m: Model, k: number): boolean {
+  const x = readNote(k), n = m.people.length;
+  if (!x) return false;
+  if (x.t === "cell") return x.who >= -1 && x.who < n && x.i < m.rows * m.cols;
+  return x.s < n && x.o < m.objects.length && (x.state === GRID_NO || x.state === GRID_YES);
+}
+/** "Onde?": próximo estado da casa — vazio → ✕ → cada personagem que ainda não está anotado em outra casa → vazio. */
+export function nextNote(notes: Notes, key: number, n: number): number | undefined {
+  const cur = notes.get(key);
+  if (cur === undefined) return -1;
+  const used = new Set([...notes].filter(([k, w]) => k !== key && w >= 0).map(([, w]) => w));
+  for (let p = cur + 1; p < n; p++) if (!used.has(p)) return p;
+  return undefined;
+}
+/** "O quê?": próximo estado — vazio → ✕ → ✓ → vazio. */
+export const nextGrid = (cur: number | undefined): number | undefined => (cur === undefined ? GRID_NO : cur === GRID_NO ? GRID_YES : undefined);

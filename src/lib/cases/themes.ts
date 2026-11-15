@@ -5,7 +5,7 @@
 //   Tango       → "equilibrio" : dois lados, uma pessoa por coluna, metade de cada lado;
 //   Zip         → "trilha"     : uma trilha numerada; cada pessoa numa parada (antes, depois, logo depois);
 //   Patches     → "comodos"    : exatamente uma pessoa em cada cômodo;
-//   Astros      → "ceu"        : uma pessoa por linha e coluna, com pistas de proximidade.
+//   Astros      → "ceu"        : uma pessoa por linha, coluna e região, sem ninguém se encostar (como os astros), com pistas de distância.
 
 import type { JourneyGame } from "../journey";
 import type { Rule } from "./model";
@@ -25,12 +25,13 @@ export const KIND_NAME: Record<Rule, string> = {
 };
 
 /** O narrador de cada jogo (conta a história no balão). */
-export const NARRATOR: Record<JourneyGame, { name: string; icon: string }> = {
-  sudoku: { name: "Bit, o robô arquivista", icon: "🤖" },
-  tango: { name: "Dona Coruja", icon: "🦉" },
-  zip: { name: "Guaxi, o guaxinim batedor", icon: "🦝" },
-  patches: { name: "Raposa Remendo", icon: "🦊" },
-  astros: { name: "Lumen, a estrela-guia", icon: "🌟" },
+/** Narrador de cada jogo (também é um avatar do elenco: img é o retrato). */
+export const NARRATOR: Record<JourneyGame, { name: string; icon: string; img: string }> = {
+  sudoku: { name: "Bit, o robô arquivista", icon: "🤖", img: "/cast/bit.webp" },
+  tango: { name: "Dona Coruja", icon: "🦉", img: "/cast/coruja.webp" },
+  zip: { name: "Guaxi, o guaxinim batedor", icon: "🦝", img: "/cast/guaxi.webp" },
+  patches: { name: "Raposa Remendo", icon: "🦊", img: "/cast/remendo.webp" },
+  astros: { name: "Lumen, a estrela-guia", icon: "✨", img: "/cast/lumen.webp" },
 };
 
 /** Histórias de cada jogo, na ordem da jornada (a história i é a do capítulo i + 1). */
@@ -44,5 +45,5 @@ export const GENERAL_HINT: Record<Rule, string> = {
   equilibrio: "Uma pessoa por coluna e metade de cada lado. Quando um lado enche, todos os que faltam estão do outro.",
   trilha: "As pessoas estão em paradas diferentes da trilha. Organize da primeira à última: “antes” e “logo depois” encaixam umas nas outras.",
   comodos: "Cada cômodo tem uma pessoa só. Descubra primeiro o cômodo de cada um; depois, os móveis e vizinhos dizem a casa exata.",
-  ceu: "Uma pessoa por linha e por coluna. Encostar inclui a diagonal: quem não encosta em ninguém precisa de espaço em volta.",
+  ceu: "Uma pessoa por linha, coluna e região, e ninguém se encosta (nem na diagonal). Descubra primeiro quais casas podem estar ocupadas; depois use as distâncias em passos.",
 };

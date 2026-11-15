@@ -8,13 +8,12 @@ import type { Story } from "../story";
 const F = "f" as const, M = "m" as const;
 const e = (label: string, g: "m" | "f", icon?: string): Ent => (icon ? { label, g, icon } : { label, g });
 
-export const TANGO_STORIES: Story[] = [
+const TANGO_A: Story[] = [
   {
     key: "ponte-arco-iris", title: "A ponte de arco-íris", universe: "transporte", tone: "encanto",
     intro: "Uma ponte de arco-íris liga as duas margens de um castelo do Reino Celestial. No ensaio do desfile, os músicos se dividiram entre os lados e trocaram de instrumento, e o maestro quer a formação exata.",
     goal: "Em que lado e posição ficou cada músico, e com que instrumento?",
     ending: "Formação anotada! No desfile, {com:Sininho} abriu a passagem tocando o sininho bem no meio da ponte.",
-    people: [e("Maestrina Ana", F, "👩‍🦰"), e("Flautista Gil", M, "👨"), e("Ritmista Bia", F, "👧"), e("Sineiro Leo", M, "👦")],
     objects: [e("Flauta", F, "🪈"), e("Tambor", M, "🥁"), e("Pandeiro", M, "🪘"), e("Sininho", M, "🔔")],
     rooms: [e("Margem do Sol", F), e("Margem da Lua", F), e("Arco Central", M), e("Torre", F)],
     blocks: [e("Pilar de Cristal", M, "💎"), e("Nuvem Densa", F, "☁️"), e("Estandarte", M, "🚩")],
@@ -25,7 +24,6 @@ export const TANGO_STORIES: Story[] = [
     intro: "Escoteiros acamparam na Floresta dos Cristais, com barracas dos dois lados de uma trilha. À noite, os vaga-lumes acenderam e alguém trocou as coisas de barraca; a chefe quer conferir tudo antes de dormir.",
     goal: "De que lado e em que barraca ficou cada escoteiro, e com o quê?",
     ending: "Tudo conferido. {com:Marshmallow} dividiu o doce com a turma inteira antes de apagar a fogueira.",
-    people: [e("Chefe Rosa", F, "👩"), e("Beto", M, "🧒"), e("Duda", F, "👧"), e("Kiko", M, "👦")],
     objects: [e("Marshmallow", M, "🍡"), e("Apito", M, "📯"), e("Binóculo", M, "🔭"), e("Mapa da Trilha", M, "🗺️")],
     rooms: [e("Lado do Riacho", M), e("Lado da Clareira", M), e("Fogueira", F), e("Mata", F)],
     blocks: [e("Cristal Gigante", M, "💎"), e("Formigueiro", M, "🐜"), e("Pedra Musgosa", F, "🪨")],
@@ -36,7 +34,6 @@ export const TANGO_STORIES: Story[] = [
     intro: "No Vale das Águas, a criançada solta barquinhos de papel dos dois cais de um canal. Um dos barquinhos chegou com uma carta dentro, e a juíza da regata quer saber quem largou de onde e com qual barco.",
     goal: "De que cais e posição largou cada criança, e com que barco?",
     ending: "Regata registrada. A carta era um convite: {com:Barco Dourado} chamou todos para um piquenique.",
-    people: [e("Juíza Marta", F, "👩‍⚖️"), e("Caio", M, "👦"), e("Lorena", F, "👧"), e("Vítor", M, "🧒")],
     objects: [e("Barco Pirata", M, "🏴‍☠️"), e("Barco de Jornal", M, "📰"), e("Barco Dourado", M, "⛵"), e("Canoa de Folha", F, "🍃")],
     rooms: [e("Cais Norte", M), e("Cais Sul", M), e("Ponte Pênsil", F), e("Comporta", F)],
     blocks: [e("Poste de Amarração", M, "🪝"), e("Caixote", M, "📦"), e("Rede de Pesca", F, "🕸️")],
@@ -47,7 +44,6 @@ export const TANGO_STORIES: Story[] = [
     intro: "No Templo das Estrelas, o coral canta dividido em duas galerias, uma de frente para a outra. No ensaio geral, as partituras se misturaram e a regente precisa remontar quem cantou em cada ponto.",
     goal: "Em que galeria e posição cantou cada um, e com o quê?",
     ending: "Coro reorganizado. No concerto, {com:Diapasão} deu a primeira nota, e o templo inteiro vibrou.",
-    people: [e("Regente Telma", F, "👩‍🏫"), e("Tenor Aldo", M, "👨‍🦳"), e("Soprano Íris", F, "👩"), e("Barítono Juca", M, "🧔")],
     objects: [e("Partitura", F, "🎼"), e("Diapasão", M, "🎵"), e("Vela", F, "🕯️"), e("Lenço", M, "🧣")],
     rooms: [e("Galeria do Oriente", F), e("Galeria do Poente", F), e("Altar", M), e("Cripta", F)],
     blocks: [e("Órgão", M, "🎹"), e("Coluna", F, "🏛️"), e("Vitral", M, "🪟")],
@@ -58,7 +54,6 @@ export const TANGO_STORIES: Story[] = [
     intro: "No mercado noturno do Deserto dos Segredos, as tendas formam duas fileiras de frente uma para a outra. Uma tempestade de areia apagou os letreiros, e o fiscal precisa saber de novo onde cada vendedor estava.",
     goal: "Em que fileira e tenda estava cada vendedor, e o que vendia?",
     ending: "Letreiros refeitos. {com:Açafrão} ofereceu chá perfumado para todo mundo depois da tempestade.",
-    people: [e("Nara", F, "🧕"), e("Seu Karim", M, "👳"), e("Dona Fátima", F, "👵"), e("Ali", M, "🧑")],
     objects: [e("Açafrão", M, "🟠"), e("Tapete", M, "🟥"), e("Lamparina", F, "🪔"), e("Tâmaras", F, "🌰")],
     rooms: [e("Fileira das Especiarias", F), e("Fileira dos Tecidos", F), e("Poço", M), e("Portal", M)],
     blocks: [e("Camelo Dormindo", M, "🐪"), e("Jarra Grande", F, "🏺"), e("Pilha de Cestos", F, "🧺")],
@@ -69,7 +64,6 @@ export const TANGO_STORIES: Story[] = [
     intro: "Exploradores cruzavam uma ponte suspensa nas Montanhas do Dragão quando um vento forte os fez parar onde estavam. Para seguir com segurança, o guia precisa saber a posição e o equipamento de cada um.",
     goal: "De que lado e em que ponto estava cada explorador, e com o quê?",
     ending: "Todos atravessaram. Do outro lado, {com:Lanterna de Cabeça} iluminou a gruta onde o dragão guardava ovos dourados.",
-    people: [e("Guia Anselmo", M, "🧔"), e("Kira", F, "👩‍🦱"), e("Geólogo Pablo", M, "👨‍🔬"), e("Cozinheira Lu", F, "👩‍🍳")],
     objects: [e("Gancho", M, "🪝"), e("Lanterna de Cabeça", F, "🔦"), e("Mochila", F, "🎒"), e("Cantil", M, "🫗")],
     rooms: [e("Lado do Penhasco", M), e("Lado da Caverna", M), e("Meio da Ponte", M), e("Mirante", M)],
     blocks: [e("Tábua Quebrada", F, "❌"), e("Rocha Solta", F, "🪨"), e("Ninho de Águia", M, "🪺")],
@@ -80,7 +74,6 @@ export const TANGO_STORIES: Story[] = [
     intro: "Sob a aurora, o lago congelado vira pista de dança. Os patinadores se alinharam nas duas margens para a abertura do festival, mas a lista de posições voou com o vento gelado.",
     goal: "Em que margem e posição ficou cada patinador, e com o quê?",
     ending: "Abertura perfeita. {com:Fita Brilhante} rodopiou a fita no meio do lago, e a aurora pareceu aplaudir.",
-    people: [e("Ívi", F, "⛸️"), e("Bruno", M, "🧑"), e("Tuli", F, "👧"), e("Vovô Ártico", M, "👴")],
     objects: [e("Cachecol", M, "🧣"), e("Chocolate Quente", M, "☕"), e("Fita Brilhante", F, "🎀"), e("Sininho de Gelo", M, "🔔")],
     rooms: [e("Margem Iluminada", F), e("Margem Sombreada", F), e("Barraca de Chá", F), e("Arquibancada", F)],
     blocks: [e("Boneco de Neve", M, "⛄"), e("Pinheiro", M, "🌲"), e("Iglu", M, "🛖")],
@@ -91,7 +84,6 @@ export const TANGO_STORIES: Story[] = [
     intro: "Na Cidade Perdida, uma escadaria antiga sobe entre duas estátuas gigantes. A equipe mapeava os degraus quando um eco estranho fez todos congelarem, e o relatório precisa da posição de cada um naquele instante.",
     goal: "De que lado e em que degrau estava cada um, e com o quê?",
     ending: "Relatório pronto. O eco vinha de uma sala escondida — e foi {com:Trena} quem mediu a porta para abri-la.",
-    people: [e("Maia", F, "👩‍🦰"), e("Técnico Iuri", M, "🧑‍🔧"), e("Fotógrafa Sol", F, "👩"), e("Historiador Lauro", M, "👨‍🏫")],
     objects: [e("Câmera", F, "📷"), e("Trena", F, "📏"), e("Caderno", M, "📓"), e("Lanterna", F, "🔦")],
     rooms: [e("Lado do Sol", M), e("Lado da Lua", M), e("Patamar", M), e("Portal", M)],
     blocks: [e("Vaso Quebrado", M, "🏺"), e("Raiz Gigante", F, "🌿"), e("Bloco Caído", M, "🧱")],
@@ -102,7 +94,6 @@ export const TANGO_STORIES: Story[] = [
     intro: "Na Dimensão do Tempo, um trem percorre as eras com janelas que mostram o passado de um lado e o futuro do outro. A fiscal precisa conferir cada passageiro antes do túnel do século seguinte.",
     goal: "De que lado e em que banco viajava cada um, e com o quê?",
     ending: "Passagens conferidas. Na saída do túnel, {com:Bilhete Dourado} ganhou uma viagem extra até a era dos dragões.",
-    people: [e("Fiscal Dora", F, "👩‍✈️"), e("Rex", M, "🦖"), e("Robô Zeta", M, "🤖"), e("Isolda", F, "🧝‍♀️")],
     objects: [e("Bilhete Dourado", M, "🎫"), e("Relógio de Bolso", M, "⌚"), e("Fóssil", M, "🦴"), e("Disquete", M, "💾")],
     rooms: [e("Janela do Passado", F), e("Janela do Futuro", F), e("Vagão-Restaurante", M), e("Cabine", F)],
     blocks: [e("Mala Gigante", F, "🧳"), e("Carrinho de Lanches", M, "🛒"), e("Porta Giratória", F, "🚪")],
@@ -113,10 +104,14 @@ export const TANGO_STORIES: Story[] = [
     intro: "O conselho do Trono do Infinito se reúne em duas bancadas, uma diante da outra. Antes da votação final, cada conselheiro recebeu um selo, e o escrivão precisa registrar quem sentou onde com qual selo.",
     goal: "Em que bancada e cadeira estava cada conselheiro, e com que selo?",
     ending: "Votação registrada. Com os selos no lugar certo, {com:Selo de Fogo} acendeu a chama do Trono pela primeira vez em cem anos.",
-    people: [e("Conselheira Aurélia", F, "👩‍⚖️"), e("Conselheiro Bóris", M, "🧔"), e("Sábia Ondina", F, "🧙‍♀️"), e("Sábio Pérsio", M, "🧙")],
     objects: [e("Selo de Fogo", M, "🔥"), e("Selo de Água", M, "💧"), e("Selo de Vento", M, "🌪️"), e("Selo de Terra", M, "🌱")],
     rooms: [e("Bancada da Luz", F), e("Bancada da Sombra", F), e("Púlpito", M), e("Galeria", F)],
     blocks: [e("Ampulheta Gigante", F, "⏳"), e("Brasão", M, "🛡️"), e("Estátua do Fundador", F, "🗿")],
     seats: [e("Cadeira de Espaldar", F, "🪑"), e("Almofada de Veludo", F, "🟪")],
   },
 ];
+
+import { TANGO_B } from "./tango-b";
+
+/** Duas investigações por capítulo: a história A e a história B do mesmo mundo, intercaladas. */
+export const TANGO_STORIES: Story[] = TANGO_A.flatMap((s, i) => [s, TANGO_B[i]]);

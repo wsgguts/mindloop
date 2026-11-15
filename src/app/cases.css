@@ -179,7 +179,6 @@
 .cx-ch { display: grid; gap: 8px; }
 .cx-ch h2 { font-size: 17px; color: var(--cosmic); }
 .cx-cards { margin: 0; padding: 0; list-style: none; display: grid; gap: 8px; }
-@media (min-width: 640px) { .cx-cards { grid-template-columns: 1fr 1fr; } }
 .cx-card { display: grid; grid-template-columns: 44px 1fr auto; gap: 10px; align-items: center; padding: 10px; border-radius: 14px; background: #fff; border: 2px solid #E4D6F5; }
 .cx-card.solved { border-color: color-mix(in srgb, var(--gc) 50%, #E4D6F5); }
 .cx-card.locked { opacity: .6; background: #F7F3FC; }

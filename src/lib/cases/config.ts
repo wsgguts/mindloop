@@ -5,16 +5,16 @@
 import { LEVELS_PER_CHAPTER, LEVELS_PER_GAME, type JourneyGame } from "../journey";
 
 /**
- * Uma investigação por capítulo, no mundo daquele capítulo (10 por jogo). Em que fase do capítulo o convite
- * aparece varia entre capítulos e entre jogos, para o ritmo não ficar previsível.
+ * Duas investigações por capítulo, no mundo daquele capítulo (20 por jogo): uma no começo e outra no fim do capítulo.
+ * Em que fases os convites aparecem varia entre capítulos e entre jogos, para o ritmo não ficar previsível.
  */
-export const CASE_OFFSETS: number[] = [6, 4, 7, 5, 8, 3, 6, 9, 5, 7];
+export const CASE_OFFSETS: [number, number][] = [[3, 7], [2, 6], [4, 8], [3, 7], [2, 8], [4, 7], [3, 6], [2, 7], [4, 8], [3, 8]];
 const GAME_SHIFT: Record<JourneyGame, number> = { sudoku: 0, tango: 1, zip: 2, patches: 3, astros: 4 };
 
 /** Fases (1–99) após as quais o jogo oferece uma investigação. A fase 100 não tem "próxima": nunca oferece. */
 export function caseLevels(game: JourneyGame): number[] {
   const chapters = LEVELS_PER_GAME / LEVELS_PER_CHAPTER;
-  return Array.from({ length: chapters }, (_, ch) => ch * LEVELS_PER_CHAPTER + CASE_OFFSETS[(ch + GAME_SHIFT[game]) % CASE_OFFSETS.length]);
+  return Array.from({ length: chapters }, (_, ch) => CASE_OFFSETS[(ch + GAME_SHIFT[game]) % CASE_OFFSETS.length].map((o) => ch * LEVELS_PER_CHAPTER + o)).flat();
 }
 
 /** Dificuldade 1–4 pelo capítulo: os mistérios crescem junto com a jornada. */

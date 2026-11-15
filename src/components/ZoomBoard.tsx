@@ -98,7 +98,9 @@ export default function ZoomBoard({ children, maxWidth = 360, panWithOneFinger =
     const a = area.current, wrap = a?.closest<HTMLElement>(".wrap.play");
     if (!a || !wrap) return;
     const measure = () => {
-      if (window.matchMedia("(orientation: landscape) and (max-height: 540px)").matches || window.innerWidth > 760) return setFit(null);
+      // Celular deitado tem layout próprio (tabuleiro ao lado dos controles). Em pé e no computador, o tabuleiro
+      // cresce até onde a partida inteira (controles e barra de ferramentas) cabe na tela, acima do menu inferior.
+      if (window.matchMedia("(orientation: landscape) and (max-height: 540px)").matches) return setFit(null);
       const w = wrap.getBoundingClientRect(), ar = a.getBoundingClientRect(), z = box.current?.getBoundingClientRect();
       if (!w.height || !z) return; // partida escondida (outra tela aberta)
       if (lockedRef.current) return; // na animação de vitória o tabuleiro não muda de tamanho

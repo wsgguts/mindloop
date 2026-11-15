@@ -1,6 +1,7 @@
 /* ===================== Astros (jogo bônus) ===================== */
 /* Céu em grade: cada constelação tem uma cor clara própria e uma borda grossa a separa das vizinhas. */
-.aboard { position: relative; width: min(100%, 360px); margin: 0 auto; display: grid; border: 3px solid var(--cosmic); border-radius: 12px; overflow: hidden; background: #fff; user-select: none; }
+/* Moldura e divisas no verde-escuro do cristal do jogo. */
+.aboard { --a-edge: #0B3D2A; position: relative; width: min(100%, 360px); margin: 0 auto; display: grid; border: 3px solid var(--a-edge); border-radius: 12px; overflow: hidden; background: #fff; user-select: none; }
 .aboard.n8, .aboard.n9 { width: min(100%, 400px); }
 .zoom-layer > .aboard { width: 100%; }
 .acell {
@@ -9,12 +10,12 @@
   box-shadow: inset 0 0 0 .5px rgba(38, 16, 77, .14);
 }
 /* Bordas de constelação (desenhadas por dentro, para a grade não mudar de tamanho). */
-.acell.et { border-top: 2.5px solid var(--cosmic); }
-.acell.er { border-right: 2.5px solid var(--cosmic); }
-.acell.eb { border-bottom: 2.5px solid var(--cosmic); }
-.acell.el { border-left: 2.5px solid var(--cosmic); }
+.acell.et { border-top: 2.5px solid var(--a-edge); }
+.acell.er { border-right: 2.5px solid var(--a-edge); }
+.acell.eb { border-bottom: 2.5px solid var(--a-edge); }
+.acell.el { border-left: 2.5px solid var(--a-edge); }
 .acell .amark { opacity: .75; }
-.acell .asym { animation: a-pop .18s ease-out; filter: drop-shadow(0 1px 2px rgba(154, 90, 0, .45)); }
+.acell .asym { animation: a-pop .18s ease-out; filter: drop-shadow(0 1px 2px rgba(11, 61, 42, .45)); }
 .acell.sel { box-shadow: inset 0 0 0 3px var(--cyan); }
 .acell.bad { background: #FFE3E8; box-shadow: inset 0 0 0 3px var(--err); }
 .acell.bad::after { content: "!"; position: absolute; top: 1px; right: 4px; font: 700 13px var(--font-title); color: #B3243E; }
@@ -23,7 +24,10 @@
 .acell.src { box-shadow: inset 0 0 0 3px var(--violet); }
 .acell:focus-visible { outline: 3px solid var(--violet); outline-offset: -5px; }
 .aboard.n9 .acell.bad::after, .aboard.n9 .acell.tip::after { font-size: 11px; right: 2px; }
-.amark-all { justify-self: center; }
+/* Controles do Astros: 4 botões numa linha, ícone em cima e nome embaixo (cabe até em 320 px). */
+.tpad.apad, .wrap.play .tpad.apad { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
+.tpad.apad .btn, .wrap.play .tpad.apad .btn { flex-direction: column; gap: 2px; min-height: 54px; padding: 4px 2px; font-size: 13px; line-height: 1.1; white-space: nowrap; }
+.tpad.apad .btn:last-child, .wrap.play .tpad.apad .btn:last-child { grid-column: auto; }
 @keyframes a-pop { from { transform: scale(.4) rotate(-30deg); opacity: .3; } to { transform: none; opacity: 1; } }
 
 /* Vitória: o céu escurece, as constelações ficam translúcidas e os astros acendem em onda. */
@@ -31,9 +35,9 @@
 .aboard.win .acell { cursor: default; animation: a-cell .9s ease-out forwards; }
 .aboard.win .acell .amark { opacity: 0; transition: opacity .4s; }
 .aboard.win .acell.star .asym { animation: a-shine 1s ease-in-out calc(500ms + (var(--r) + var(--c)) * 90ms) 2 alternate; }
-@keyframes a-night { to { background: #1B0B3D; } }
-@keyframes a-cell { to { background: color-mix(in srgb, var(--sky) 22%, #26104D); } }
-@keyframes a-shine { to { transform: scale(1.3) rotate(45deg); filter: drop-shadow(0 0 8px #FFE58A) drop-shadow(0 0 2px #fff); } }
+@keyframes a-night { to { background: #072A1F; } }
+@keyframes a-cell { to { background: color-mix(in srgb, var(--sky) 22%, #0B2E33); } }
+@keyframes a-shine { to { transform: scale(1.3) rotate(45deg); filter: drop-shadow(0 0 8px #9DFF7A) drop-shadow(0 0 2px #fff); } }
 @media (prefers-reduced-motion: reduce) {
   .acell .asym, .aboard.win, .aboard.win .acell, .aboard.win .acell.star .asym { animation: none; }
 }
@@ -49,7 +53,7 @@
 .gcard.bonus.locked .gem-wrap { filter: grayscale(.7) brightness(.85); opacity: .75; }
 .gcard .gem-wrap { position: relative; display: inline-block; }
 .gcard .gem-lock { position: absolute; right: -6px; bottom: -4px; font-size: 26px; filter: drop-shadow(0 2px 2px rgba(0,0,0,.35)); }
-.badge.bonus { background: #FFF1C2; color: #6B4A00; }
+.badge.bonus { background: #DDF9D2; color: #0B5A33; }
 .bonus-req { list-style: none; padding: 0; margin: 4px 0 0; display: grid; gap: 4px; font-size: 13px; text-align: left; width: 100%; }
 .bonus-req li { display: flex; justify-content: space-between; gap: 8px; }
 .bonus-req li.ok b { color: var(--ok); }
@@ -57,43 +61,46 @@
 /* Modo Administrador: selo no topo no lugar do apelido. */
 .chip.admin-chip { background: #FFF1C2; color: #6B4A00; border: 1px solid #E8C25A; }
 
-/* ---------- Símbolo do Astros na arte do Início (parte de baixo, sob a logo) ---------- */
-/* Posição em % da arte home-art (944 × 1680): centro em x 50%, y ≈ 66% — abaixo do painel da logo (que termina em ≈ 61,5%), no anel de luz, acima do personagem. */
+/* ---------- Cristal do Astros na arte do Início (parte de baixo, sob a logo) ---------- */
+/* O cristal verde já está pintado na arte (home-art, 944 × 1680): ocupa x 382–562 e y 885–1090 px.
+   O botão cobre o cristal; bloqueado, um véu apaga só o cristal e mostra o cadeado; liberado, ele ganha halo e faíscas. */
 .bonus-spot {
-  position: absolute; left: 50%; top: 66%; width: 11%; aspect-ratio: 1; transform: translate(-50%, -50%);
-  border: 0; padding: 0; background: transparent; border-radius: 50%; cursor: pointer; z-index: 2;
+  position: absolute; left: 40.5%; top: 52.7%; width: 19%; height: 12.2%;
+  border: 0; padding: 0; background: transparent; border-radius: 40%; cursor: pointer; z-index: 2;
   display: grid; place-items: center; -webkit-tap-highlight-color: transparent;
 }
 .bonus-spot > * { grid-area: 1 / 1; }
-.bonus-spot .bs-gem { width: 100%; height: 100%; display: grid; place-items: center; }
-.bonus-spot .bs-gem svg { width: 100%; height: 100%; }
-.bonus-spot:focus-visible { outline: 3px solid var(--cyan); outline-offset: 4px; }
+.bonus-spot:focus-visible { outline: 3px solid var(--cyan); outline-offset: 2px; }
 
-/* Bloqueado: apagado, com cadeado. */
-.bonus-spot:not(.open) .bs-gem { filter: grayscale(.85) brightness(.75); opacity: .7; }
-.bonus-spot .bs-lock { align-self: end; justify-self: end; font-size: clamp(12px, 3.2vw, 20px); transform: translate(20%, 10%); filter: drop-shadow(0 1px 2px rgba(0,0,0,.6)); }
-@media (hover: hover) { .bonus-spot:not(.open):hover .bs-gem { opacity: .9; filter: grayscale(.5) brightness(.9); } }
+/* Bloqueado: o cristal pintado fica cinza e escuro (véu no formato do cristal), com o cadeado no centro. */
+.bonus-spot .bs-veil {
+  width: 100%; height: 100%; pointer-events: none;
+  clip-path: polygon(50% 0, 84% 20%, 100% 48%, 86% 82%, 50% 100%, 14% 82%, 0 48%, 16% 20%);
+  -webkit-backdrop-filter: grayscale(1) brightness(.5); backdrop-filter: grayscale(1) brightness(.5);
+  background: rgba(20, 12, 40, .25); transition: background .2s;
+}
+.bonus-spot .bs-lock { font-size: clamp(18px, 5vw, 30px); filter: drop-shadow(0 2px 3px rgba(0,0,0,.7)); }
+@media (hover: hover) { .bonus-spot:not(.open):hover .bs-veil { background: rgba(20, 12, 40, .05); } }
 
-/* Liberado: halo pulsando, anel girando, faíscas e uma leve flutuação. */
-.bonus-spot.open .bs-gem { animation: bs-float 3.2s ease-in-out infinite; filter: drop-shadow(0 0 6px #FFC93C) drop-shadow(0 0 14px rgba(255, 201, 60, .65)); }
-.bonus-spot .bs-halo { width: 170%; height: 170%; border-radius: 50%; background: radial-gradient(closest-side, rgba(255, 225, 120, .55), rgba(240, 91, 200, .25) 55%, transparent 72%); animation: bs-pulse 2.4s ease-in-out infinite; pointer-events: none; }
-.bonus-spot .bs-ring { width: 135%; height: 135%; border-radius: 50%; border: 2px dashed rgba(255, 233, 160, .85); animation: bs-spin 9s linear infinite; pointer-events: none; }
+/* Liberado: halo esmeralda pulsando, anel girando e faíscas em volta do cristal. */
+.bonus-spot .bs-halo { width: 150%; aspect-ratio: 1; border-radius: 50%; background: radial-gradient(closest-side, rgba(216, 255, 176, .5), rgba(61, 220, 90, .3) 55%, transparent 72%); animation: bs-pulse 2.4s ease-in-out infinite; pointer-events: none; mix-blend-mode: screen; }
+.bonus-spot .bs-ring { width: 125%; aspect-ratio: 1; border-radius: 50%; border: 2px dashed rgba(216, 255, 176, .8); animation: bs-spin 9s linear infinite; pointer-events: none; }
 .bonus-spot .bs-spark {
-  width: 7%; height: 7%; border-radius: 50%; background: #FFF5C8; box-shadow: 0 0 6px 2px #FFC93C; pointer-events: none;
-  transform: rotate(calc(var(--i) * 60deg)) translateY(-78%); animation: bs-twinkle 1.8s ease-in-out calc(var(--i) * .3s) infinite;
+  width: 6%; aspect-ratio: 1; border-radius: 50%; background: #FFFBD6; box-shadow: 0 0 6px 2px #3DDC5A; pointer-events: none;
+  transform: rotate(calc(var(--i) * 60deg)) translateY(-1000%); animation: bs-twinkle 1.8s ease-in-out calc(var(--i) * .3s) infinite;
 }
-.bonus-spot .bs-tag {
-  align-self: end; transform: translateY(70%); padding: 1px 8px; border-radius: 999px; white-space: nowrap;
-  font: 700 clamp(9px, 2.4vw, 12px) / 1.5 var(--font-title); letter-spacing: .04em; text-transform: uppercase;
-  color: #3A2200; background: linear-gradient(180deg, #FFE58A, #FFC93C); box-shadow: 0 2px 6px rgba(0,0,0,.35);
-}
-@media (hover: hover) { .bonus-spot.open:hover .bs-gem { filter: drop-shadow(0 0 10px #FFE58A) drop-shadow(0 0 22px rgba(255, 201, 60, .9)); } }
-.bonus-spot.open:active .bs-gem { transform: scale(.94); }
-@keyframes bs-float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-6%); } }
-@keyframes bs-pulse { 0%, 100% { transform: scale(.85); opacity: .65; } 50% { transform: scale(1.08); opacity: 1; } }
+@media (hover: hover) { .bonus-spot.open:hover .bs-halo { animation-duration: 1.2s; } }
+.bonus-spot.open:active .bs-halo { transform: scale(.9); }
+@keyframes bs-pulse { 0%, 100% { transform: scale(.85); opacity: .6; } 50% { transform: scale(1.06); opacity: 1; } }
 @keyframes bs-spin { to { transform: rotate(360deg); } }
 @keyframes bs-twinkle { 0%, 100% { opacity: 0; scale: .4; } 50% { opacity: 1; scale: 1.2; } }
 @media (prefers-reduced-motion: reduce) {
-  .bonus-spot.open .bs-gem, .bonus-spot .bs-halo, .bonus-spot .bs-ring, .bonus-spot .bs-spark { animation: none; }
+  .bonus-spot .bs-halo, .bonus-spot .bs-ring, .bonus-spot .bs-spark { animation: none; }
   .bonus-spot .bs-spark { opacity: .8; }
+}
+
+/* Na grade de 2 colunas do Início, o card do bônus (5º) ocupa a linha inteira em vez de ficar sozinho numa coluna. */
+@media (min-width: 341px) and (not ((orientation: landscape) and (max-height: 540px))) {
+  .ggrid > .gcard.bonus:last-child:nth-child(odd) { grid-column: 1 / -1; }
+  .ggrid > .gcard.bonus:last-child:nth-child(odd) > :is(.gtext, .bonus-req, .gprog) { width: 100%; max-width: 320px; }
 }

@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { allCases } from "./catalog";
 import { CASES_DATA } from "./data";
 import { allowedCells, blockedCells, objectsOf, peopleOf, rcOf, sideNeighbors } from "./model";
-import { OBJ_MARK, cellsOfClue, focusOf, markKey, objMarkKey, validMark } from "./relations";
+import { GRID_NO, GRID_YES, cellNote, cellsOfClue, focusOf, gridNote, nextGrid, nextNote, readNote, validMark } from "./relations";
 
 describe("investigação: ligações entre pistas, personagens, objetos e casas", () => {
   it("toda pista cita alguém ou algum objeto, e selecionar a pista acende exatamente isso", () => {
@@ -29,15 +29,35 @@ describe("investigação: ligações entre pistas, personagens, objetos e casas"
     }
   });
 
-  it("marcas X de casa e de objeto não se misturam e são validadas no rascunho", () => {
+  it("quadro de decisões: anotações de casa (✕ ou personagem) e da tabela (✕ ou ✓); versões antigas são descartadas", () => {
     for (const c of allCases()) {
-      const m = c.model, n = m.people.length;
-      expect(markKey(m, n - 1, m.rows * m.cols - 1)).toBeLessThan(OBJ_MARK);
-      expect(objMarkKey(m, n - 1, n - 1)).toBeGreaterThanOrEqual(OBJ_MARK);
-      expect(validMark(m, markKey(m, 0, 0))).toBe(true);
-      expect(validMark(m, objMarkKey(m, n - 1, n - 1))).toBe(true);
-      expect(validMark(m, OBJ_MARK + n * n)).toBe(false);
+      const m = c.model, n = m.people.length, V = m.rows * m.cols;
+      for (const who of [-1, 0, n - 1]) {
+        expect(readNote(cellNote(V - 1, who))).toEqual({ t: "cell", i: V - 1, who });
+        expect(validMark(m, cellNote(V - 1, who))).toBe(true);
+      }
+      for (const st of [GRID_NO, GRID_YES]) {
+        expect(readNote(gridNote(n - 1, n - 1, st))).toMatchObject({ t: "grid", s: n - 1, o: n - 1, state: st });
+        expect(validMark(m, gridNote(n - 1, n - 1, st))).toBe(true);
+      }
+      expect(validMark(m, cellNote(V, 0))).toBe(false);
+      expect(validMark(m, cellNote(0, n))).toBe(false);
+      expect(validMark(m, gridNote(n, 0, GRID_NO))).toBe(false);
+      expect(validMark(m, gridNote(0, n, GRID_YES))).toBe(false);
+      for (const old of [0, 5, 100000, 100003, 200000, 200007, 500001, 500017]) expect(validMark(m, old)).toBe(false);
     }
+  });
+
+  it("tabela O quê?: cada toque alterna vazio → ✕ → ✓ → vazio", () => {
+    expect([nextGrid(undefined), nextGrid(GRID_NO), nextGrid(GRID_YES)]).toEqual([GRID_NO, GRID_YES, undefined]);
+  });
+
+  it("cada toque: vazio → ✕ → personagens (pulando quem já está anotado em outro espaço) → vazio", () => {
+    const notes = new Map<number, number>([[7, 1]]);
+    const seq: (number | undefined)[] = [];
+    let cur: number | undefined;
+    for (let i = 0; i < 5; i++) { const nx = nextNote(cur === undefined ? new Map([...notes]) : new Map([...notes, [3, cur]]), 3, 3); seq.push(nx); cur = nx; if (nx === undefined) break; }
+    expect(seq).toEqual([-1, 0, 2, undefined]);
   });
 });
 
