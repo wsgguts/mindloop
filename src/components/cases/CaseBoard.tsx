@@ -1,184 +1,133 @@
 "use client";
-import TangoSymbol from "../TangoSymbol";
-import { CRISTAL, ORBE } from "../../lib/tangoLogic";
-import { type Model, cellName, hasEdge, layoutVoice, patternVoice, stopOrd, the, valueText } from "../../lib/cases/model";
+// Tabuleiro da investigação: o CENÁRIO do caso (o mesmo componente para os 5 jogos).
+// Cômodos coloridos (com o nome no primeiro canto e paredes entre eles), móveis que bloqueiam a casa, assentos
+// que podem ser ocupados e os personagens posicionados (com o objeto que a pessoa escolheu para cada um).
+// A regra de cada jogo aparece por cima:
+//   Zip — a trilha numerada (as outras casas ficam fora do caminho);
+//   Tango — os dois lados nomeados à esquerda;
+//   Astros — com alguém selecionado, as linhas/colunas ocupadas apagam e as 8 casas em volta acendem;
+//   Sudoku — linhas, colunas e cômodos já ocupados apagam para quem está selecionado.
+import { type Model, allowedCells, cellName, propAt, rcOf, roomOf, stopOf } from "../../lib/cases/model";
+import type { Focus } from "../../lib/cases/relations";
 
-// Área interativa de dedução de cada tipo de mistério. Todas seguem o mesmo gesto:
-// escolha um item (disco, pessoa, lugar, objeto) e depois o valor (número, símbolo, parada, casa).
-// Valores nunca se repetem quando o caso pede isso: escolher um valor já usado o tira do outro item.
+/** Cores de piso de cada cômodo (claras, para os ícones contrastarem). */
+export const ROOM_TINTS = ["#EDE2FB", "#D8F3F7", "#FDEBC8", "#DDF4E4", "#FFE0EC"];
 
 export interface BoardProps {
   model: Model;
+  /** Resposta atual: casa de cada pessoa, depois objeto de cada pessoa (-1 = vazio). */
   a: number[];
+  /** Pessoa selecionada (para posicionar). */
   sel: number | null;
   done: boolean;
-  /** Marcas de erro no tabuleiro (três iguais, estrada inexistente): só depois de reveladas, como no resto do jogo. */
+  /** Marcas de erro da regra do lugar (só depois de reveladas, como no resto do jogo). */
   showErrors?: boolean;
+  focus?: Focus;
   onSelect: (s: number | null) => void;
-  onAssign: (s: number, v: number) => void;
+  /** Coloca a pessoa s na casa v (-1 = tira do tabuleiro). */
+  onPlace: (s: number, v: number) => void;
 }
 
-const symOf = (v: number) => (v === 0 ? CRISTAL : ORBE);
-/** Valor do Tango: o ícone da história (☂️, 🍫, 🟢…) ou, sem ícone, o símbolo clássico (Cristal/Orbe). */
-function Sym({ model, v, size }: { model: Model; v: number; size: number | string }) {
-  const icon = model.values[v]?.icon;
-  return icon ? <span className="cx-emoji" style={{ fontSize: typeof size === "number" ? size : undefined }} aria-hidden="true">{icon}</span> : <TangoSymbol v={symOf(v)} size={size} />;
-}
-const deArt = (e: { label: string; g?: "m" | "f" }) => `${e.g === "f" ? "da" : "do"} ${e.label}`;
-
-export default function CaseBoard(p: BoardProps) {
-  switch (p.model.kind) {
-    case "code": return <CodeBoard {...p} />;
-    case "pattern": return <PatternBoard {...p} />;
-    case "route": return <RouteBoard {...p} />;
-    case "layout": return <LayoutBoard {...p} />;
-  }
-}
-
-/** Teclado de valores (números do cofre ou paradas da rota). */
-function Pad({ model, a, sel, done, onAssign, label }: BoardProps & { label: (v: number) => string }) {
-  return (
-    <div className="cx-pad" role="group" aria-label={sel === null ? "Escolha um item primeiro" : `Valor para ${model.slots[sel].label}`}>
-      {model.values.map((_, v) => {
-        const owner = a.indexOf(v);
-        return (
-          <button key={v} className={`${owner >= 0 ? "used" : ""}${sel !== null && a[sel] === v ? " on" : ""}`} disabled={done || sel === null}
-            onClick={() => sel !== null && onAssign(sel, v)} aria-label={`${label(v)}${owner >= 0 ? ` (agora com ${model.slots[owner].label})` : ""}`}>
-            {label(v)}
-          </button>
-        );
-      })}
-      <button className="erase" disabled={done || sel === null || a[sel] < 0} onClick={() => sel !== null && onAssign(sel, -1)} aria-label="Apagar">⌫</button>
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------- Mini Sudoku: cofre de discos
-
-function CodeBoard(p: BoardProps) {
-  const { model, a, sel, done, onSelect } = p;
-  return (
-    <div className="cx-code">
-      <div className="cx-safe" role="group" aria-label="Posições do segredo" style={{ "--n": model.slots.length } as React.CSSProperties}>
-        {model.slots.map((s, i) => (
-          <button key={i} className={`cx-dial${sel === i ? " sel" : ""}${a[i] >= 0 ? " set" : ""}`} disabled={done}
-            aria-pressed={sel === i} aria-label={`${s.label}: ${a[i] >= 0 ? a[i] + 1 : "vazio"}`} onClick={() => onSelect(sel === i ? null : i)}>
-            <span className="cx-dial-face">{a[i] >= 0 ? a[i] + 1 : "?"}</span>
-            <small>{s.icon && <span aria-hidden="true">{s.icon} </span>}{s.label}</small>
-          </button>
-        ))}
-      </div>
-      <Pad {...p} label={(v) => String(v + 1)} />
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------- Tango: fila de Cristais e Orbes
-
-function PatternBoard({ model, a, done, showErrors, onAssign }: BoardProps) {
-  // Toque alterna: vazio → Cristal → Orbe → vazio (como no Tango).
-  const cycle = (s: number) => onAssign(s, a[s] === -1 ? 0 : a[s] === 0 ? 1 : -1);
-  const triple = (i: number) => !!showErrors && a[i] >= 0 && [[i - 2, i - 1], [i - 1, i + 1], [i + 1, i + 2]].some(([x, y]) => a[x] === a[i] && a[y] === a[i]);
-  const half = model.slots.length / 2;
-  const count = (v: number) => a.filter((x) => x === v).length;
-  return (
-    <div className="cx-pattern">
-      <p className="cx-dir" aria-hidden="true">← começo {deArt(patternVoice(model).line)} · fim {deArt(patternVoice(model).line)} →</p>
-      <ol className="cx-line" style={{ "--n": model.slots.length } as React.CSSProperties}>
-        {model.slots.map((s, i) => (
-          <li key={i}>
-            <button className={`cx-person${a[i] >= 0 ? " set" : ""}${triple(i) ? " bad" : ""}`} disabled={done} onClick={() => cycle(i)}
-              aria-label={`${s.label}, posição ${i + 1}: ${a[i] >= 0 ? model.values[a[i]].label : "vazio"}. Toque para trocar.`}>
-              <span className="cx-sym">{a[i] >= 0 ? <Sym model={model} v={a[i]} size="100%" /> : <i />}</span>
-              <span className="cx-pos" aria-hidden="true">{i + 1}</span><span className="cx-name">{s.label}</span>
-            </button>
-          </li>
-        ))}
-      </ol>
-      <p className="cx-count" aria-live="polite">
-        <span className={showErrors && count(0) > half ? "over" : ""} aria-label={`${model.values[0].label}: ${count(0)} de ${half}`}><Sym model={model} v={0} size={18} /> {count(0)}/{half}</span>
-        <span className={showErrors && count(1) > half ? "over" : ""} aria-label={`${model.values[1].label}: ${count(1)} de ${half}`}><Sym model={model} v={1} size={18} /> {count(1)}/{half}</span>
-      </p>
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------- Zip: mapa de lugares e estradas
-
-function RouteBoard(p: BoardProps) {
-  const { model, a, sel, done, showErrors, onSelect } = p;
-  const pos = model.pos!;
-  const at: number[] = [];
-  a.forEach((v, s) => { if (v >= 0) at[v] = s; });
-  const legs: [number, number][] = [];
-  for (let k = 1; k < model.slots.length; k++) if (at[k - 1] !== undefined && at[k] !== undefined) legs.push([at[k - 1], at[k]]);
-  return (
-    <div className="cx-route">
-      <div className="cx-map" role="group" aria-label="Mapa com os lugares">
-        <svg viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
-          {model.edges!.map(([x, y], i) => (
-            <line key={i} x1={pos[x][0]} y1={pos[x][1]} x2={pos[y][0]} y2={pos[y][1]} className="road" vectorEffect="non-scaling-stroke" />
-          ))}
-          {legs.map(([x, y], i) => (
-            <line key={`l${i}`} x1={pos[x][0]} y1={pos[x][1]} x2={pos[y][0]} y2={pos[y][1]} className={`leg${showErrors && !hasEdge(model, x, y) ? " bad" : ""}`} vectorEffect="non-scaling-stroke" />
-          ))}
-        </svg>
-        {model.slots.map((s, i) => (
-          <button key={i} className={`cx-place${sel === i ? " sel" : ""}${a[i] >= 0 ? " set" : ""}`} style={{ left: `${pos[i][0]}%`, top: `${pos[i][1]}%` }}
-            disabled={done} aria-pressed={sel === i} aria-label={`${s.label}: ${a[i] >= 0 ? valueText(model, a[i]) : "sem ordem"}`} onClick={() => onSelect(sel === i ? null : i)}>
-            <span className="cx-pin">{s.icon}</span>
-            <span className="cx-pname">{s.label}</span>
-            {a[i] >= 0 && <b className="cx-step">{a[i] + 1}</b>}
-          </button>
-        ))}
-      </div>
-      <p className="cx-help">{sel === null ? "Toque num lugar e depois escolha a posição dele no percurso." : `Em que posição do percurso aparece ${the(model.slots[sel])}?`}</p>
-      <Pad {...p} label={(v) => stopOrd(model, v)} />
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------- Patches: vitrine em grade
-
-function LayoutBoard({ model, a, sel, done, onSelect, onAssign }: BoardProps) {
-  const [rows, cols] = model.grid!;
-  const ownerOf = (v: number) => a.indexOf(v);
-  function tapCell(v: number) {
-    if (done) return;
+export default function CaseBoard({ model: m, a, sel, done, showErrors, focus, onSelect, onPlace }: BoardProps) {
+  const n = m.people.length;
+  const { rows, cols } = m;
+  const pos = a.slice(0, n), obj = a.slice(n);
+  const allowed = new Set(allowedCells(m));
+  const ownerOf = (v: number) => pos.indexOf(v);
+  const firstOfRoom = (v: number) => m.scene.room.indexOf(m.scene.room[v]) === v;
+  // Para quem está selecionado: casas que a regra do lugar já fecha (linha, coluna, cômodo ou lado ocupados).
+  const closed = (v: number) => {
+    if (sel === null) return false;
+    const [r, c] = rcOf(m, v);
+    return pos.some((w, t) => {
+      if (t === sel || w < 0) return false;
+      const [r2, c2] = rcOf(m, w);
+      if ((m.rule === "regioes" || m.rule === "ceu") && (r === r2 || c === c2)) return true;
+      if ((m.rule === "regioes" || m.rule === "comodos") && roomOf(m, v) === roomOf(m, w)) return true;
+      if (m.rule === "equilibrio" && c === c2) return true;
+      return false;
+    });
+  };
+  const rays = m.rule === "ceu" ? pos.flatMap((v, s) => (v >= 0 && (s === sel || focus?.people.has(s)) ? [v] : [])) : [];
+  const inRay = (v: number) => rays.some((w) => w !== v && Math.max(Math.abs(rcOf(m, v)[0] - rcOf(m, w)[0]), Math.abs(rcOf(m, v)[1] - rcOf(m, w)[1])) === 1);
+  const clash = (v: number) => {
     const o = ownerOf(v);
-    if (sel !== null) { if (o === sel) onSelect(null); else { onAssign(sel, v); onSelect(null); } }
+    if (!showErrors || o < 0) return false;
+    const [r, c] = rcOf(m, v);
+    return pos.some((w, t) => {
+      if (t === o || w < 0) return false;
+      const [r2, c2] = rcOf(m, w);
+      return ((m.rule === "regioes" || m.rule === "ceu") && (r === r2 || c === c2)) || ((m.rule === "regioes" || m.rule === "comodos") && roomOf(m, v) === roomOf(m, w)) || (m.rule === "equilibrio" && c === c2);
+    });
+  };
+  const edge = (v: number, dr: number, dc: number) => {
+    const [r, c] = rcOf(m, v), y = r + dr, x = c + dc;
+    return y >= 0 && y < rows && x >= 0 && x < cols && roomOf(m, y * cols + x) !== roomOf(m, v);
+  };
+  function tapCell(v: number) {
+    if (done || !allowed.has(v)) return;
+    const o = ownerOf(v);
+    if (sel !== null) { if (o === sel) onSelect(null); else { onPlace(sel, v); onSelect(null); } }
     else if (o >= 0) onSelect(o);
   }
-  const tray = model.slots.map((_, i) => i).filter((i) => a[i] < 0);
+  const tray = m.people.map((_, i) => i).filter((i) => pos[i] < 0);
+  // Trilha do Zip: linha que liga o centro das casas, em ordem.
+  const center = (v: number) => { const [r, c] = rcOf(m, v); return [((c + 0.5) / cols) * 100, ((r + 0.5) / rows) * 100]; };
+
   return (
-    <div className="cx-layout">
-      <div className="cx-shelf" style={{ gridTemplateColumns: `auto repeat(${cols}, 1fr)` }} role="grid" aria-label={`Grade ${rows} por ${cols}`}>
-        <span />
-        {Array.from({ length: cols }, (_, c) => <span key={c} className="cx-axis">{"ABC"[c]}</span>)}
-        {Array.from({ length: rows }, (_, r) => [
-          <span key={`r${r}`} className="cx-axis">{r + 1}</span>,
-          ...Array.from({ length: cols }, (_, c) => {
-            const v = r * cols + c, o = ownerOf(v);
+    <div className="cx-scenebox">
+      <div className={`cx-sceneframe rule-${m.rule}`}>
+        {m.rule === "equilibrio" && (
+          <div className="cx-sides" aria-hidden="true">{m.scene.rooms.slice(0, 2).map((r, k) => <span key={k} style={{ background: ROOM_TINTS[k] }}>{r.label}</span>)}</div>
+        )}
+        <div className="cx-sceneboard" style={{ gridTemplateColumns: `repeat(${cols}, 1fr)`, aspectRatio: `${cols} / ${rows}` }} role="grid"
+          aria-label={`Cenário ${rows} por ${cols} com ${m.scene.rooms.length} ${m.rule === "equilibrio" ? "lados" : "cômodos"}`}>
+          {m.trail && (
+            <svg className="cx-trail" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+              <polyline points={m.trail.map((v) => center(v).join(",")).join(" ")} vectorEffect="non-scaling-stroke" />
+            </svg>
+          )}
+          {Array.from({ length: rows * cols }, (_, v) => {
+            const o = ownerOf(v), p = propAt(m, v);
+            const blocked = !!p?.block;
+            const offTrail = !!m.trail && !m.trail.includes(v);
+            const shut = !blocked && !offTrail && o < 0 && closed(v);
+            const room = m.scene.rooms[roomOf(m, v)];
+            const cls = ["cx-sc", blocked ? "block" : offTrail ? "offtrail" : o >= 0 ? "full" : "free", o >= 0 && o === sel && "sel",
+              sel !== null && o < 0 && allowed.has(v) && !shut && "target", shut && "off", inRay(v) && "ray", clash(v) && "bad",
+              focus?.cells.has(v) && "rel", o >= 0 && focus?.people.has(o) && "relp",
+              edge(v, -1, 0) && "bt", edge(v, 0, 1) && "br", edge(v, 1, 0) && "bb", edge(v, 0, -1) && "bl"].filter(Boolean).join(" ");
+            const label = `Casa ${cellName(m, v)}, ${room.label}: ${blocked ? `${p!.label} (bloqueada)` : offTrail ? "fora da trilha" : o >= 0 ? `${m.people[o].label}${obj[o] >= 0 ? ` com ${m.objects[obj[o]].label}` : ""}` : shut ? "fechada pela regra do lugar" : p ? `${p.label}, livre` : "livre"}${m.trail && !offTrail ? `, parada ${stopOf(m, v) + 1}` : ""}`;
             return (
-              <button key={v} role="gridcell" className={`cx-niche${o >= 0 ? " full" : ""}${o >= 0 && o === sel ? " sel" : ""}${sel !== null && o < 0 ? " target" : ""}`} disabled={done}
-                aria-label={`${layoutVoice(model).cell.label} ${cellName(model, v)}: ${o >= 0 ? model.slots[o].label : "vazio"}`} onClick={() => tapCell(v)}>
-                {o >= 0 ? <><span className="cx-obj">{model.slots[o].icon}</span><small>{model.slots[o].label}</small></> : <small className="cx-cell">{cellName(model, v)}</small>}
+              <button key={v} role="gridcell" className={cls} disabled={done || blocked || offTrail} aria-label={label} onClick={() => tapCell(v)}
+                style={{ "--floor": ROOM_TINTS[roomOf(m, v) % ROOM_TINTS.length] } as React.CSSProperties}>
+                {firstOfRoom(v) && m.rule !== "equilibrio" && <span className="cx-room" aria-hidden="true">{room.label}</span>}
+                {m.trail && !offTrail && <span className="cx-stop" aria-hidden="true">{stopOf(m, v) + 1}</span>}
+                {blocked ? <span className="cx-prop" aria-hidden="true">{p!.icon}</span>
+                  : o >= 0 ? <>
+                    <span className="cx-who" aria-hidden="true">{m.people[o].icon}</span>
+                    {obj[o] >= 0 && <span className="cx-hold" aria-hidden="true">{m.objects[obj[o]].icon}</span>}
+                    <small>{m.people[o].label}</small>
+                  </>
+                  : <>{p && <span className="cx-seat" aria-hidden="true">{p.icon}</span>}{!offTrail && <small className="cx-cell">{cellName(m, v)}</small>}</>}
               </button>
             );
-          }),
-        ])}
+          })}
+        </div>
       </div>
-      <div className="cx-tray" role="group" aria-label="Peças fora da grade">
-        {tray.length === 0 ? <span className="cx-help">Todas as peças estão na grade. Toque numa peça para movê-la.</span> : tray.map((i) => (
-          <button key={i} className={`cx-piece${sel === i ? " sel" : ""}`} disabled={done} aria-pressed={sel === i} onClick={() => onSelect(sel === i ? null : i)}>
-            <span className="cx-obj">{model.slots[i].icon}</span>{model.slots[i].label}
+      <div className="cx-tray" role="group" aria-label="Personagens ainda sem lugar">
+        {tray.length === 0 ? <span className="cx-help">Todos estão no cenário. Toque num deles para mudar de lugar.</span> : tray.map((i) => (
+          <button key={i} className={`cx-piece${sel === i ? " sel" : ""}${focus?.people.has(i) ? " rel" : ""}`} disabled={done} aria-pressed={sel === i} onClick={() => onSelect(sel === i ? null : i)}>
+            <span className="cx-obj">{m.people[i].icon}</span>{m.people[i].label}
           </button>
         ))}
-        {sel !== null && a[sel] >= 0 && !done && (
-          <button className="cx-piece out" onClick={() => { onAssign(sel, -1); onSelect(null); }}>↩ Tirar {model.slots[sel].label} da grade</button>
+        {sel !== null && pos[sel] >= 0 && !done && (
+          <button className="cx-piece out" onClick={() => { onPlace(sel, -1); onSelect(null); }}>↩ Tirar {m.people[sel].label} do cenário</button>
         )}
       </div>
-      <p className="cx-help">{sel === null ? `Escolha um item e depois ${the(layoutVoice(model).cell)} onde ele fica.` : `Onde fica ${the(model.slots[sel])}? Toque na grade.`}</p>
+      <p className="cx-help">{sel === null
+        ? "Escolha um personagem e depois a casa onde ele estava. Casas com móvel estão bloqueadas."
+        : `Onde estava ${m.people[sel].label}? ${m.rule === "ceu" ? "Casas apagadas já têm alguém na linha ou coluna; as douradas encostam nele." : m.rule === "trilha" ? "Só as paradas numeradas da trilha servem." : "Casas apagadas já estão fechadas pela regra do lugar."}`}</p>
     </div>
   );
 }

@@ -1,9 +1,11 @@
-// Mindloop Investigação — formato de uma história. Cada caso do banco tem a SUA história (stories/*.ts), na ordem
-// da jornada: título, cenário, personagens/objetos, as palavras das pistas (voz) e o desfecho.
+// Mindloop Investigação — formato de uma história.
+// Cada jogo tem 10 investigações, uma por capítulo, e cada uma acontece no MUNDO daquele capítulo (capítulo 1 =
+// Reino Celestial, 2 = Floresta dos Cristais… 10 = Trono do Infinito). A história traz o seu próprio lugar:
+// os cômodos, os móveis (que bloqueiam casas) e os assentos (casas que podem ser ocupadas e citadas nas pistas).
+// O que se descobre é sempre o mesmo par: ONDE cada personagem estava e QUE OBJETO tinha nas mãos.
 // A história não repete as regras do jogo (elas aparecem à parte, na tela da investigação).
 
 import type { Ent } from "./model";
-import type { Voice } from "./voice";
 
 /** Universo narrativo (usado para garantir variedade entre casos vizinhos). */
 export type Universe =
@@ -21,17 +23,18 @@ export interface Story {
   title: string;
   universe: Universe;
   tone: Tone;
-  /** Contexto: 2–3 frases curtas, sem regras do jogo. */
+  /** Contexto: 2–3 frases curtas, sem regras do jogo (contado pelo narrador do jogo). */
   intro: string;
   /** A pergunta do caso. */
   goal: string;
-  /** Desfecho mostrado ao resolver (a conclusão da história). */
+  /** Desfecho mostrado ao resolver. Pode citar quem tinha cada objeto: {com:Nome do Objeto} → "a Ana". */
   ending: string;
-  /** Personagens, objetos ou lugares (na ordem: posição na fila/cofre; no mapa e na grade a ordem não importa). */
-  slots: Ent[];
-  /** Tango: os dois valores possíveis (com ícone). */
-  values?: [Ent, Ent];
-  voice: Voice;
-  /** Mini Sudoku: regra fixa com as palavras da história (substitui a regra da voz). */
-  rule?: string;
+  /** Personagens (4; os casos iniciais usam os 3 primeiros). */
+  people: Ent[];
+  /** Objetos (4; um por personagem). */
+  objects: Ent[];
+  /** O lugar: cômodos (4), móveis que bloqueiam (3) e assentos (2). No Tango, os 2 primeiros cômodos são os lados. */
+  rooms: Ent[];
+  blocks: Ent[];
+  seats: Ent[];
 }

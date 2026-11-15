@@ -22,7 +22,7 @@ export function CaseScene({ kind, look, className }: { kind: CaseKind; look: Loo
       {bg}
       <rect width="160" height="120" fill={`url(#bg${id})`} />
       <rect width="160" height="120" fill={`url(#gl${id})`} />
-      {kind === "code" && (
+      {kind === "regioes" && (
         <g>
           {/* cofre com três discos e maçaneta */}
           <rect x="34" y="14" width="92" height="92" rx="10" fill={deep} stroke="#120630" strokeWidth="3" />
@@ -40,7 +40,7 @@ export function CaseScene({ kind, look, className }: { kind: CaseKind; look: Loo
           <text x="22" y="34" fontSize="13" fill="#FFD23F" opacity=".9">✦</text><text x="134" y="104" fontSize="10" fill={light}>✦</text>
         </g>
       )}
-      {kind === "pattern" && (
+      {kind === "equilibrio" && (
         <g>
           {/* varal de lampiões alternando cristal (hexágono) e orbe (círculo) */}
           <path d="M6 22 Q80 48 154 22" fill="none" stroke={light} strokeWidth="1.6" opacity=".7" />
@@ -62,7 +62,7 @@ export function CaseScene({ kind, look, className }: { kind: CaseKind; look: Loo
           {[30, 62, 100, 132].map((x) => <path key={x} d={`M${x} 108v-12a5 5 0 0 1 10 0v12`} fill="#120630" opacity=".8" />)}
         </g>
       )}
-      {kind === "route" && (
+      {kind === "trilha" && (
         <g>
           {/* mapa de pergaminho com estradas, caminho tracejado e alfinete */}
           <path d="M14 16l40-6 52 6 40-6v96l-40 6-52-6-40 6z" fill="#F6E7C8" stroke="#8A6A3B" strokeWidth="2" />
@@ -78,7 +78,22 @@ export function CaseScene({ kind, look, className }: { kind: CaseKind; look: Loo
           <path d="M28 38l-3 8h6z" fill="#8A6A3B" />
         </g>
       )}
-      {kind === "layout" && (
+      {kind === "ceu" && (
+        <g>
+          {/* céu 4×4: um astro por linha e coluna; o "raio" de 8 casas em volta de um deles mostra o que é encostar */}
+          <rect x="32" y="8" width="96" height="96" rx="8" fill="#140838" stroke={light} strokeOpacity=".5" strokeWidth="2" />
+          {[0, 1, 2, 3].map((r) => [0, 1, 2, 3].map((c) => (
+            <rect key={`${r}${c}`} x={36 + c * 22.5} y={12 + r * 22.5} width="20" height="20" rx="3" fill="#24104F" stroke={light} strokeOpacity=".18" />
+          )))}
+          <rect x={36 + 0 * 22.5 - 1} y={12 + 1 * 22.5 - 1} width="45" height="67.5" rx="5" fill={main} fillOpacity=".12" stroke={main} strokeWidth="1.5" strokeDasharray="4 3" />
+          {[[0, 1], [1, 3], [2, 0], [3, 2]].map(([r, c], i) => (
+            <path key={i} transform={`translate(${46 + c * 22.5} ${22 + r * 22.5}) scale(${i === 2 ? 0.95 : 0.75})`}
+              d="M0-9c1 5 3 7 9 9-6 2-8 4-9 9-1-5-3-7-9-9 6-2 8-4 9-9z" fill={i === 2 ? "#FFE58A" : "#FFC93C"} stroke="#9A5A00" strokeWidth="1" />
+          ))}
+          <circle cx="140" cy="20" r="1.6" fill="#fff" opacity=".8" /><circle cx="20" cy="96" r="1.3" fill="#fff" opacity=".6" /><circle cx="146" cy="88" r="1" fill={light} />
+        </g>
+      )}
+      {kind === "comodos" && (
         <g>
           {/* vitrine de nichos 3×3 com relíquias e um nicho vazio */}
           <rect x="30" y="10" width="100" height="100" rx="8" fill="#5A2E14" stroke="#2E1408" strokeWidth="3" />

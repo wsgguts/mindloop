@@ -4,6 +4,7 @@ import "./globals.css";
 import "./features.css";
 import "./journeys.css";
 import "./cases.css";
+import "./cases-areas.css";
 import "./ui.css";
 import "./astros.css";
 

@@ -129,7 +129,7 @@ export const ACHIEVEMENTS: Achievement[] = [
   { id: "inv-deducao-pura", title: "Dedução Pura", desc: "Resolva 5 mistérios diferentes sem pedir nenhuma dica.", category: "investigacao", rarity: "prata", target: 5, unit: "mistérios", value: golds },
   { id: "inv-detetive-experiente", title: "Detetive Experiente", desc: "Resolva 30 mistérios.", category: "investigacao", rarity: "ouro", target: 30, unit: "mistérios", value: (c) => cases(c) },
   { id: "inv-lupa-de-ouro", title: "Coleção de Lupas", desc: "Resolva 20 mistérios diferentes sem pedir nenhuma dica.", category: "investigacao", rarity: "ouro", target: 20, unit: "mistérios", value: golds },
-  { id: "inv-mestre", title: "Mestre Investigador", desc: "Resolva 80 mistérios.", category: "investigacao", rarity: "diamante", target: 80, unit: "mistérios", value: (c) => cases(c) },
+  { id: "inv-mestre", title: "Mestre Investigador", desc: "Resolva 40 mistérios.", category: "investigacao", rarity: "diamante", target: 40, unit: "mistérios", value: (c) => cases(c) },
   { id: "inv-quatro-jogos", title: "Detetive Completo", desc: "Resolva pelo menos um mistério em cada um dos 4 jogos.", category: "investigacao", rarity: "prata", target: ALL_GAMES.length, unit: "jogos", value: gamesWithCase },
   { id: "inv-xp-1000", title: "Mil Pistas", desc: "Acumule 1.000 XP em investigações.", category: "investigacao", rarity: "prata", target: 1000, unit: "XP", value: caseXp },
   { id: "inv-raciocinio-versatil", title: "Raciocínio Versátil", desc: "Resolva mistérios de 8 estruturas de raciocínio diferentes (exclusão, cruzamento, contradição…).", category: "investigacao", rarity: "ouro", target: 8, unit: "estruturas", value: structuresSolved },

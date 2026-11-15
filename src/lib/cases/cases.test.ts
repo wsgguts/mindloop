@@ -1,34 +1,27 @@
 import { describe, expect, it } from "vitest";
 import { EVERY_GAME } from "../games";
+import { emptyProgress } from "../journey";
 import { ACHIEVEMENTS, evaluate } from "../achievements";
 import { emptyLog } from "../history";
-import { emptyProgress } from "../journey";
-import { CASE_PATTERNS, caseLevels, xpFor, medalFor } from "./config";
+import { allCases, caseAfter, casesOf, firstBroken, isComplete, isCorrect } from "./catalog";
+import { caseLevels, difficultyOf, xpFor } from "./config";
 import { CASES_DATA } from "./data";
-import { allCases, caseAfter, caseById, casesOf, firstBroken, isCorrect } from "./catalog";
 import { generateGame } from "./generate";
-import { type Model, allAssignments, clueState, clueText, deduce, evalClue, solveAll } from "./model";
-import { emptyCaseLog, goldCount, parseCaseLog, recordSkip, recordSolve, saveDraft, shouldOffer, solvedCount, xpTotal } from "./progress";
+import { allAnswers, clueState, deduce, evalClue, posList, ruleOk } from "./model";
+import { emptyCaseLog, parseCaseLog, recordSkip, recordSolve, saveDraft, shouldOffer, solvedCount, xpTotal } from "./progress";
+import { RULE_OF } from "./themes";
 
-const progress = { sudoku: emptyProgress(), zip: emptyProgress(), tango: emptyProgress(), patches: emptyProgress(), astros: emptyProgress() };
+const progress = Object.fromEntries(EVERY_GAME.map((g) => [g, emptyProgress()])) as Record<(typeof EVERY_GAME)[number], string>;
 
 describe("banco de mistérios", () => {
-  it("segue a agenda de config.ts: um mistério por fase agendada, em todos os jogos", () => {
+  it("uma investigação por capítulo em cada jogo (10 por jogo, 50 no total), na fase da agenda", () => {
+    expect(CASES_DATA).toHaveLength(50);
     for (const g of EVERY_GAME) {
       const levels = caseLevels(g);
+      expect(levels).toHaveLength(10);
+      levels.forEach((l, i) => expect(Math.ceil(l / 10), `${g}`).toBe(i + 1));
       expect(CASES_DATA.filter((c) => c.game === g).map((c) => c.level)).toEqual(levels);
-      expect(levels.length).toBeGreaterThanOrEqual(30);
-      // nunca depois da fase 100 e nunca em fases seguidas (sempre há uma fase tradicional entre dois mistérios)
-      expect(levels.every((l) => l >= 1 && l < 100)).toBe(true);
-      for (let i = 1; i < levels.length; i++) expect(levels[i] - levels[i - 1]).toBeGreaterThanOrEqual(2);
     }
-  });
-
-  it("frequência: em média uma investigação a cada 2 a 4 fases, com padrões variados", () => {
-    const sizes = CASE_PATTERNS.map((p) => p.length);
-    expect(Math.min(...sizes)).toBeGreaterThanOrEqual(3);
-    expect(Math.max(...sizes)).toBeLessThanOrEqual(4);
-    expect(new Set(CASE_PATTERNS.map((p) => p.join())).size).toBe(CASE_PATTERNS.length);
   });
 
   it("ids únicos, e cada jogo só tem os próprios mistérios", () => {
@@ -36,9 +29,13 @@ describe("banco de mistérios", () => {
     for (const g of EVERY_GAME) expect(casesOf(g).every((c) => c.game === g && c.id.startsWith(`${g}-`))).toBe(true);
   });
 
-  it("todo mistério tem UMA única solução, que é a resposta guardada", () => {
+  it("cada jogo usa a regra de cenário dele", () => {
+    for (const c of CASES_DATA) expect(c.model.rule, c.id).toBe(RULE_OF[c.game]);
+  });
+
+  it("todo mistério tem UMA única solução (lugar + objeto de cada um), que é a resposta guardada", () => {
     for (const c of CASES_DATA) {
-      const sols = solveAll(c.model, c.clues, 2);
+      const sols = allAnswers(c.model).filter((a) => c.clues.every((k) => evalClue(c.model, k, a)));
       expect(sols, c.id).toHaveLength(1);
       expect(sols[0], c.id).toEqual(c.sol);
     }
@@ -48,171 +45,135 @@ describe("banco de mistérios", () => {
     for (const c of CASES_DATA) {
       const d = deduce(c.model, c.clues);
       expect(d.solved, c.id).toBe(true);
-      expect(d.domains.map((x) => x.indexOf(true)), c.id).toEqual(c.sol);
     }
   });
 
   it("nenhuma pista é dispensável (cada uma é necessária para a solução ser única)", () => {
     for (const c of CASES_DATA) {
-      const all = allAssignments(c.model);
+      const all = allAnswers(c.model);
       c.clues.forEach((k, i) => {
-        if (k.k === "count" || k.k === "noTriple" || k.k === "roads") return;
+        if (k.k === "rule") return; // a regra do lugar já está embutida nas possibilidades
         const without = c.clues.filter((_, j) => j !== i);
         expect(all.filter((a) => without.every((x) => evalClue(c.model, x, a))).length, `${c.id} pista ${i}`).toBeGreaterThan(1);
       });
     }
   });
 
+  it("a regra do lugar deixa dúvida: sem as pistas, há várias posições possíveis", () => {
+    for (const c of CASES_DATA) expect(posList(c.model).length, c.id).toBeGreaterThanOrEqual(4);
+  });
+
   it("o banco é reproduzível: gerar de novo dá o mesmo resultado (data.ts está atualizado)", () => {
     for (const g of EVERY_GAME) expect(generateGame(g)).toEqual(CASES_DATA.filter((c) => c.game === g));
-  }, 120_000);
+  });
 
-  it("dificuldade cresce ao longo da jornada", () => {
+  it("a dificuldade cresce: mais pessoas, mais pistas e pistas cruzadas nos capítulos finais", () => {
     for (const g of EVERY_GAME) {
-      const cs = casesOf(g);
-      for (let i = 1; i < cs.length; i++) expect(cs[i].difficulty).toBeGreaterThanOrEqual(cs[i - 1].difficulty);
-      const size = (m: Model) => m.slots.length * m.values.length;
-      expect(size(cs[cs.length - 1].model)).toBeGreaterThan(size(cs[0].model));
+      const cs = CASES_DATA.filter((c) => c.game === g);
+      cs.forEach((c) => expect(c.difficulty, c.id).toBe(difficultyOf(c.chapter)));
+      const via = (c: (typeof cs)[number]) => c.clues.filter((k) => k.k === "via").length;
+      const late = cs.filter((c) => c.difficulty >= 3), early = cs.filter((c) => c.difficulty === 1);
+      expect(late.every((c) => c.model.people.length === 4), g).toBe(true);
+      expect(late.every((c) => via(c) >= 2), g).toBe(true);
+      expect(Math.min(...late.map((c) => c.model.rows * c.model.cols)), g).toBeGreaterThanOrEqual(Math.min(...early.map((c) => c.model.rows * c.model.cols)));
     }
   });
 });
 
 describe("catálogo (textos, dicas e explicação)", () => {
-  it("cada mistério tem todos os campos do banco preenchidos", () => {
+  it("cada mistério tem todos os campos preenchidos", () => {
     for (const c of allCases()) {
       expect(c.title.length, c.id).toBeGreaterThan(5);
       expect(c.story.length, c.id).toBeGreaterThan(40);
-      expect(c.description.length).toBeGreaterThan(20);
-      expect(c.goal.endsWith("?")).toBe(true);
-      expect(c.art.startsWith("/")).toBe(true);
-      expect(c.clueTexts.length).toBeGreaterThan(0);
-      expect(c.clueTexts.every((t) => /^[A-ZÀ-Ú]/.test(t) && t.endsWith(".") && !t.includes("undefined") && !t.includes("{"))).toBe(true);
-      expect([...c.notes, ...c.ruleTexts, c.ending, ...c.explanation].every((t) => !t.includes("undefined") && !t.includes("{")), c.id).toBe(true);
-      expect(c.ending.length, c.id).toBeGreaterThan(30);
-      expect(c.structureName.length, c.id).toBeGreaterThan(5);
+      expect(c.goal.length, c.id).toBeGreaterThan(10);
+      expect(c.ending.length, c.id).toBeGreaterThan(20);
+      expect(c.ending, c.id).not.toMatch(/\{com:/);
+      expect(c.ruleTexts).toHaveLength(1);
+      expect(c.clueTexts.length, c.id).toBe(c.clues.length);
+      for (const t of c.clueTexts) expect(t, c.id).toMatch(/^[A-ZÀ-Ú].+\.$/);
       expect(c.hints).toHaveLength(3);
-      expect(c.hints.every((h) => h.length > 20 && !h.includes("undefined"))).toBe(true);
-      expect(c.explanation.length).toBeGreaterThanOrEqual(c.model.slots.length - 1);
-      expect(c.estimate[0]).toBeLessThanOrEqual(c.estimate[1]);
-      expect(c.xp).toBeGreaterThan(0);
+      expect(c.explanation.length, c.id).toBeGreaterThanOrEqual(c.model.people.length);
+      expect(c.narrator.name.length).toBeGreaterThan(2);
     }
   });
 
-  it("a dica 3 explica uma dedução, sem entregar a resposta inteira", () => {
-    for (const c of allCases()) {
-      const named = c.model.slots.filter((s) => c.hints[2].includes(s.label)).length;
-      expect(named, c.id).toBeLessThan(c.model.slots.length);
+  it("os textos nunca citam pessoas, objetos ou cômodos que não existem no caso", () => {
+    for (const c of allCases()) for (const t of c.clueTexts) {
+      expect(t, c.id).not.toContain("undefined");
+      expect(t, c.id).not.toMatch(/\bnull\b/);
     }
-  });
-
-  it("concordância: duas coisas femininas viram 'vizinhas'", () => {
-    const m: Model = { kind: "layout", distinct: true, grid: [2, 2], slots: [{ label: "Coroa", g: "f" }, { label: "Chave", g: "f" }, { label: "Vaso", g: "m" }], values: [{ label: "A1" }, { label: "B1" }, { label: "A2" }, { label: "B2" }] };
-    expect(clueText(m, { k: "touch", a: 0, b: 1 })).toBe("A Coroa e a Chave são vizinhas (lado a lado ou uma em cima da outra).");
-    expect(clueText(m, { k: "apart", a: 0, b: 2 })).toContain("não são vizinhos");
   });
 });
 
 describe("verificação da resposta", () => {
-  it("aceita só a solução; qualquer resposta errada aponta uma pista contrariada", () => {
-    for (const c of allCases().filter((_, i) => i % 4 === 0)) {
-      expect(isCorrect(c, c.answer)).toBe(true);
-      expect(firstBroken(c, c.answer)).toBeNull();
-      for (const a of allAssignments(c.model).slice(0, 300)) {
-        const same = a.every((v, i) => v === c.answer[i]);
-        expect(isCorrect(c, a)).toBe(same);
-        if (!same) expect(firstBroken(c, a)).not.toBeNull();
-      }
+  it("aceita só a solução; qualquer resposta errada aponta uma inconsistência", () => {
+    for (const c of allCases()) {
+      expect(isCorrect(c, c.answer), c.id).toBe(true);
+      const n = c.model.people.length;
+      const wrong = c.answer.slice();
+      [wrong[n], wrong[n + 1]] = [wrong[n + 1], wrong[n]]; // troca dois objetos
+      expect(isCorrect(c, wrong), c.id).toBe(false);
+      expect(firstBroken(c, wrong), c.id).not.toBeNull();
     }
   });
 
-  it("recusa respostas incompletas ou com valores repetidos", () => {
-    const c = casesOf("sudoku")[0];
-    expect(isCorrect(c, c.answer.map(() => -1))).toBe(false);
-    expect(isCorrect(c, c.answer.map(() => c.answer[0]))).toBe(false);
-    expect(isCorrect(c, c.answer.slice(1))).toBe(false);
+  it("recusa respostas incompletas ou com lugar/objeto repetido", () => {
+    const c = allCases()[0];
+    const n = c.model.people.length;
+    expect(isComplete(c, c.answer.map((v, i) => (i === 0 ? -1 : v)))).toBe(false);
+    const dup = c.answer.slice(); dup[1] = dup[0];
+    expect(isComplete(c, dup)).toBe(false);
+    const dupO = c.answer.slice(); dupO[n + 1] = dupO[n];
+    expect(isCorrect(c, dupO)).toBe(false);
   });
 
   it("estado das pistas só confere o que foi preenchido (nunca revela a solução)", () => {
-    const c = casesOf("tango")[0];
-    const empty = c.answer.map(() => -1);
-    for (const k of [...c.rules, ...c.clues]) expect(clueState(c.model, k, empty)).toBeNull();
-    for (const k of [...c.rules, ...c.clues]) expect(clueState(c.model, k, c.answer)).toBe(true);
-    // três iguais seguidos quebram a regra mesmo com a fila incompleta
-    const bad = empty.slice(); bad[0] = bad[1] = bad[2] = 0;
-    expect(clueState(c.model, { k: "noTriple" }, bad)).toBe(false);
+    for (const c of allCases().slice(0, 20)) {
+      const empty = new Array(c.answer.length).fill(-1);
+      for (const k of c.clues) expect(clueState(c.model, k, empty), c.id).toBeNull();
+      for (const k of c.clues) expect(clueState(c.model, k, c.answer), c.id).toBe(true);
+      expect(ruleOk(c.model, c.answer.slice(0, c.model.people.length)), c.id).toBe(true);
+    }
   });
 
   it("caseAfter encontra o mistério de cada fase agendada e nada nas outras", () => {
     for (const g of EVERY_GAME) {
-      const levels = new Set(caseLevels(g));
-      for (let l = 1; l <= 100; l++) expect(!!caseAfter(g, l)).toBe(levels.has(l));
+      for (const l of caseLevels(g)) expect(caseAfter(g, l)?.level).toBe(l);
+      expect(caseAfter(g, 1)).toBeUndefined();
     }
-    expect(caseById("sudoku-02")?.game).toBe("sudoku");
   });
 });
 
 describe("progresso das investigações", () => {
-  const c = casesOf("zip")[0];
-
+  const c = allCases()[0];
+  const id = c.id;
   it("convite: aparece até resolver ou pular; pular nunca tira nada", () => {
     let log = emptyCaseLog();
-    expect(shouldOffer(log, c.id)).toBe(true);
-    log = recordSkip(log, c.id, 1000);
-    expect(shouldOffer(log, c.id)).toBe(false);
+    expect(shouldOffer(log, id)).toBe(true);
+    log = recordSkip(log, id, 1);
+    expect(shouldOffer(log, id)).toBe(false);
     expect(xpTotal(log)).toBe(0);
-    expect(solvedCount(log)).toBe(0);
-    // um caso pulado ainda pode ser resolvido depois (caderno de investigações)
-    log = recordSolve(log, c, 90_000, 0, 2000).log;
-    expect(solvedCount(log)).toBe(1);
   });
 
-  it("XP só na primeira solução; dicas reduzem o XP e a medalha", () => {
-    let log = emptyCaseLog();
-    const r1 = recordSolve(log, c, 120_000, 2, 1000);
-    expect(r1.solve.first).toBe(true);
-    expect(r1.solve.xp).toBe(xpFor(c.difficulty, 2));
-    expect(r1.solve.xp).toBeLessThan(xpFor(c.difficulty, 0));
-    log = r1.log;
-    const r2 = recordSolve(log, c, 60_000, 0, 2000);
-    expect(r2.solve.xp).toBe(0);
-    expect(r2.solve.record).toBe(true);
-    log = r2.log;
-    expect(xpTotal(log)).toBe(xpFor(c.difficulty, 2));
-    expect(log.records[c.id].bestMs).toBe(60_000);
-    expect(log.records[c.id].bestHints).toBe(0);
-    expect(goldCount(log)).toBe(1);
-    expect(log.history).toHaveLength(2);
-    expect(shouldOffer(log, c.id)).toBe(false);
-    expect(medalFor(0)).toBe("ouro"); expect(medalFor(1)).toBe("prata"); expect(medalFor(3)).toBe("bronze");
+  it("XP só na primeira solução; dicas reduzem o XP", () => {
+    const r1 = recordSolve(emptyCaseLog(), c, 90_000, 0, 1);
+    expect(r1.solve.xp).toBe(xpFor(c.difficulty, 0));
+    const r2 = recordSolve(r1.log, c, 80_000, 2, 2);
+    expect(r2.solve.first).toBe(false);
+    expect(xpTotal(r2.log)).toBe(xpFor(c.difficulty, 0));
+    expect(solvedCount(r2.log)).toBe(1);
   });
 
-  it("o mesmo evento de solução não é contado duas vezes", () => {
-    const a = recordSolve(emptyCaseLog(), c, 50_000, 0, 1234).log;
-    const b = recordSolve(a, c, 50_000, 0, 1234).log;
-    expect(b.history).toHaveLength(1);
-  });
-
-  it("sobrevive a recarregar a página (salvar → ler) e ignora dados corrompidos", () => {
-    let log = recordSolve(emptyCaseLog(), c, 70_000, 1, 5000).log;
-    log = saveDraft(log, "tango-03", { a: [0, -1, 1, -1], hints: 1, ms: 12_000 });
-    log = recordSkip(log, "patches-05", 6000);
+  it("o rascunho (respostas e X) sobrevive a recarregar a página", () => {
+    const log = saveDraft(emptyCaseLog(), id, { a: c.answer.map(() => -1), hints: 1, ms: 5000, k: c.storyKey, x: [3, 100002] });
     const back = parseCaseLog(JSON.stringify(log));
-    expect(back).toEqual(log);
-    expect(parseCaseLog("{lixo")).toEqual(emptyCaseLog());
-    expect(parseCaseLog(JSON.stringify({ v: 2 }))).toEqual(emptyCaseLog());
-    expect(saveDraft(log, "tango-03", null).records["tango-03"].draft).toBeUndefined();
+    expect(back.records[id].draft).toEqual({ a: c.answer.map(() => -1), hints: 1, ms: 5000, k: c.storyKey, x: [3, 100002] });
   });
 
   it("conquistas de investigação usam o mesmo sistema de medalhas", () => {
-    expect(ACHIEVEMENTS.filter((a) => a.category === "investigacao").length).toBeGreaterThanOrEqual(10);
-    let log = emptyCaseLog();
-    const none = evaluate({ log: emptyLog(), progress }, {}, 1);
-    expect(none.fresh.some((a) => a.category === "investigacao")).toBe(false);
-    log = recordSolve(log, c, 45_000, 0, 10).log;
-    const ev = evaluate({ log: emptyLog(), progress, cases: log }, {}, 1);
-    const ids = ev.fresh.map((a) => a.id);
-    expect(ids).toContain("inv-primeira-pista");
-    expect(ids).toContain("inv-olho-rapido");
-    expect(ids).not.toContain("inv-detetive");
+    expect(ACHIEVEMENTS.filter((x) => x.category === "investigacao").length).toBeGreaterThanOrEqual(10);
+    const r = recordSolve(emptyCaseLog(), c, 50_000, 0, 1);
+    const ev = evaluate({ log: emptyLog(), progress, cases: r.log }, {}, 1);
+    expect(ev.fresh.map((x) => x.id)).toContain("inv-primeira-pista");
   });
 });

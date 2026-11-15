@@ -84,14 +84,15 @@ describe("investigação", () => {
     return log;
   };
 
-  it("Raciocínio Versátil: 8 estruturas diferentes (8 casos da mesma estrutura não bastam)", () => {
+  it("Raciocínio Versátil: 8 estruturas diferentes (8 casos de só 7 estruturas não bastam)", () => {
     const byStructure = new Map<string, string>();
     for (const c of CASES_DATA) if (!byStructure.has(c.structure)) byStructure.set(c.structure, c.id);
     const eight = [...byStructure.values()].slice(0, 8);
+    expect(eight).toHaveLength(8);
     expect(fresh({ log: emptyLog(), progress: P(), cases: solveAll(eight) })).toContain("inv-raciocinio-versatil");
-    const s0 = CASES_DATA[0].structure;
-    const same = CASES_DATA.filter((c) => c.structure === s0).slice(0, 8).map((c) => c.id);
-    expect(same.length).toBe(8);
+    const seven = new Set([...byStructure.keys()].slice(0, 7));
+    const same = CASES_DATA.filter((c) => seven.has(c.structure)).slice(0, 12).map((c) => c.id);
+    expect(same.length).toBeGreaterThanOrEqual(8);
     expect(fresh({ log: emptyLog(), progress: P(), cases: solveAll(same) })).not.toContain("inv-raciocinio-versatil");
   });
 

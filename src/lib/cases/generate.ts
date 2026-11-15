@@ -1,18 +1,20 @@
 // Mindloop Investigação — gerador do banco de mistérios (usado por scripts/gen_cases.ts, nunca no navegador).
-// Cada caso nasce de três ingredientes:
-//   • a HISTÓRIA (stories/*.ts): única para aquele caso, com personagens, cenário, voz e desfecho próprios;
-//   • a ESTRUTURA investigativa (structures.ts): a forma do raciocínio (exclusão, cruzamento, sequência…);
-//   • a DIFICULDADE do capítulo (tamanho do problema, tipos de pista liberados, profundidade da dedução).
-// Para cada caso: monta o cenário, sorteia uma solução, escolhe pistas verdadeiras até restar UMA solução, tira as
-// que sobram e só aceita o caso se ele (1) se resolve inteiro por dedução, (2) tem de fato a forma da estrutura e
-// (3) não repete o caso anterior do mesmo jogo (estrutura, quantidade de pistas, combinação de tipos e resposta).
+// Cada caso nasce de quatro ingredientes:
+//   • a HISTÓRIA (stories/*.ts): personagens, objetos e o vocabulário do lugar (cômodos, móveis, assentos);
+//   • a REGRA do cenário, que vem do jogo (regiões, equilíbrio, trilha, cômodos, céu);
+//   • a ESTRUTURA investigativa (structures.ts): a forma do raciocínio;
+//   • a DIFICULDADE do capítulo (tamanho, tipos de pista, profundidade da dedução).
+// Para cada caso: monta o cenário, sorteia uma solução (lugar + objeto de cada pessoa), escolhe pistas verdadeiras
+// até restar UMA solução, tira as que sobram e só aceita o caso se ele (1) se resolve inteiro por dedução, (2) tem
+// de fato a forma da estrutura e (3) não repete o caso anterior do mesmo jogo.
 // Tudo é determinístico (semente pelo id), então rodar de novo gera o mesmo banco.
 
 import { LEVELS_PER_CHAPTER, type JourneyGame } from "../journey";
 import { type Difficulty, caseLevels, difficultyOf } from "./config";
-import { type CaseKind, type Clue, type ClueKind, type Ent, type Model, allAssignments, deduce, evalClue, involved, isRule, num } from "./model";
-import { POOLS, STRUCTURES, type StructureId, structurePlan } from "./structures";
-import { KIND_OF, STORIES } from "./themes";
+import { type Clue, type ClueKind, type Ent, type Model, type PosClue, type Rule, allAnswers, deduce, evalClue, isRule, kingDist, posList, propAt, rcOf, roomOf, sideNeighbors, stopOf } from "./model";
+import { type Layout, buildScene } from "./scenery";
+import { STRUCTURES, type StructureId, directCount, poolOf, structurePlan } from "./structures";
+import { RULE_OF, STORIES } from "./themes";
 
 /** Registro guardado no banco (src/lib/cases/data.ts). Os textos são montados a partir dele em catalog.ts. */
 export interface CaseData {
@@ -24,11 +26,11 @@ export interface CaseData {
   difficulty: Difficulty;
   /** Chave da história (stories/*.ts). */
   story: string;
-  /** Estrutura investigativa (forma do raciocínio). */
   structure: StructureId;
   model: Model;
+  /** A regra do lugar ({k:"rule"}) e as pistas. */
   clues: Clue[];
-  /** Resposta: valor de cada slot. */
+  /** Resposta: casa de cada pessoa, depois o objeto de cada pessoa. */
   sol: number[];
 }
 
@@ -48,215 +50,142 @@ function shuffle<T>(r: Rng, xs: T[]): T[] {
   return a;
 }
 
-// ---------------------------------------------------------------- dificuldade por tipo
+// ---------------------------------------------------------------- tamanho e pistas de cada regra
 
-interface Tier {
-  /** Tipos de pista liberados nesta dificuldade (a estrutura escolhe dentre eles). */
-  gate: ClueKind[];
-  /** Quantidade de pistas (sem contar as regras). */
-  clues: [number, number];
-  /** Mínimo de pistas que relacionam dois ou mais elementos (o coração da dedução). */
-  minRel: number;
-  /** Rodadas de dedução: mínimo e máximo (encadeamento das descobertas). */
-  rounds: [number, number];
-}
-
-/** Limite de pistas de cada tipo (evita casos resolvidos por eliminação óbvia). */
-const CAP: Partial<Record<ClueKind, number>> = { not: 2, either: 2, parity: 2, row: 2, col: 2, countIn: 2, sum: 2, twice: 1, between: 2, sameRow: 2, sameCol: 2 };
-
-const ALL_CODE: ClueKind[] = ["is", "not", "either", "lt", "next", "parity", "between", "sum", "diff", "twice"];
-const ALL_LAYOUT: ClueKind[] = ["is", "row", "col", "left", "above", "touch", "not", "sameRow", "sameCol", "apart", "either"];
-
-export function tierOf(kind: CaseKind, d: Difficulty): Tier {
-  const no = (xs: ClueKind[], ...out: ClueKind[]) => xs.filter((k) => !out.includes(k));
-  switch (kind) {
-    case "code": return [
-      { gate: no(ALL_CODE, "sum", "diff", "twice"), clues: [3, 5], minRel: 1, rounds: [1, 3] },
-      { gate: no(ALL_CODE, "twice"), clues: [4, 6], minRel: 2, rounds: [2, 4] },
-      { gate: no(ALL_CODE, "is"), clues: [4, 7], minRel: 3, rounds: [2, 6] },
-      { gate: no(ALL_CODE, "is"), clues: [5, 8], minRel: 3, rounds: [3, 8] },
-    ][d - 1] as Tier;
-    case "pattern": return [
-      { gate: ["is", "same", "opp", "countIn"], clues: [2, 4], minRel: 1, rounds: [1, 3] },
-      { gate: ["is", "same", "opp", "countIn"], clues: [2, 5], minRel: 2, rounds: [2, 4] },
-      { gate: ["is", "same", "opp", "countIn"], clues: [3, 6], minRel: 3, rounds: [2, 6] },
-      { gate: ["is", "same", "opp", "countIn"], clues: [4, 7], minRel: 4, rounds: [3, 8] },
-    ][d - 1] as Tier;
-    case "route": return [
-      { gate: ["is", "not", "lt", "next", "between", "either"], clues: [1, 3], minRel: 0, rounds: [1, 4] },
-      { gate: ["is", "not", "lt", "next", "between", "either", "diff"], clues: [1, 4], minRel: 1, rounds: [2, 5] },
-      { gate: ["not", "lt", "next", "between", "either", "diff"], clues: [2, 5], minRel: 1, rounds: [2, 6] },
-      { gate: ["not", "lt", "next", "between", "either", "diff"], clues: [3, 6], minRel: 2, rounds: [2, 8] },
-    ][d - 1] as Tier;
-    case "layout": return [
-      { gate: no(ALL_LAYOUT, "apart", "either"), clues: [3, 5], minRel: 1, rounds: [1, 3] },
-      { gate: ALL_LAYOUT, clues: [4, 6], minRel: 2, rounds: [2, 4] },
-      { gate: no(ALL_LAYOUT, "is"), clues: [4, 7], minRel: 3, rounds: [2, 6] },
-      { gate: no(ALL_LAYOUT, "is"), clues: [5, 8], minRel: 3, rounds: [3, 8] },
-    ][d - 1] as Tier;
-  }
-}
-/** Pistas "fortes" (dão uma casa de cara) pesam menos no sorteio: preferimos relações. */
-const WEIGHT: Partial<Record<ClueKind, number>> = { is: 0.4, not: 0.6, either: 0.6, parity: 0.8, row: 1, col: 1 };
-
-// ---------------------------------------------------------------- cenários (a partir da história)
-
-/** Tamanho do problema pelo capítulo (cresce ao longo da jornada). */
-export function sizeOf(kind: CaseKind, chapter: number): { n: number; V?: number; grid?: [number, number] } {
-  const d = difficultyOf(chapter);
-  switch (kind) {
-    case "code": { const n = chapter <= 2 ? 3 : chapter <= 6 ? 4 : 5; return { n, V: Math.min(7, n + (d === 1 ? 1 : 2)) }; }
-    case "pattern": return { n: chapter <= 2 ? 4 : chapter <= 7 ? 6 : 8 };
-    case "route": return { n: chapter <= 3 ? 4 : chapter <= 6 ? 5 : 6 };
-    case "layout": { const [r, c, n] = chapter <= 2 ? [2, 2, 3] : chapter <= 5 ? [2, 3, 4] : chapter <= 8 ? [3, 3, 4] : [3, 3, 5]; return { n, grid: [r, c] }; }
+/** Quantas pessoas e como é o lugar, pela regra e pela dificuldade. */
+export function layoutOf(rule: Rule, d: Difficulty): { n: number; L: Layout } {
+  const n = rule === "equilibrio" ? 4 : d === 1 ? 3 : 4;
+  switch (rule) {
+    case "regioes": return { n, L: { rows: n, cols: n, rooms: n, blocks: d === 1 ? 1 : 2, seats: d === 1 ? 1 : 2 } };
+    case "ceu": return { n, L: { rows: 4, cols: 4, rooms: 3, blocks: d <= 2 ? 2 : 3, seats: 2 } };
+    case "comodos": return { n, L: n === 3 ? { rows: 3, cols: 3, rooms: 3, blocks: 2, seats: 1 } : d === 2 ? { rows: 3, cols: 4, rooms: 4, blocks: 2, seats: 2 } : { rows: 4, cols: 4, rooms: 4, blocks: 3, seats: 2 } };
+    case "trilha": return { n, L: n === 3 ? { rows: 3, cols: 3, rooms: 2, blocks: 2, seats: 1, trail: 5 } : d === 2 ? { rows: 3, cols: 4, rooms: 3, blocks: 2, seats: 2, trail: 6 } : { rows: 4, cols: 4, rooms: 3, blocks: 3, seats: 2, trail: 7 } };
+    case "equilibrio": return { n, L: { rows: 2, cols: 4, rooms: 2, blocks: d >= 3 ? 1 : 0, seats: 2 } };
   }
 }
 
-const strip = (e: Ent): Ent => ({ label: e.label, ...(e.g ? { g: e.g } : {}), ...(e.icon ? { icon: e.icon } : {}), ...(e.pl ? { pl: e.pl } : {}) });
+/** Pistas de posição de cada regra. */
+const POS: Record<Rule, ClueKind[]> = {
+  regioes: ["at", "room", "notRoom", "eitherRoom", "row", "col", "left", "above", "seat", "by"],
+  ceu: ["at", "near", "far", "alone", "nearN", "corner", "diag", "row", "col", "room", "notRoom", "seat", "by"],
+  comodos: ["at", "room", "notRoom", "eitherRoom", "seat", "by", "touch", "apart", "left", "above"],
+  trilha: ["at", "stop", "notStop", "before", "next", "room", "notRoom", "eitherRoom", "seat", "by"],
+  equilibrio: ["at", "side", "sameSide", "oppSide", "beside", "left", "col", "seat", "by"],
+};
+/** O que pode vir dentro de uma pista cruzada ("quem tinha o X …"), por regra. */
+const VIA: Record<Rule, ClueKind[]> = {
+  regioes: ["room", "notRoom", "row", "col", "seat", "by", "left", "above"],
+  ceu: ["room", "near", "far", "corner", "alone", "row", "col"],
+  comodos: ["room", "notRoom", "seat", "by", "touch", "apart"],
+  trilha: ["stop", "notStop", "before", "next", "room", "seat"],
+  equilibrio: ["side", "sameSide", "oppSide", "beside", "col", "seat"],
+};
 
-function baseModel(kind: CaseKind, chapter: number, slots: Ent[], values?: Ent[]): Model {
-  const sz = sizeOf(kind, chapter);
-  const S = slots.slice(0, sz.n).map(strip);
-  if (kind === "code") return { kind, distinct: true, slots: S, values: Array.from({ length: sz.V! }, (_, i) => ({ label: String(i + 1) })) };
-  if (kind === "pattern") return { kind, distinct: false, slots: S, values: values!.map(strip) };
-  const [rows, cols] = sz.grid!;
-  return { kind, distinct: true, grid: [rows, cols], slots: S, values: Array.from({ length: rows * cols }, (_, v) => ({ label: `${"ABC"[v % cols]}${Math.floor(v / cols) + 1}` })) };
-}
+interface Tier { clues: [number, number]; minVia: number; rounds: [number, number]; at: boolean }
+const TIERS: Record<Difficulty, Tier> = {
+  1: { clues: [3, 6], minVia: 1, rounds: [1, 6], at: true },
+  2: { clues: [4, 7], minVia: 1, rounds: [2, 7], at: true },
+  3: { clues: [4, 8], minVia: 2, rounds: [2, 9], at: false },
+  4: { clues: [5, 9], minVia: 2, rounds: [3, 12], at: false },
+};
+/** Limite de pistas de cada tipo (evita casos resolvidos por uma lista de respostas diretas). */
+const CAP: Partial<Record<string, number>> = {
+  at: 1, has: 2, row: 2, col: 2, room: 2, notRoom: 2, eitherRoom: 1, seat: 1, by: 2, corner: 1, alone: 1, nearN: 1,
+  stop: 1, notStop: 2, side: 2, hasNot: 3, via: 4, left: 2, above: 2,
+};
+/** Pistas que entregam muito de cara pesam menos no sorteio: preferimos relações e pistas cruzadas. */
+const WEIGHT: Partial<Record<ClueKind, number>> = { at: 0.3, has: 0.5, room: 0.8, stop: 0.6, side: 0.8, row: 0.8, col: 0.8, via: 1.6 };
+const SYMMETRIC = ["near", "far", "diag", "touch", "apart", "sameSide", "oppSide", "beside"];
 
-/** Mapa: lugares em pontos de uma grade, caminho-solução por vizinhos ortogonais (estradas nunca se cruzam). */
-function routeModel(r: Rng, chapter: number, places0: Ent[]): { model: Model; sol: number[] } | null {
-  const n = sizeOf("route", chapter).n;
-  const d = difficultyOf(chapter);
-  // 4 e 5 lugares numa grade 2×3 (mapa mais ligado, mais caminhos possíveis); 6 lugares numa 3×3.
-  const [R, C] = n <= 5 ? [2, 3] : [3, 3];
-  const key = (y: number, x: number) => y * C + x;
-  let path: number[] | null = null;
-  const walk = (cur: number[]): boolean => {
-    if (cur.length === n) { path = cur.slice(); return true; }
-    const last = cur[cur.length - 1];
-    const [y, x] = [Math.floor(last / C), last % C];
-    for (const [dy, dx] of shuffle(r, [[1, 0], [-1, 0], [0, 1], [0, -1]])) {
-      const ny = y + dy, nx = x + dx;
-      if (ny < 0 || nx < 0 || ny >= R || nx >= C || cur.includes(key(ny, nx))) continue;
-      cur.push(key(ny, nx));
-      if (walk(cur)) return true;
-      cur.pop();
-    }
-    return false;
-  };
-  walk([Math.floor(r() * R * C)]);
-  if (!path) return null;
-  const cells: number[] = path;
-  const places = places0.slice(0, n).map(strip);
-  const order = shuffle(r, cells.map((_, i) => i)); // slot i = lugar i; order[i] = passo do lugar i
-  const cellOf = (slot: number) => cells[order[slot]];
-  const slotAt = (step: number) => order.indexOf(step);
-  const edges: [number, number][] = [];
-  for (let k = 1; k < n; k++) edges.push([slotAt(k - 1), slotAt(k)]);
-  // Estradas extras entre lugares vizinhos — também na diagonal, desde que duas diagonais nunca se cruzem
-  // (mais estradas = mais caminhos possíveis = mais raciocínio e mais pistas necessárias).
-  const extra: [number, number][] = [];
-  const dyx = (a: number, b: number) => [Math.abs(Math.floor(cellOf(a) / C) - Math.floor(cellOf(b) / C)), Math.abs((cellOf(a) % C) - (cellOf(b) % C))];
-  for (let a = 0; a < n; a++) for (let b = a + 1; b < n; b++) {
-    const [dy, dx] = dyx(a, b);
-    if ((dy + dx === 1 || (dy === 1 && dx === 1)) && Math.abs(order[a] - order[b]) !== 1) extra.push([a, b]);
-  }
-  /** Duas diagonais do mesmo quadradinho se cruzam. */
-  const crosses = ([a, b]: [number, number], [p, q]: [number, number]) => {
-    const [dy1, dx1] = dyx(a, b), [dy2, dx2] = dyx(p, q);
-    if (dy1 !== 1 || dx1 !== 1 || dy2 !== 1 || dx2 !== 1) return false;
-    const box = (u: number, v: number) => [Math.min(Math.floor(cellOf(u) / C), Math.floor(cellOf(v) / C)), Math.min(cellOf(u) % C, cellOf(v) % C)].join();
-    return box(a, b) === box(p, q);
-  };
-  const want = d + 1 + (n >= 5 ? 1 : 0);
-  for (const e of shuffle(r, extra)) {
-    if (edges.length - (n - 1) >= want) break;
-    if (!edges.some((f) => crosses(e, f))) edges.push(e);
-  }
-  const xs = cells.map((c) => c % C), ys = cells.map((c) => Math.floor(c / C));
-  const [x0, x1, y0, y1] = [Math.min(...xs), Math.max(...xs), Math.min(...ys), Math.max(...ys)];
-  const pos: [number, number][] = places.map((_, s) => {
-    const c = cellOf(s);
-    const jx = (r() - 0.5) * 8, jy = (r() - 0.5) * 8;
-    return [Math.round(16 + ((c % C) - x0) * (68 / Math.max(1, x1 - x0)) + jx), Math.round(20 + (Math.floor(c / C) - y0) * (62 / Math.max(1, y1 - y0)) + jy)];
-  });
-  return {
-    model: { kind: "route", distinct: true, slots: places, values: places.map((_, i) => ({ label: String(i + 1) })), edges, pos },
-    sol: order,
-  };
-}
-
-// ---------------------------------------------------------------- pistas
-
-function candidates(m: Model, sol: number[], kinds: ClueKind[]): Clue[] {
-  const S = m.slots.length, V = m.values.length;
-  const n = (s: number) => num(m, sol[s]);
-  const rcOf = (s: number) => [Math.floor(sol[s] / m.grid![1]), sol[s] % m.grid![1]];
-  const out: Clue[] = [];
+/** Todas as pistas verdadeiras para a solução (de posição, de objeto e cruzadas). */
+function candidates(m: Model, sol: number[], kinds: ClueKind[], viaKinds: ClueKind[]): Clue[] {
+  const n = m.people.length;
+  const pos = sol.slice(0, n), obj = sol.slice(n);
   const has = (k: ClueKind) => kinds.includes(k);
-  for (let s = 0; s < S; s++) {
-    if (has("is")) out.push({ k: "is", s, v: sol[s] });
-    for (let v = 0; v < V; v++) if (v !== sol[s]) {
-      if (has("not")) out.push({ k: "not", s, v });
-      if (has("either")) out.push({ k: "either", s, v: v < sol[s] ? [v, sol[s]] : [sol[s], v] });
+  const rooms = m.scene.rooms.length;
+  /** Pistas de posição sobre a pessoa s (s pode ser -1 = quem tinha um objeto). */
+  const single = (s: number, v: number, allow: (k: ClueKind) => boolean): PosClue[] => {
+    const out: PosClue[] = [];
+    const [r, c] = rcOf(m, v), room = roomOf(m, v);
+    if (allow("at")) out.push({ k: "at", s, v });
+    if (allow("room")) out.push({ k: "room", s, r: room });
+    if (allow("notRoom")) for (let k = 0; k < rooms; k++) if (k !== room) out.push({ k: "notRoom", s, r: k });
+    if (allow("eitherRoom")) for (let k = 0; k < rooms; k++) if (k !== room) out.push({ k: "eitherRoom", s, r: room < k ? [room, k] : [k, room] });
+    const seat = propAt(m, v);
+    if (allow("seat") && seat && !seat.block) out.push({ k: "seat", s, p: seat.label });
+    if (allow("by")) for (const w of sideNeighbors(m, v)) { const p = propAt(m, w); if (p?.block) out.push({ k: "by", s, p: p.label }); }
+    if (allow("row")) out.push({ k: "row", s, r });
+    if (allow("col")) out.push({ k: "col", s, c });
+    if (allow("corner") && (r === 0 || r === m.rows - 1) && (c === 0 || c === m.cols - 1)) out.push({ k: "corner", s });
+    const touching = pos.filter((w) => w !== v && kingDist(m, v, w) === 1).length;
+    if (allow("alone") && touching === 0) out.push({ k: "alone", s });
+    if (allow("nearN") && touching > 0) out.push({ k: "nearN", s, n: touching });
+    if (allow("stop") && m.trail) out.push({ k: "stop", s, n: stopOf(m, v) });
+    if (allow("notStop") && m.trail) for (let k = 0; k < m.trail.length; k++) if (k !== stopOf(m, v)) out.push({ k: "notStop", s, n: k });
+    if (allow("side")) out.push({ k: "side", s, r });
+    return out;
+  };
+  const pair = (a: number, b: number, va: number, vb: number, allow: (k: ClueKind) => boolean): PosClue[] => {
+    const out: PosClue[] = [];
+    const [r1, c1] = rcOf(m, va), [r2, c2] = rcOf(m, vb);
+    const king = kingDist(m, va, vb), manh = Math.abs(r1 - r2) + Math.abs(c1 - c2);
+    if (allow("left") && c1 < c2) out.push({ k: "left", a, b });
+    if (allow("above") && r1 < r2) out.push({ k: "above", a, b });
+    if (allow("near") && king === 1) out.push({ k: "near", a, b });
+    if (allow("far") && king > 1) out.push({ k: "far", a, b });
+    if (allow("diag") && Math.abs(r1 - r2) === Math.abs(c1 - c2)) out.push({ k: "diag", a, b });
+    if (allow("touch") && manh === 1) out.push({ k: "touch", a, b });
+    if (allow("apart") && manh !== 1) out.push({ k: "apart", a, b });
+    if (allow("before") && m.trail && stopOf(m, va) < stopOf(m, vb)) out.push({ k: "before", a, b });
+    if (allow("next") && m.trail && stopOf(m, vb) === stopOf(m, va) + 1) out.push({ k: "next", a, b });
+    if (allow("sameSide") && r1 === r2) out.push({ k: "sameSide", a, b });
+    if (allow("oppSide") && r1 !== r2) out.push({ k: "oppSide", a, b });
+    if (allow("beside") && Math.abs(c1 - c2) === 1) out.push({ k: "beside", a, b });
+    return out;
+  };
+  const out: Clue[] = [];
+  for (let s = 0; s < n; s++) {
+    out.push(...single(s, pos[s], has));
+    if (has("has")) out.push({ k: "has", s, o: obj[s] });
+    if (has("hasNot")) for (let o = 0; o < n; o++) if (o !== obj[s]) out.push({ k: "hasNot", s, o });
+  }
+  for (let a = 0; a < n; a++) for (let b = 0; b < n; b++) if (a !== b) out.push(...pair(a, b, pos[a], pos[b], has));
+  if (has("via")) for (let o = 0; o < n; o++) {
+    const h = obj.indexOf(o);
+    const allow = (k: ClueKind) => viaKinds.includes(k);
+    for (const c of single(-1, pos[h], allow)) out.push({ k: "via", o, c });
+    for (let b = 0; b < n; b++) if (b !== h) {
+      for (const c of pair(-1, b, pos[h], pos[b], allow)) out.push({ k: "via", o, c });
+      // Ordem invertida ("a Ana estava antes de quem tinha…") só para relações que não são simétricas.
+      for (const c of pair(b, -1, pos[b], pos[h], allow)) if (!SYMMETRIC.includes(c.k)) out.push({ k: "via", o, c });
     }
-    if (has("parity")) out.push({ k: "parity", s, even: n(s) % 2 === 0 });
-    if (has("row")) out.push({ k: "row", s, r: rcOf(s)[0] });
-    if (has("col")) out.push({ k: "col", s, c: rcOf(s)[1] });
   }
-  for (let a = 0; a < S; a++) for (let b = 0; b < S; b++) {
-    if (a === b) continue;
-    if (has("lt") && n(a) < n(b)) out.push({ k: "lt", a, b });
-    if (has("next") && n(b) === n(a) + 1) out.push({ k: "next", a, b });
-    if (has("twice") && n(a) === 2 * n(b)) out.push({ k: "twice", a, b });
-    if (has("between")) for (let s = 0; s < S; s++) if (s !== a && s !== b && n(a) < n(s) && n(s) < n(b)) out.push({ k: "between", s, a, b });
-    if (a > b) continue;
-    if (has("diff") && n(a) !== n(b)) out.push({ k: "diff", a, b, d: Math.abs(n(a) - n(b)) });
-    if (has("sum")) out.push({ k: "sum", ss: [a, b], t: n(a) + n(b) });
-    if (has("same") && sol[a] === sol[b]) out.push({ k: "same", a, b });
-    if (has("opp") && sol[a] !== sol[b]) out.push({ k: "opp", a, b });
-    if (m.grid) {
-      const [r1, c1] = rcOf(a), [r2, c2] = rcOf(b);
-      const touch = Math.abs(r1 - r2) + Math.abs(c1 - c2) === 1;
-      if (has("touch") && touch) out.push({ k: "touch", a, b });
-      if (has("apart") && !touch) out.push({ k: "apart", a, b });
-      if (has("sameRow") && r1 === r2) out.push({ k: "sameRow", a, b });
-      if (has("sameCol") && c1 === c2) out.push({ k: "sameCol", a, b });
-    }
-  }
-  if (m.grid) for (let a = 0; a < S; a++) for (let b = 0; b < S; b++) {
-    if (a === b) continue;
-    const [r1, c1] = rcOf(a), [r2, c2] = rcOf(b);
-    if (has("left") && c1 < c2) out.push({ k: "left", a, b });
-    if (has("above") && r1 < r2) out.push({ k: "above", a, b });
-  }
-  // Grupos de três: somas (Mini Sudoku) e contagens (Tango).
-  for (let a = 0; a < S; a++) for (let b = a + 1; b < S; b++) for (let c = b + 1; c < S; c++) {
-    const ss = [a, b, c];
-    if (has("sum") && S >= 4) out.push({ k: "sum", ss, t: n(a) + n(b) + n(c) });
-    if (has("countIn")) for (const v of [0, 1]) {
-      const k = ss.filter((s) => sol[s] === v).length;
-      if (k === 3 || k === 1) out.push({ k: "countIn", ss, v, n: k });
-      if (k === 0) out.push({ k: "countIn", ss, v, n: 0 });
-    }
-  }
-  return out.filter((c) => evalClue(m, c, sol));
+  // Pistas simétricas aparecem uma vez só (a–b e b–a dizem o mesmo).
+  const seen = new Set<string>();
+  return out.filter((c) => {
+    const key = c.k !== "via" && "a" in c && SYMMETRIC.includes(c.k) ? JSON.stringify({ k: c.k, x: [c.a, c.b].sort() }) : JSON.stringify(c);
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return evalClue(m, c, sol);
+  });
 }
+
+const kindKey = (c: Clue) => c.k;
 
 /** Escolhe pistas até a solução ser única; depois remove as dispensáveis. null se o caso não fica bom. */
-function chooseClues(r: Rng, m: Model, sol: number[], rules: Clue[], kinds: ClueKind[], maxIs: number, favor: Partial<Record<ClueKind, number>>, range: [number, number], minRel: number): Clue[] | null {
-  const base = allAssignments(m).filter((a) => rules.every((c) => evalClue(m, c, a)));
-  const cands = candidates(m, sol, kinds)
-    .map((c) => ({ c, key: r() ** (1 / ((WEIGHT[c.k] ?? 2) * (favor[c.k] ?? 1))) }))
+function chooseClues(r: Rng, m: Model, base: number[][], cands: Clue[], favor: Partial<Record<string, number>>, maxDirect: number, t: Tier): Clue[] | null {
+  const order = cands
+    .map((c) => ({ c, key: r() ** (1 / ((WEIGHT[c.k] ?? 1) * (favor[c.k] ?? 1) * (c.k === "via" ? favor[c.c.k] ?? 1 : 1))) }))
     .sort((x, y) => y.key - x.key).map((x) => x.c);
   let rem = base;
   const chosen: Clue[] = [];
-  const used: Partial<Record<ClueKind, number>> = {};
-  for (const c of cands) {
+  const used: Partial<Record<string, number>> = {};
+  for (const c of order) {
     if (rem.length === 1) break;
-    if ((used[c.k] ?? 0) >= (c.k === "is" ? maxIs : CAP[c.k] ?? Infinity)) continue;
+    if ((used[kindKey(c)] ?? 0) >= (CAP[c.k] ?? 3)) continue;
+    if ((c.k === "at" || c.k === "has") && directCount(chosen) >= maxDirect) continue;
     const next = rem.filter((a) => evalClue(m, c, a));
-    if (next.length < rem.length) { chosen.push(c); rem = next; used[c.k] = (used[c.k] ?? 0) + 1; }
+    if (next.length < rem.length && next.length > 0) { chosen.push(c); rem = next; used[kindKey(c)] = (used[kindKey(c)] ?? 0) + 1; }
   }
   if (rem.length !== 1) return null;
   // Minimiza: tira cada pista que não faz falta para a solução continuar única.
@@ -265,100 +194,65 @@ function chooseClues(r: Rng, m: Model, sol: number[], rules: Clue[], kinds: Clue
     const without = kept.filter((x) => x !== c);
     if (base.filter((a) => without.every((x) => evalClue(m, x, a))).length === 1) kept = without;
   }
-  if (kept.length < range[0] || kept.length > range[1]) return null;
-  if (kept.filter((c) => involved(m, c).length > 1).length < minRel) return null;
-  // Duas pistas sobre o mesmo slot que juntas viram uma resposta direta ("é 3 ou 4" + "não é 3") ficam de fora.
-  for (const x of kept) for (const y of kept) if (x !== y && involved(m, x).length === 1 && involved(m, y).length === 1 && involved(m, x)[0] === involved(m, y)[0]) return null;
+  if (kept.length < t.clues[0] || kept.length > t.clues[1]) return null;
+  if (kept.filter((c) => c.k === "via").length < t.minVia) return null;
   return shuffle(r, kept);
 }
 
-// ---------------------------------------------------------------- impressão digital (para comparar casos)
-
-/** Combinação de tipos de pista (ignora nomes e números): dois casos com a mesma assinatura raciocinam parecido. */
-export const signature = (clues: Clue[]) => clues.filter((c) => !isRule(c)).map((c) => c.k).sort().join(",");
+/** Combinação de tipos de pista (ignora nomes): dois casos com a mesma assinatura raciocinam parecido. */
+export const signature = (clues: Clue[]) => clues.filter((c) => !isRule(c)).map((c) => (c.k === "via" ? `via:${c.c.k}` : c.k)).sort().join(",");
 export const clueCount = (clues: Clue[]) => clues.filter((c) => !isRule(c)).length;
-
-/**
- * O caso novo é diferente o bastante dos anteriores do mesmo jogo? Sempre: outra estrutura, outra combinação de
- * tipos de pista e outra resposta. Quantidade de pistas, do mais exigente ao mais tolerante:
- *   2 → diferente das DUAS anteriores (quebra o vaivém 4, 5, 4, 5…);  1 → diferente da anterior;
- *   0 → pode repetir a anterior, mas nunca três casos seguidos com a mesma quantidade.
- */
-type Strict = 0 | 1 | 2;
-function variesFrom(prev: CaseData | undefined, prev2: CaseData | undefined, structure: StructureId, clues: Clue[], sol: number[], strict: Strict): boolean {
-  if (!prev) return true;
-  const n = clueCount(clues), p1 = clueCount(prev.clues), p2 = prev2 ? clueCount(prev2.clues) : -1;
-  const countOk = strict === 2 ? n !== p1 && n !== p2 : strict === 1 ? n !== p1 : n !== p1 || n !== p2;
-  return prev.structure !== structure && countOk && signature(prev.clues) !== signature(clues) && prev.sol.join() !== sol.join();
-}
 
 // ---------------------------------------------------------------- geração
 
-/** Motivos de descarte (diagnóstico do gerador; não afeta o resultado). */
 export const REJECTS: Record<string, number> = {};
 const rej = (k: string) => { REJECTS[k] = (REJECTS[k] ?? 0) + 1; };
+const strip = (e: Ent): Ent => ({ label: e.label, ...(e.g ? { g: e.g } : {}), ...(e.icon ? { icon: e.icon } : {}) });
 
-/** Diagnóstico: o caso sai com esta estrutura (sem vizinhos)? */
-export function tryStructure(game: JourneyGame, level: number, index: number, structure: StructureId) { return attemptCase(game, level, index, structure, [], 1, 4000); }
-
-/** Tenta gerar o caso com uma estrutura. */
-function attemptCase(game: JourneyGame, level: number, index: number, structure: StructureId, before: CaseData[], strict: Strict, tries: number): CaseData | null {
-  const [prev, prev2] = before;
-  const kind = KIND_OF[game];
+function attemptCase(game: JourneyGame, level: number, index: number, structure: StructureId, prev: CaseData | undefined, tries: number): CaseData | null {
+  const rule = RULE_OF[game];
   const chapter = Math.ceil(level / LEVELS_PER_CHAPTER);
   const difficulty = difficultyOf(chapter);
-  const tier = tierOf(kind, difficulty);
+  const t = TIERS[difficulty];
   const st = STRUCTURES[structure];
   const story = STORIES[game][index];
-  const kinds = (st.kinds[kind] ?? []).filter((k) => tier.gate.includes(k));
-  const range: [number, number] = structure === "percurso" ? [1, 2] : tier.clues;
-  const minRel = structure === "percurso" ? 0 : tier.minRel;
+  const { n, L } = layoutOf(rule, difficulty);
+  const kinds = [...POS[rule].filter((k) => k !== "at" || t.at), "has", "hasNot", "via"] as ClueKind[];
   const id = `${game}-${String(level).padStart(2, "0")}`;
   for (let attempt = 0; attempt < tries; attempt++) {
     const r = rngOf(`${id}#${structure}#${attempt}`);
-    let model: Model, sol: number[];
-    if (kind === "route") {
-      const g = routeModel(r, chapter, story.slots);
-      if (!g) { rej("mapa"); continue; }
-      ({ model, sol } = g);
-    } else {
-      model = baseModel(kind, chapter, story.slots, story.values);
-      const rules0: Clue[] = kind === "pattern" ? [{ k: "count" }, { k: "noTriple" }] : [];
-      sol = pick(r, allAssignments(model).filter((a) => rules0.every((c) => evalClue(model, c, a))));
-    }
-    if (prev && prev.sol.join() === sol.join()) { rej("sol=anterior"); continue; }
-    const rules: Clue[] = kind === "pattern" ? [{ k: "count" }, { k: "noTriple" }] : kind === "route" ? [{ k: "roads" }] : [];
-    const clues = chooseClues(r, model, sol, rules, kinds, st.maxIsBy?.[kind] ?? st.maxIs, st.favor ?? {}, range, minRel);
+    const place = buildScene(r, story, rule, L);
+    if (!place) { rej("cenario"); continue; }
+    const model: Model = { rule, people: story.people.slice(0, n).map(strip), objects: story.objects.slice(0, n).map(strip), ...place };
+    const P = posList(model);
+    // O lugar precisa deixar dúvida (senão a regra sozinha resolve as posições), mas não demais.
+    if (P.length < (n === 3 ? 4 : 6) || P.length * (n === 3 ? 6 : 24) > 30000) { rej("posicoes"); continue; }
+    const base = allAnswers(model);
+    const sol = pick(r, base);
+    const cands = candidates(model, sol, kinds, VIA[rule]);
+    const clues = chooseClues(r, model, base, cands, st.favor, st.maxDirect, t);
     if (!clues) { rej("pistas"); continue; }
-    const all = [...rules, ...clues];
+    const all: Clue[] = [{ k: "rule" }, ...clues];
     const ded = deduce(model, all);
     if (!ded.solved) { rej("chute"); continue; }
-    if (ded.rounds < tier.rounds[0] || ded.rounds > tier.rounds[1]) { rej("rodadas"); continue; }
+    if (ded.rounds < t.rounds[0] || ded.rounds > t.rounds[1]) { rej("rodadas"); continue; }
     if (!st.need({ m: model, clues: all, ded, difficulty })) { rej(`forma:${structure}`); continue; }
-    if (!variesFrom(prev, prev2, structure, all, sol, strict)) { rej("igual-anterior"); continue; }
+    if (prev && (prev.structure === structure || signature(prev.clues) === signature(all))) { rej("igual-anterior"); continue; }
     return { id, game, level, chapter, difficulty, story: story.key, structure, model, clues: all, sol };
   }
   return null;
 }
 
-/**
- * Gera um caso completo. Usa a estrutura da agenda; se ela não couber no tamanho do problema, tenta as outras
- * estruturas da mesma dificuldade (nunca a do caso anterior; a do penúltimo fica por último).
- * `prev` e `prev2` = os dois casos anteriores do mesmo jogo.
- */
-export function generateCase(game: JourneyGame, level: number, index: number, prev?: CaseData, prev2?: CaseData): CaseData {
-  const kind = KIND_OF[game];
+/** Gera um caso: tenta a estrutura da agenda e, se não couber, as outras da mesma dificuldade. */
+export function generateCase(game: JourneyGame, level: number, index: number, prev?: CaseData): CaseData {
   if (!STORIES[game][index]) throw new Error(`Falta a história ${index + 1} de ${game}`);
+  const rule = RULE_OF[game];
   const levels = caseLevels(game);
-  const plan = structurePlan(game, kind, levels.map((l) => difficultyOf(Math.ceil(l / LEVELS_PER_CHAPTER))));
+  const plan = structurePlan(game, rule, levels.map((l) => difficultyOf(Math.ceil(l / LEVELS_PER_CHAPTER))));
   const d = difficultyOf(Math.ceil(level / LEVELS_PER_CHAPTER));
-  const rest = POOLS[kind][d].filter((s) => s !== plan[index]);
-  const order = [plan[index], ...rest.filter((s) => s !== prev2?.structure), ...rest.filter((s) => s === prev2?.structure)].filter((s) => s !== prev?.structure);
-  const before = [prev, prev2].filter((x): x is CaseData => !!x);
-  // Em metade dos casos (sorteio fixo pelo id), tenta primeiro uma quantidade de pistas nova em relação às duas anteriores.
-  const phases: Strict[] = rngOf(`${game}-${level}#variar`)() < 0.5 ? [2, 1, 0] : [1, 0];
-  for (const strict of phases) for (const s of order) {
-    const c = attemptCase(game, level, index, s, before, strict, strict === 2 ? 250 : 3000);
+  const order = [plan[index], ...poolOf(rule, d).filter((s) => s !== plan[index])].filter((s) => s !== prev?.structure);
+  for (const tries of [400, 2500]) for (const s of order) {
+    const c = attemptCase(game, level, index, s, prev, tries);
     if (c) return c;
   }
   throw new Error(`Não foi possível gerar o caso ${game}-${level}`);
@@ -369,11 +263,10 @@ export function generateGame(game: JourneyGame): CaseData[] {
   const out: CaseData[] = [];
   const levels = caseLevels(game);
   if (STORIES[game].length !== levels.length) throw new Error(`${game}: ${STORIES[game].length} histórias para ${levels.length} casos`);
-  levels.forEach((level, i) => out.push(generateCase(game, level, i, out[i - 1], out[i - 2])));
+  levels.forEach((level, i) => out.push(generateCase(game, level, i, out[i - 1])));
   return out;
 }
 
-/** O banco inteiro: um caso para cada fase da agenda (config.ts), em todos os jogos. */
 export function generateAll(games: JourneyGame[]): CaseData[] {
   return games.flatMap(generateGame);
 }
