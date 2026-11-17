@@ -13,7 +13,14 @@ export const ASTROS_PUZZLES: AstrosPuzzle[] = ASTROS_RAW.map((raw, i) => ({
   raw,
 }));
 
-/** Cores das constelações (claras, para o astro dourado contrastar; a borda grossa separa as regiões). */
+/**
+ * Céu da PRÉVIA (jogo ainda bloqueado): 5×5 exclusivo, fora dos 100 níveis oficiais. Solução única e resolvível só com
+ * o raciocínio mais simples ("única casa possível"); a constelação de uma casa só dá o primeiro astro de graça.
+ * Jogar a prévia não registra nada: nem progresso, nem tempo, nem ranking (ver AstrosDemo).
+ */
+export const ASTROS_DEMO: AstrosPuzzle = { id: "astros-demo", name: "Primeiro céu", level: "céu 5×5", raw: "5|aaabbcccbbcccbbccdeecceee" };
+
+/** Cores das constelações (claras, para o astro verde contrastar; a borda grossa separa as regiões). */
 export const SKY_COLORS = ["#FFD9F2", "#C9F4FA", "#FFE9B8", "#E2D6FF", "#CFF5E4", "#FFD6CC", "#D7E6FF", "#F4F0C2", "#F0D3FF"];
 /** Nome de cada constelação (para leitores de tela e mensagens). */
 export const SKY_NAMES = ["Rosa", "Turquesa", "Âmbar", "Lilás", "Menta", "Coral", "Celeste", "Areia", "Orquídea"];

@@ -283,7 +283,8 @@ export default function CaseScreen({ c, record, active, continueLabel, onContinu
         </section>
         <div className="cx-done-actions">
           <button ref={doneRef} className="btn cta" onClick={() => { sfx("ui"); onContinue(); }}>{continueLabel}</button>
-          <button className="btn sec" onClick={() => { sfx("ui"); onExit(); }}>{exitLabel}</button>
+          {/* Aberto pelo caderno, "sair" e "continuar" levam ao mesmo lugar: um botão só. */}
+          {exitLabel !== continueLabel && <button className="btn sec" onClick={() => { sfx("ui"); onExit(); }}>{exitLabel}</button>}
         </div>
       </div>
     );

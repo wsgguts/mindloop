@@ -37,10 +37,10 @@
 .cx-sceneframe.rule-equilibrio { max-width: calc(var(--cols, 4) * var(--cell) + 50px); }
 .cx-sceneframe.rule-equilibrio { grid-template-columns: auto minmax(0, 1fr); align-items: stretch; }
 .cx-sceneboard { min-width: 0; width: 100%; box-sizing: border-box; }
-/* Os rótulos dos lados nunca esticam o tabuleiro: altura 0 no cálculo da linha, e esticam até a altura dele. */
 .cx-sides { display: grid; grid-template-rows: 1fr 1fr; gap: 6px; height: 0; min-height: 100%; }
 .cx-sides span { min-height: 0; overflow: hidden; white-space: normal; line-height: 1.1; text-align: center; font-size: 10.5px; }
 .cx-sides span { display: grid; place-items: center; writing-mode: vertical-rl; transform: rotate(180deg); padding: 6px 4px; border-radius: 8px; font: 700 11px var(--font-body); color: #26104D; border: 2px solid #26104D; }
+/* Os rótulos dos lados nunca esticam o tabuleiro: altura 0 no cálculo da linha, e esticam até a altura dele. */
 .cx-sceneboard { position: relative; display: grid; gap: 0; padding: 6px; border-radius: 16px; background: #3A2652; border: 3px solid #26104D; box-shadow: inset 0 0 0 2px rgba(255, 255, 255, .06), 0 8px 18px rgba(38, 16, 77, .25); }
 .rule-ceu .cx-sceneboard { background: #1B0B3F; }
 .cx-trail { position: absolute; inset: 6px; width: calc(100% - 12px); height: calc(100% - 12px); pointer-events: none; z-index: 1; }
@@ -51,9 +51,11 @@
   background: linear-gradient(135deg, rgba(255, 255, 255, .35) 25%, transparent 25% 50%, rgba(255, 255, 255, .35) 50% 75%, transparent 75%) 0 0 / 16px 16px, var(--floor);
   transition: box-shadow .15s, transform .12s, opacity .2s;
 }
+/* Nome do cômodo: no canto da 1ª casa; pode se estender sobre as casas seguintes do MESMO cômodo na linha (--span),
+   sem cobrir outro cômodo. A fonte se ajusta (CaseBoard); o que ainda não couber aparece na legenda "Locais". */
+.cx-room { position: absolute; top: 2px; left: 3px; max-width: calc(var(--span, 1) * 100% + (var(--span, 1) - 1) * 5px - 6px); /* 5px = margens + bordas entre casas */ padding: 0 4px; border-radius: 4px; background: rgba(255, 255, 255, .88); color: #26104D; font: 700 8.5px/1.4 var(--font-body); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; z-index: 2; pointer-events: none; }
 .cx-sc.bt { border-top: 3px solid #26104D; } .cx-sc.bb { border-bottom: 3px solid #26104D; }
 .cx-sc.bl { border-left: 3px solid #26104D; } .cx-sc.br { border-right: 3px solid #26104D; }
-.cx-room { position: absolute; top: 2px; left: 3px; max-width: calc(100% - 6px); padding: 0 4px; border-radius: 4px; background: rgba(255, 255, 255, .88); color: #26104D; font: 700 8.5px/1.4 var(--font-body); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; z-index: 2; pointer-events: none; }
 .cx-stop { position: absolute; bottom: 2px; left: 3px; min-width: 16px; height: 16px; padding: 0 3px; border-radius: 999px; background: #FFC93C; color: #3A2200; font: 800 10px/16px var(--font-title); z-index: 2; }
 .cx-sc small { font: 600 9.5px var(--font-body); color: #3E3354; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; position: relative; z-index: 2; }
 .cx-sc .cx-cell { color: rgba(38, 16, 77, .35); }
@@ -162,7 +164,11 @@ img.art.fill { width: 100%; height: 100%; vertical-align: top; }
 .cx-face-pic:has(.art) { width: 64px; height: 64px; border-radius: 50%; padding: 2px; background: linear-gradient(135deg, var(--tint), #26104D); box-shadow: 0 0 0 2px #fff, 0 0 10px color-mix(in srgb, var(--tint) 60%, transparent); }
 .cx-item-pic:has(.art) { width: 52px; height: 52px; border-radius: 12px; overflow: hidden; padding: 0; }
 .cx-face-ans i img.art { width: 1.25em; height: 1.25em; }
-.cx-who:has(.art) { width: 62%; aspect-ratio: 1; border-radius: 50%; box-shadow: 0 2px 6px rgba(38, 16, 77, .35), 0 0 0 2px #fff; }
+/* Retrato: 62% da casa em TODAS as casas. A % conta a partir da área interna, que as paredes grossas (3 px, divisa de
+   cômodo) estreitam; --wx devolve essa diferença para o retrato não mudar de tamanho conforme a parede. */
+.cx-sc { --wx: 0px; } .cx-sc.bl { --wx: 1.5px; } .cx-sc.br { --wx: 1.5px; } .cx-sc.bl.br { --wx: 3px; }
+.cx-sc.block .cx-room { background: rgba(255, 255, 255, .92); }
+.cx-who:has(.art) { width: calc((100% + var(--wx)) * .62); aspect-ratio: 1; border-radius: 50%; box-shadow: 0 2px 6px rgba(38, 16, 77, .35), 0 0 0 2px #fff; }
 .cx-hold:has(.art) { width: 34%; max-width: 26px; aspect-ratio: 1; filter: none; }
 .cx-hold .art { border-radius: 24%; box-shadow: 0 1px 3px rgba(0, 0, 0, .35); }
 .cx-icons { display: inline-flex; gap: 3px; vertical-align: middle; margin-left: 4px; }
@@ -177,9 +183,9 @@ img.art.fill { width: 100%; height: 100%; vertical-align: top; }
 .rule-comodos .cx-sc.bb { border-bottom-color: color-mix(in srgb, var(--piece) 55%, #26104D); }
 .rule-comodos .cx-sc.bl { border-left-color: color-mix(in srgb, var(--piece) 55%, #26104D); }
 .rule-comodos .cx-sc.br { border-right-color: color-mix(in srgb, var(--piece) 55%, #26104D); }
+.rule-comodos .cx-room { background: color-mix(in srgb, var(--piece) 22%, #fff); }
 .cx-ptag { position: absolute; left: 3px; bottom: 3px; width: 30%; max-width: 30px; aspect-ratio: 1; z-index: 2; pointer-events: none; }
 .cx-ptag .ptag { box-shadow: inset 0 2px 0 rgba(255, 255, 255, .55), inset 0 -2px 0 rgba(38, 16, 77, .22), 0 2px 4px rgba(38, 16, 77, .3); border-width: 1.5px; }
-.rule-comodos .cx-room { background: color-mix(in srgb, var(--piece) 22%, #fff); }
 @media (max-width: 520px) { .cx-ptag { max-width: 20px; left: 2px; bottom: 2px; } .cx-sc.full:has(.cx-ptag) small { padding-left: 14px; } }
 
 /* =====================================================================================================
@@ -208,8 +214,6 @@ img.art.is-item { object-fit: contain; border-radius: 0; filter: drop-shadow(0 0
   border-color: color-mix(in srgb, var(--neo-blk) 55%, #140838); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--neo-blk) 45%, transparent), inset 0 0 14px color-mix(in srgb, var(--neo-blk) 35%, transparent); }
 .cx-sc.block .cx-prop { width: 64%; aspect-ratio: 1; display: grid; place-items: center; font-size: clamp(20px, 6vw, 30px); filter: none; }
 .cx-sc.block .cx-prop .art-emo { font-size: inherit; }
-.cx-sc.block .cx-room { background: rgba(255, 255, 255, .92); }
-
 /* Assentos: medalhão dourado no canto da casa */
 .cx-seat { --neo: var(--neo-seat); display: grid; place-items: center; width: 24%; max-width: 22px; aspect-ratio: 1; padding: 2px; border-radius: 50%; background: var(--cosmos); font-size: 11px; opacity: 1;
   box-shadow: 0 0 0 1.5px color-mix(in srgb, var(--neo) 85%, transparent), 0 0 7px color-mix(in srgb, var(--neo) 45%, transparent); }

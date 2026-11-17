@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-  ASTROS_PUZZLES, EMPTY, MARK, STAR, cloneA, countSolutions, emptyGrid, findProblems, isAstrosSolved, logicSteps,
+  ASTROS_DEMO, ASTROS_PUZZLES, EMPTY, MARK, STAR, cloneA, countSolutions, emptyGrid, findProblems, isAstrosSolved, logicSteps,
   nextHint, parseAstros, solutionGrid, starsOf, type AGrid,
 } from "./astros";
 import { ALL_GAMES, BONUS_GAME, EVERY_GAME, bonusUnlocked, visibleGames } from "./games";
@@ -152,5 +152,17 @@ describe("jogo bônus", () => {
 
   it("o progresso vazio do bônus é um progresso normal de 100 níveis", () => {
     expect(emptyProgress()).toHaveLength(LEVELS_PER_GAME);
+  });
+});
+
+describe("Astros: prévia (jogo bloqueado)", () => {
+  it("o céu da prévia é exclusivo, com solução única e resolvível só com o raciocínio mais simples", () => {
+    expect(ASTROS_PUZZLES.some((p) => p.raw === ASTROS_DEMO.raw)).toBe(false); // nunca uma fase oficial
+    const b = parseAstros(ASTROS_DEMO.raw);
+    expect(b.n).toBe(5);
+    expect(countSolutions(b, 2)).toBe(1);
+    const L = logicSteps(b);
+    expect(L.solved).toBe(true);
+    expect(L.tier).toBe(1);
   });
 });

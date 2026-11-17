@@ -70,10 +70,15 @@
 
 /* ---------- Tabuleiro: leitura ---------- */
 .cx-room { font: 700 clamp(9.5px, 2.7vw, 11px)/1.35 var(--font-body); padding: 1px 5px; background: rgba(255, 255, 255, .94); top: 3px; left: 3px; box-shadow: 0 1px 2px rgba(38, 16, 77, .15); }
+.cx-roomkey { list-style: none; margin: 2px 0 0; padding: 0; display: flex; flex-wrap: wrap; justify-content: center; gap: 4px 12px; font: 600 12.5px/1.3 var(--font-body); color: var(--t-ink, #26104D); }
+.cx-roomkey li { display: inline-flex; align-items: center; gap: 5px; }
+.cx-roomkey .cx-roomkey-t { font-weight: 800; text-transform: uppercase; letter-spacing: .06em; font-size: 11px; opacity: .75; }
+.cx-roomkey i { flex: none; width: 12px; height: 12px; border-radius: 3px; border: 1.5px solid rgba(38, 16, 77, .35); }
 .cx-sc small { font: 700 clamp(10px, 2.8vw, 12px)/1.2 var(--font-body); color: #26104D; }
 .cx-sc .cx-cell { color: rgba(38, 16, 77, .6); font-size: clamp(10px, 2.8vw, 12px); }
 .cx-stop { min-width: 18px; height: 18px; font: 800 11px/18px var(--font-title); }
 .cx-sides span { font: 700 12px/1.15 var(--font-body); }
+@media (max-width: 520px) { .cx-sides span { font-size: 11px; } }
 
 /* ✕ = ninguém estava aqui */
 .cx-x { position: relative; z-index: 2; font: 900 clamp(24px, 7.5vw, 38px)/1 var(--font-title); color: #D81E5B; text-shadow: 0 1px 0 #fff, 0 0 8px rgba(216, 30, 91, .35); animation: cx-pop .18s ease-out; }
@@ -112,12 +117,12 @@
 }
 
 /* Tango: rótulos dos lados legíveis mesmo com nome longo */
-@media (max-width: 520px) { .cx-sides span { font-size: 11px; } }
 @media (prefers-reduced-motion: reduce) { .cx-x { animation: none; } }
 
 /* Nome do cômodo sempre por cima do retrato (o retrato desce um pouco quando a casa tem nome). */
 .cx-room { z-index: 4; }
 .cx-sc.full:has(.cx-room) .cx-who { margin-top: 12px; }
+
 /* Celular: Local e Objeto um embaixo do outro, cada um com a largura toda (nada cortado). */
 @media (max-width: 520px) {
   .cx-play .cx-answers li { grid-template-columns: 1fr; }

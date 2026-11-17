@@ -10,6 +10,8 @@ import { BANDS, type Band, gameScore, overallScore } from "../lib/scoring";
 
 interface Props {
   times: Record<JourneyGame, Times>;
+  /** Jogos com ranking: os 4 principais e, depois de liberado pelas 4 jornadas, o Astros (jogo bônus). */
+  games?: JourneyGame[];
   /** Identidade anônima do jogador (a mesma do progresso salvo no servidor). */
   me: Identity | null;
   /** Entrar ou sair do ranking (nada é apagado ao sair). */
@@ -22,7 +24,7 @@ interface Props {
 
 const fmt = (n: number) => n.toLocaleString("pt-BR");
 
-export default function Ranking({ times, me, onListed, onFixIdentity, onAuthLost }: Props) {
+export default function Ranking({ times, me, games = ALL_GAMES, onListed, onFixIdentity, onAuthLost }: Props) {
   const online = !!rankingConfig();
   const [game, setGame] = useState<JourneyGame | null>(null);
   const [band, setBand] = useState<Band>("all");
@@ -35,7 +37,7 @@ export default function Ranking({ times, me, onListed, onFixIdentity, onAuthLost
   const req = useRef(0);
   const listed = me?.listed === true;
 
-  const local = ALL_GAMES.map((g) => ({ g, score: gameScore(g, times[g]), levels: Object.keys(times[g]).length }));
+  const local = games.map((g) => ({ g, score: gameScore(g, times[g]), levels: Object.keys(times[g]).length }));
   const localTotal = overallScore(local.map((x) => x.score));
 
   const load = useCallback(async () => {
@@ -45,7 +47,7 @@ export default function Ranking({ times, me, onListed, onFixIdentity, onAuthLost
     try {
       if (me && !synced.current) {
         synced.current = true;
-        for (const g of ALL_GAMES) await syncGame(me, g, times[g]);
+        for (const g of games) await syncGame(me, g, times[g]); // principais primeiro: o servidor confere o desbloqueio do bônus
       }
       const r = await fetchRanking(game, game ? band : "all", me?.id ?? null);
       if (n === req.current) setRows(r);
@@ -54,7 +56,7 @@ export default function Ranking({ times, me, onListed, onFixIdentity, onAuthLost
       if (e instanceof RankError && e.code === "AUTH") onAuthLost();
       setError(e instanceof RankError ? e.message : "Não foi possível carregar o ranking agora.");
     } finally { if (n === req.current) setLoading(false); }
-  }, [online, me, game, band, times, onAuthLost]);
+  }, [online, me, game, band, times, games, onAuthLost]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -80,7 +82,7 @@ export default function Ranking({ times, me, onListed, onFixIdentity, onAuthLost
 
       <div className="chips" role="group" aria-label="Modalidade do ranking">
         <button className={game === null ? "on" : ""} aria-pressed={game === null} onClick={() => setGame(null)}>Geral</button>
-        {ALL_GAMES.map((g) => (
+        {games.map((g) => (
           <button key={g} className={game === g ? "on" : ""} aria-pressed={game === g} onClick={() => setGame(g)}>
             <Gem kind={g} size={20} />{GAME_META[g].name}
           </button>

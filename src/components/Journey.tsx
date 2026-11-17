@@ -136,7 +136,7 @@ export default function Journey({ game, done, focus, justDone, justUnlocked, onP
     sfx("ui"); scrollToCur.current = "auto"; setChapterId(id);
   }
 
-  useFitHeight(rootRef, [stage]); // visão geral: cabe inteira na tela do celular, sem rolar
+  useFitHeight(rootRef, [stage]); // visão geral e mapa do capítulo: cabem inteiros na tela do celular, sem rolar
   const style = { "--gc": color, ...(curColor && { "--cur": curColor }) } as React.CSSProperties;
 
   if (stage === "overview") {
@@ -206,7 +206,7 @@ export default function Journey({ game, done, focus, justDone, justUnlocked, onP
   }
 
   return (
-    <div ref={rootRef} className={`journey jmap${justDone !== undefined ? " enter" : ""}`} style={style}>
+    <div ref={rootRef} className={`journey jmap fitmap${justDone !== undefined ? " enter" : ""}`} style={style}>
       <header className="jmapbar">
         <button className="back" onClick={() => { sfx("ui"); setStage("overview"); }} aria-label="Voltar aos capítulos da jornada">‹ Capítulos</button>
         <div className="jmap-t">
@@ -220,9 +220,10 @@ export default function Journey({ game, done, focus, justDone, justUnlocked, onP
       </header>
 
       <section className="jch" aria-label={`Capítulo ${ch.id}: ${world.name}`}>
-        <p className="jmap-tip"><b>{ch.title}:</b> {ch.text}</p>
         {/* O mundo e os níveis formam um único bloco: os pontos usam % da arte e rolam junto com ela.
             O mundo (cenário) é o mesmo nos 4 jogos; o jogo só muda a luz, os cristais e as partículas. */}
+        {/* trail-fit: no celular em pé, a pintura encolhe (sem distorcer) até caber na altura que sobra — sem rolar. */}
+        <div className="trail-fit">
         <div className="trail">
           <JourneyScene key={world.id} scene={world} game={game} />
           <ol className="tlevels">
@@ -252,11 +253,12 @@ export default function Journey({ game, done, focus, justDone, justUnlocked, onP
             })}
           </ol>
         </div>
+        {/* Em tela em pé fica no topo da pintura (céu), sem cobrir as fases; nas outras, flutua acima da barra inferior. */}
+        {(offscreen || chapterId !== curChapter) && (
+          <button className="jump" onClick={jump}>Ir para o nível {cur}</button>
+        )}
+        </div>
       </section>
-
-      {(offscreen || chapterId !== curChapter) && (
-        <button className="jump" onClick={jump}>Ir para o nível {cur}</button>
-      )}
       {toast && <div className="toast note info" role="status"><b aria-hidden="true">ℹ</b><span>{toast}</span></div>}
     </div>
   );

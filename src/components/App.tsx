@@ -21,6 +21,8 @@ import { initSound } from "../lib/sound/engine";
 import TangoGame from "./TangoGame";
 import ZipGame from "./ZipGame";
 import AstrosGame from "./AstrosGame";
+import AstrosDemo, { type DemoStage } from "./AstrosDemo";
+import FeedbackButton from "./FeedbackButton";
 import { ASTROS_PUZZLES } from "../lib/astros";
 import { COMMENT_MAX, submitFeedback, validateFeedback } from "../lib/feedback";
 import { ALL_GAMES, BONUS_GAME, EVERY_GAME, GAME_META, bonusUnlocked, isMainGame, visibleGames } from "../lib/games";
@@ -42,7 +44,7 @@ import CaseBook, { CaseSummary } from "./cases/CaseBook";
 import { afterContinue, caseById, casesOf } from "../lib/cases/catalog";
 import { CASES_KEY, type CaseLog, type Draft, emptyCaseLog, parseCaseLog, recordOf, recordSkip, recordSolve, saveDraft, shouldOffer, solvedCount } from "../lib/cases/progress";
 
-type View = "home" | "journey" | "game" | "rules" | "profile" | "feedback" | "ranking" | "achievements" | "case" | "casebook";
+type View = "home" | "journey" | "game" | "rules" | "profile" | "feedback" | "ranking" | "achievements" | "case" | "casebook" | "demo";
 /**
  * Investigação aberta. "offer" = convite depois do Continuar; "play" = investigando.
  * next: a fase tradicional que vem depois (convite da jornada); sem next, veio do caderno de investigações.
@@ -57,14 +59,18 @@ const CODE_UNSEEN_KEY = "mindloop:code-unseen"; // código de recuperação aind
 const FRESH_KEY = "mindloop:fresh"; // sessionStorage: acabou de reiniciar o jogo
 const SYNC_DELAY_MS = 2500; // espera juntar várias gravações antes de enviar
 /** Gravações que não são progresso (identidade, partida em andamento): não disparam sincronização. */
-const NO_SYNC = new Set([RANK_KEY, KEYS.save, KEYS.nick, CODE_UNSEEN_KEY]);
+/** Já enviou ao menos uma opinião (o botão para de chamar atenção e a tela de parabéns para de pedir nota). */
+const FB_SENT_KEY = "mindloop:fb-sent";
+/** Primeira conclusão destes níveis (em qualquer jogo): a tela de parabéns pergunta "Está curtindo?" com 5 estrelas. */
+const ASK_RATING_AT = new Set([3, 10, 25, 50, 100]);
+const NO_SYNC = new Set([RANK_KEY, KEYS.save, KEYS.nick, CODE_UNSEEN_KEY, FB_SENT_KEY]);
 
 // Para onde o "Voltar" da tela de opinião leva (ela pode ser aberta de qualquer tela pelo botão flutuante).
 const BACK_LABEL: Record<Exclude<View, "feedback">, string> = {
-  home: "Voltar ao início", journey: "Voltar à jornada", game: "Voltar ao jogo", rules: "Voltar às regras", profile: "Voltar ao perfil",
+  home: "Voltar ao início", demo: "Voltar à prévia", journey: "Voltar à jornada", game: "Voltar ao jogo", rules: "Voltar às regras", profile: "Voltar ao perfil",
   ranking: "Voltar ao ranking", achievements: "Voltar às conquistas", case: "Voltar à investigação", casebook: "Voltar às investigações",
 };
-const TAB_OF: Record<View, Tab> = { home: "home", journey: "home", game: "home", rules: "rules", profile: "profile", feedback: "profile", ranking: "ranking", achievements: "achievements", case: "home", casebook: "home" };
+const TAB_OF: Record<View, Tab> = { home: "home", journey: "home", game: "home", rules: "rules", profile: "profile", feedback: "profile", ranking: "ranking", achievements: "achievements", case: "home", casebook: "home", demo: "home" };
 // Chave de "já viu as regras" de cada jogo (a do Sudoku é a original, mantida por compatibilidade).
 // Tutorial de cada jogo: "done" (visto até o fim) ou "skipped" (pulado). Independente por jogo.
 const TUTORIAL_KEY = (g: RulesGame) => `mindloop:tutorial:${g}`;
@@ -92,7 +98,11 @@ export default function App() {
   const [nickModal, setNickModal] = useState<null | { then: () => void }>(null); // o que fazer depois de salvar
   const [seen, setSeen] = useState<PerGame<boolean>>(() => perGame(() => false)); // tutorial já concluído ou pulado
   /** Tutorial aberto: primeiro acesso (mostra "Pular") ou aberto pela pessoa (mostra "Fechar"). */
-  const [tutorial, setTutorial] = useState<null | { game: RulesGame; first: boolean; finish: string }>(null);
+  /** demo: aberto pela prévia do Astros — fechar o tutorial ali não o marca como visto (a prévia não registra nada). */
+  const [tutorial, setTutorial] = useState<null | { game: RulesGame; first: boolean; finish: string; demo?: boolean }>(null);
+  /** Prévia do Astros (jogo bônus bloqueado): etapa e rodada (cada "Jogar de novo" recomeça do zero). */
+  const [demo, setDemo] = useState<DemoStage | null>(null);
+  const [demoRound, setDemoRound] = useState(0);
   const [rulesTab, setRulesTab] = useState<RulesGame>("sudoku");
   const [save, setSave] = useState<Save | null>(null);
   const [journeyGame, setJourneyGame] = useState<RulesGame>("sudoku");
@@ -111,6 +121,8 @@ export default function App() {
   const [fbError, setFbError] = useState<string | null>(null);
   const [bot, setBot] = useState(""); // campo-armadilha contra robôs
   const [fbFrom, setFbFrom] = useState<Exclude<View, "feedback">>("profile"); // tela de onde a opinião foi aberta
+  const [fbSent, setFbSent] = useState(false); // já enviou alguma opinião
+  const rateRef = useRef<number | null>(null); // nota escolhida na tela de parabéns (abre a opinião já com ela)
   // Histórico central de partidas, conquistas e ranking (todos alimentados pelo mesmo evento de vitória).
   const [log, setLog] = useState<PlayerLog>(emptyLog);
   const [unlocked, setUnlocked] = useState<Unlocked>({});
@@ -170,6 +182,7 @@ export default function App() {
     setTimes(tms);
     setLastPlayed(perGame((g) => parseLevel(readStore(LAST_KEY(g)))));
     try { const s = readStore(KEYS.save); if (s) setSave(JSON.parse(s) as Save); } catch { /* ignora */ }
+    setFbSent(readStore(FB_SENT_KEY) === "1");
     // Histórico: na primeira abertura desta versão, os recordes já salvos viram registros importados.
     let lg = parseLog(readStore(HISTORY_KEY));
     if (!lg) { lg = importLegacy(tms); writeStore(HISTORY_KEY, JSON.stringify(lg)); }
@@ -339,10 +352,13 @@ export default function App() {
 
   /** Card, nome, arte ou "Jogar agora" de um jogo: abre a jornada dele (pedindo o apelido na primeira vez). */
   function openGame(id: RulesGame) {
-    if (id === BONUS_GAME && !bonusOpen) return; // jogo bônus ainda bloqueado
+    if (id === BONUS_GAME && !bonusOpen) return openDemo(); // bloqueado: abre a prévia jogável (nunca as fases oficiais)
     if (nick) openJourney(id, "overview");
     else openNick(() => openJourney(id, "overview"));
   }
+  /** Prévia do Astros: começa na apresentação. Não depende de apelido e não grava nada. */
+  function openDemo() { setDemo("intro"); setView("demo"); }
+  function closeDemo() { setDemo(null); setView("home"); }
   function openJourney(game: RulesGame, start: "overview" | "map" = "map") { setJourneyGame(game); setJourneyStart(start); setArrival(null); setView("journey"); }
 
   const saveLog = (l: PlayerLog) => { logRef.current = l; setLog(l); writeStore(HISTORY_KEY, JSON.stringify(l)); };
@@ -394,8 +410,9 @@ export default function App() {
       setNewMedals((n) => n + ev.fresh.length);
     }
     // Ranking online: reenvia os melhores tempos do jogo (o servidor guarda só o melhor de cada nível).
-    // O ranking online conta só os 4 jogos principais (o servidor não conhece o jogo bônus).
-    if (meRef.current && !offline() && isMainGame(game)) syncGame(meRef.current, game, t.times).catch(() => { /* tenta de novo ao abrir o ranking */ });
+    // O jogo bônus entra no ranking só depois de liberado pelas 4 jornadas (a mesma regra do app: bonusUnlocked;
+    // o servidor confere de novo). No Modo Administrador nada vai para o servidor (offline).
+    if (meRef.current && !offline() && (isMainGame(game) || bonusUnlocked(progress))) syncGame(meRef.current, game, t.times).catch(() => { /* tenta de novo ao abrir o ranking */ });
   }
 
   // ---- Mindloop Investigação ----
@@ -451,6 +468,7 @@ export default function App() {
     }
     if (to === "achievements") return openAchievements();
     if (to === "home") return goHome();
+    if (to === "feedback") { setJourneyGame(game); setJourneyStart("map"); setArrival(null); return openFeedback(rateRef.current, "journey"); } // nota da tela de parabéns
     const firstTime = !isDone(before, level);
     setJourneyGame(game);
     setJourneyStart("map");
@@ -466,6 +484,7 @@ export default function App() {
     try {
       await submitFeedback({ rating, comment, honeypot: bot });
       setFbStatus("ok"); setRating(null); setComment("");
+      setFbSent(true); writeStore(FB_SENT_KEY, "1");
     } catch {
       setFbStatus("error");
       setFbError("Não conseguimos enviar agora. Confira a internet e tente de novo — seu texto foi mantido.");
@@ -473,9 +492,9 @@ export default function App() {
   }
 
   /** Abre a tela de opinião (do Perfil ou do botão flutuante); a partida em andamento fica guardada e pausada. */
-  function openFeedback() {
-    if (view !== "feedback") setFbFrom(view);
-    setRating(null); setComment(""); setFbStatus("idle"); setFbError(null); setBot("");
+  function openFeedback(rate: number | null = null, from: Exclude<View, "feedback"> | null = null) {
+    if (from) setFbFrom(from); else if (view !== "feedback") setFbFrom(view);
+    setRating(rate); setComment(""); setFbStatus("idle"); setFbError(null); setBot("");
     setView("feedback");
   }
 
@@ -485,7 +504,7 @@ export default function App() {
   function closeTutorial(how: "done" | "skipped" | "closed") {
     const t = tutorial;
     setTutorial(null);
-    if (t && (t.first || !seen[t.game]) && how !== "closed") {
+    if (t && !t.demo && (t.first || !seen[t.game]) && how !== "closed") {
       setSeen((s) => ({ ...s, [t.game]: true }));
       writeStore(TUTORIAL_KEY(t.game), how);
     }
@@ -505,7 +524,7 @@ export default function App() {
     active: playing,
     onMenu: () => openJourney(game),
     onRules: () => openTutorial(game),
-    onFeedback: openFeedback,
+    onFeedback: () => openFeedback(),
     onWin: (ms: number) => winLevel(game, idx + 1, ms),
     onCelebrated: celebrated,
     onHint: () => { hintsRef.current += 1; },
@@ -531,30 +550,25 @@ export default function App() {
   return (
     <>
       {view !== "home" && (
-        <header className={`top${view === "game" || view === "case" ? " in-game" : ""}`}>
+        <header className={`top${view === "game" || view === "case" || view === "demo" ? " in-game" : ""}`}>
           <span className="brand"><img src="/cube.png" alt="" width={36} height={34} /><span className="wordmark">MindLoop</span></span>
           <span className="top-actions">
             {admin ? <span className="chip admin-chip" aria-label="Modo Administrador ligado: jogador de teste, fora do ranking">🔧 Admin</span>
               : nick && <button type="button" className="chip chip-avatar" onClick={openAvatars} aria-label={`Apelido: ${nick}. Avatar: ${avatar.name}${avFresh.size ? `. ${avFresh.size} novo(s) avatar(es) liberado(s)` : ""}`}><AvatarPic m={avatar} size={26} />{nick}{avFresh.size > 0 && <i className="dot" aria-hidden="true" />}</button>}
             {view !== "game" && view !== "feedback" && (
-              <button type="button" className="icon-btn" onClick={openFeedback} aria-label="Dar opinião sobre o MindLoop" title="Dar opinião">
-                <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M4.5 5.5h15A1.5 1.5 0 0 1 21 7v8.5a1.5 1.5 0 0 1-1.5 1.5H10l-4.5 3.5V17h-1A1.5 1.5 0 0 1 3 15.5V7a1.5 1.5 0 0 1 1.5-1.5z" /></svg>
-              </button>
+              <FeedbackButton compact calm={fbSent} onClick={() => openFeedback()} />
             )}
           </span>
         </header>
       )}
 
-      <main id="main" className={view === "home" ? "home-main" : view === "game" || view === "case" ? "page in-game" : "page"}>
+      <main id="main" className={view === "home" ? "home-main" : view === "game" || view === "case" || view === "demo" ? "page in-game" : "page"}>
         {!ready ? (
           <div className="wrap"><p role="status">Carregando…</p></div>
         ) : view === "home" ? (
           <>
             <section className="home" aria-label="Início">
-              <img className="home-bg" src="/home-art.webp" alt="" aria-hidden="true" decoding="async" />
-              <button type="button" className="icon-btn home-fb" onClick={openFeedback} aria-label="Dar opinião sobre o MindLoop" title="Dar opinião">
-                <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M4.5 5.5h15A1.5 1.5 0 0 1 21 7v8.5a1.5 1.5 0 0 1-1.5 1.5H10l-4.5 3.5V17h-1A1.5 1.5 0 0 1 3 15.5V7a1.5 1.5 0 0 1 1.5-1.5z" /></svg>
-              </button>
+              <FeedbackButton className="home-fb" calm={fbSent} onClick={() => openFeedback()} />
               <div className="art">
                 <img src="/home-art.webp" width={944} height={1680} decoding="async" alt="MindLoop — Desafie sua mente. Um cubo mágico de quebra-cabeça sobre ilhas flutuantes, com os cristais dos jogos Mini Sudoku, Zip, Tango, Patches e, embaixo, o cristal verde do Astros." fetchPriority="high" />
                 {ART_SPOTS.map((s) => (
@@ -564,11 +578,11 @@ export default function App() {
                 ))}
                 {/* Cristal verde do jogo bônus, pintado na arte sob a logo: apagado e com cadeado até liberar; liberado, brilha e abre o jogo. */}
                 <button type="button" className={`bonus-spot${bonusOpen ? " open" : ""}`}
-                  onClick={() => (bonusOpen ? openGame(BONUS_GAME) : document.getElementById("bonus-card")?.scrollIntoView({ behavior: "smooth", block: "center" }))}
-                  aria-label={bonusOpen ? `Jogar ${GAME_META[BONUS_GAME].name}, o jogo bônus` : `${GAME_META[BONUS_GAME].name}: jogo bônus bloqueado. Complete as 4 jornadas para liberar. Ver o que falta.`}>
+                  onClick={() => openGame(BONUS_GAME)}
+                  aria-label={bonusOpen ? `Jogar ${GAME_META[BONUS_GAME].name}, o jogo bônus` : `${GAME_META[BONUS_GAME].name}: jogo bônus bloqueado. Abrir a prévia jogável.`}>
                   {bonusOpen ? <><span className="bs-halo" aria-hidden="true" /><span className="bs-ring" aria-hidden="true" />
                     {[0, 1, 2, 3, 4, 5].map((i) => <span key={i} className="bs-spark" style={{ "--i": i } as React.CSSProperties} aria-hidden="true" />)}</>
-                    : <><span className="bs-veil" aria-hidden="true" /><span className="bs-lock" aria-hidden="true">🔒</span></>}
+                    : <><span className="bs-veil" aria-hidden="true" /><span className="bs-lock" aria-hidden="true">🔒</span><span className="bs-demo" aria-hidden="true">Prévia</span></>}
                 </button>
                 <button className="hotspot" onClick={() => document.getElementById("jogos")?.scrollIntoView({ behavior: "smooth", block: "start" })} aria-label="Jogar agora: ver os jogos">
                   <span aria-hidden="true">Jogar agora</span>
@@ -607,7 +621,7 @@ export default function App() {
                   const full = isComplete(progress[BONUS_GAME]);
                   if (!bonusOpen) {
                     return (
-                      <article id="bonus-card" className="gcard bonus locked" style={{ "--gc": meta.color } as React.CSSProperties} aria-labelledby="bonus-name">
+                      <article id="bonus-card" className="gcard bonus locked" style={{ "--gc": meta.color } as React.CSSProperties} aria-labelledby="bonus-name" onClick={openDemo}>
                         <span className="gem-wrap"><Gem kind={BONUS_GAME} size={88} /><span className="gem-lock" aria-hidden="true">🔒</span></span>
                         <span className="badge bonus">Jogo bônus · bloqueado</span>
                         <h2 className="gname" id="bonus-name">{meta.name}</h2>
@@ -618,7 +632,8 @@ export default function App() {
                             return <li key={g} className={n === LEVELS_PER_GAME ? "ok" : ""}><span>{GAME_META[g].name}</span><b>{n === LEVELS_PER_GAME ? "✓ completa" : `${n}/${LEVELS_PER_GAME}`}</b></li>;
                           })}
                         </ul>
-                        <button className="btn sec gplay" disabled aria-label={`${meta.name}: bloqueado até completar as 4 jornadas principais`}>🔒 Bloqueado</button>
+                        <button className="btn sec gplay ademo-cta" onClick={(e) => { e.stopPropagation(); openDemo(); }}
+                          aria-label={`${meta.name}: experimentar a prévia (o jogo completo libera com as 4 jornadas)`}>▶ Experimentar a prévia</button>
                       </article>
                     );
                   }
@@ -645,7 +660,7 @@ export default function App() {
             focus={focusLevel(progress[journeyGame], lastPlayed[journeyGame])}
             justDone={arrival?.game === journeyGame ? arrival.justDone : undefined}
             justUnlocked={arrival?.game === journeyGame ? arrival.justUnlocked : undefined}
-            onBack={() => goHome(true)} onHelp={() => openTutorial(journeyGame, "Concluir")} onFeedback={openFeedback} onPlay={(n) => startGame(journeyGame, n - 1)}
+            onBack={() => goHome(true)} onHelp={() => openTutorial(journeyGame, "Concluir")} onFeedback={() => openFeedback()} onPlay={(n) => startGame(journeyGame, n - 1)}
             cases={{ solved: solvedCount(caseLog, journeyGame), total: casesOf(journeyGame).length }} onCases={() => openCasebook(journeyGame)} />
         ) : view === "case" && caseRun && runCase ? (
           caseRun.mode === "offer" ? (
@@ -710,7 +725,7 @@ export default function App() {
                     try { const code = await issueRecovery(m); saveMe({ ...m, recovery: code }); setCodeModal(code); return null; }
                     catch (e) { return e instanceof RankError ? e.message : "Não foi possível gerar agora."; }
                   }}
-                  onRecover={() => setNickModal({ then: () => {} })} onRetry={() => connect()} onReset={resetAll} onFeedback={openFeedback}
+                  onRecover={() => setNickModal({ then: () => {} })} onRetry={() => connect()} onReset={resetAll} onFeedback={() => openFeedback()}
                   admin={admin} onAdmin={changeAdmin} />
               )}
             </div>
@@ -723,7 +738,7 @@ export default function App() {
             <button className="btn sec" onClick={() => { setProfileTab("ajustes"); setView("profile"); }}>Ir para os Ajustes</button>
           </div>
         ) : view === "ranking" ? (
-          <Ranking times={times} me={me}
+          <Ranking times={times} me={me} games={bonusEarned ? EVERY_GAME : ALL_GAMES}
             onListed={async (l) => { const m = meRef.current; if (!m) return; await setListed(m, l); saveMe({ ...m, listed: l }); }}
             onFixIdentity={() => { setProfileTab("ajustes"); setView("profile"); }}
             onAuthLost={() => { saveMe(null); setCloudIssue("offline"); }} />
@@ -804,15 +819,22 @@ export default function App() {
             <PatchesGame key={`p-${activeSession.idx}-${activeSession.round}`} puzzle={PATCHES_PUZZLES[activeSession.idx]} {...sessionProps("patches", activeSession.idx)} />
           </div>
         )}
+        {demo && (<div hidden={view !== "demo"}>
+          <AstrosDemo stage={demo} round={demoRound} progress={progress} active={view === "demo" && !tutorial && !nickModal}
+            onStage={(st) => { if (st === "play") setDemoRound((r) => r + 1); setDemo(st); }}
+            onClose={closeDemo} onFeedback={() => openFeedback()}
+            onRules={() => setTutorial({ game: BONUS_GAME, first: false, finish: "Voltar à prévia", demo: true })} />
+        </div>)}
       </main>
 
       {result && showComplete && (
         <LevelComplete key={`${result.game}-${result.level}-${result.ms}`} result={result} medals={winMedals} hasNext={result.level < LEVELS_PER_GAME}
+          askRating={!fbSent && !admin && ASK_RATING_AT.has(result.level) && !isDone(result.before, result.level)} onRate={(n) => { rateRef.current = n; }}
           onSwitch={leaveCelebration} onClose={() => { setShowComplete(false); setResult(null); setWinMedals([]); }} />
       )}
 
       {/* Medalhas novas fora da tela de parabéns: uma de cada vez e nunca por cima da partida ou de tutoriais. */}
-      {ready && toasts.length > 0 && view !== "game" && view !== "case" && !showComplete && !tutorial && !nickModal && (
+      {ready && toasts.length > 0 && view !== "game" && view !== "case" && view !== "demo" && !showComplete && !tutorial && !nickModal && (
         <AchievementToast key={toasts[0].id} a={toasts[0]} left={toasts.length - 1}
           onDone={() => setToasts((q) => q.slice(1))} onOpen={openAchievements} />
       )}
@@ -828,7 +850,7 @@ export default function App() {
       )}
       {codeModal && <CodeModal code={codeModal} onClose={() => { setCodeModal(null); markCodeUnseen(false); }} />}
 
-      <BottomNav active={TAB_OF[view]} onChange={(t) => (t === "achievements" ? openAchievements() : onTab(t))} inGame={view === "game" || view === "case"}
+      <BottomNav active={TAB_OF[view]} onChange={(t) => (t === "achievements" ? openAchievements() : onTab(t))} inGame={view === "game" || view === "case" || view === "demo"}
         badges={{ achievements: newMedals, profile: codeUnseen ? 1 : 0 }} />
     </>
   );

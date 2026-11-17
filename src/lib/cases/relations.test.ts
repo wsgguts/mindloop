@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { allCases } from "./catalog";
 import { CASES_DATA } from "./data";
 import { allowedCells, blockedCells, objectsOf, peopleOf, rcOf, sideNeighbors } from "./model";
+import { roomRun } from "../../components/cases/CaseBoard";
 import { GRID_NO, GRID_YES, cellNote, cellsOfClue, focusOf, gridNote, nextGrid, nextNote, readNote, validMark } from "./relations";
 
 describe("investigação: ligações entre pistas, personagens, objetos e casas", () => {
@@ -128,6 +129,17 @@ describe("cenários: o lugar de cada caso é coerente", () => {
     for (const rule of ["regioes", "equilibrio", "trilha", "comodos", "ceu"]) {
       const cs = CASES_DATA.filter((c) => c.model.rule === rule);
       expect(cs.filter((c) => c.clues.some((k) => k.k === "via")).length, rule).toBeGreaterThanOrEqual(8);
+    }
+  });
+  it("o nome do cômodo só se estende sobre casas seguidas do MESMO cômodo, na mesma linha", () => {
+    for (const c of CASES_DATA) {
+      const m = c.model;
+      m.scene.rooms.forEach((_, k) => {
+        const v = m.scene.room.indexOf(k), span = roomRun(m, v), [r, col] = rcOf(m, v);
+        expect(col + span, c.id).toBeLessThanOrEqual(m.cols);
+        for (let i = 0; i < span; i++) { expect(m.scene.room[v + i], c.id).toBe(k); expect(rcOf(m, v + i)[0], c.id).toBe(r); }
+        if (col + span < m.cols) expect(m.scene.room[v + span], c.id).not.toBe(k);
+      });
     }
   });
 });

@@ -104,3 +104,42 @@
   .ggrid > .gcard.bonus:last-child:nth-child(odd) { grid-column: 1 / -1; }
   .ggrid > .gcard.bonus:last-child:nth-child(odd) > :is(.gtext, .bonus-req, .gprog) { width: 100%; max-width: 320px; }
 }
+
+/* ---------- Prévia do Astros (jogo bônus bloqueado) ---------- */
+/* Na arte do Início: cristal apagado com cadeado + etiqueta "Prévia" (tocar abre a prévia jogável). */
+.bonus-spot .bs-demo {
+  align-self: end; transform: translateY(45%); padding: 1px 8px; border-radius: 999px; white-space: nowrap; pointer-events: none;
+  font: 700 clamp(9px, 2.4vw, 12px) / 1.5 var(--font-title); letter-spacing: .05em; text-transform: uppercase;
+  color: #0B3D2A; background: linear-gradient(180deg, #D8FFB0, #3DDC5A); box-shadow: 0 2px 6px rgba(0, 0, 0, .4);
+}
+/* Card bloqueado no Início: inteiro clicável, abre a prévia. */
+.gcard.bonus.locked { cursor: pointer; }
+.gcard.bonus.locked .ademo-cta { border-color: var(--gc); color: #0B5A33; background: #EFFFE6; }
+
+/* Apresentação e encerramento: um cartão central, no verde do jogo. */
+.ademo { display: grid; place-items: center; min-height: calc(100svh - 32px); padding: 16px 12px calc(16px + env(safe-area-inset-bottom, 0px)); }
+.ademo-card {
+  width: min(100%, 420px); display: grid; justify-items: center; gap: 10px; padding: 22px 18px 18px; text-align: center;
+  border-radius: 22px; background: var(--cloud, #FFF8FF); color: var(--ink, #26104D);
+  border: 2px solid var(--gc); box-shadow: 0 0 0 4px color-mix(in srgb, var(--gc) 18%, transparent), 0 16px 40px rgba(10, 30, 20, .35);
+}
+.ademo-card h1 { margin: 0; font: 700 clamp(26px, 7vw, 32px) / 1.1 var(--font-title); }
+.ademo-rules { list-style: none; margin: 4px 0 2px; padding: 0; display: grid; gap: 8px; text-align: left; width: 100%; }
+.ademo-rules li { display: grid; grid-template-columns: 30px 1fr; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 12px; background: color-mix(in srgb, var(--gc) 10%, #fff); font-size: 14.5px; line-height: 1.35; }
+.ademo-rules li > :first-child { justify-self: center; color: #6D5BA6; }
+.ademo-touch { display: inline-flex; gap: 1px; }
+.ademo-lead { margin: 0; font-size: 15px; line-height: 1.45; }
+.ademo-star { display: grid; place-items: center; width: 104px; height: 104px; border-radius: 50%; background: radial-gradient(circle, color-mix(in srgb, var(--gc) 35%, #fff) 0 40%, transparent 70%); animation: ademo-glow 2.4s ease-in-out infinite; }
+@keyframes ademo-glow { 50% { transform: scale(1.06); filter: drop-shadow(0 0 10px #9DFF7A); } }
+.ademo-unlock { width: 100%; display: grid; gap: 6px; padding: 10px 12px; border-radius: 14px; border: 1.5px dashed var(--gc); text-align: left; font-size: 14px; }
+.ademo-actions { width: 100%; display: grid; gap: 8px; margin-top: 4px; }
+.ademo-actions .btn { width: 100%; min-height: 48px; }
+@media (prefers-reduced-motion: reduce) { .ademo-star { animation: none; } }
+
+/* Partida da prévia: faixa discreta acima do cabeçalho do jogo. */
+.ademo-play { display: grid; gap: 6px; }
+.ademo-ribbon {
+  margin: calc(4px + env(safe-area-inset-top, 0px)) auto 0; display: inline-flex; align-items: center; gap: 8px; padding: 4px 12px; border-radius: 999px;
+  justify-self: center; background: #EFFFE6; color: #0B3D2A; border: 1.5px solid var(--gc); font-size: 12.5px; line-height: 1.3;
+}
+.ademo-ribbon b { font: 700 12px var(--font-title); letter-spacing: .06em; text-transform: uppercase; }

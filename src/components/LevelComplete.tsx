@@ -22,7 +22,7 @@ export interface LevelResult {
 }
 
 /** Para onde a tela de parabéns leva: o próximo nível (Continuar), a jornada (tempo esgotado) ou as conquistas. */
-export type LeaveTo = "next" | "journey" | "achievements" | "home";
+export type LeaveTo = "next" | "journey" | "achievements" | "home" | "feedback";
 
 interface Props {
   result: LevelResult;
@@ -37,6 +37,10 @@ interface Props {
   onSwitch: (to: LeaveTo) => void;
   /** Fim da transição: a tela de parabéns pode sair de cena. */
   onClose: () => void;
+  /** Pergunta "Está curtindo o MindLoop?" com 5 estrelas (alguns níveis, só para quem nunca deu opinião). */
+  askRating?: boolean;
+  /** Nota escolhida: a tela de opinião abre já com ela (destino "feedback"). */
+  onRate?: (stars: number) => void;
 }
 
 export const AUTO_CONTINUE_MS = 6500;
@@ -55,7 +59,7 @@ function noteOf(r: LevelResult): string | null {
 // Tela especial de conclusão: fogos, confetes, tempo e progresso da jornada.
 // Continuar → cobre a tela, abre o PRÓXIMO nível e se desfaz suavemente.
 // Sem toque, ao fim do temporizador → cobre a tela, troca para a JORNADA (progresso já salvo) e se desfaz.
-export default function LevelComplete({ result, medals = [], hasNext, onSwitch, onClose }: Props) {
+export default function LevelComplete({ result, medals = [], hasNext, onSwitch, onClose, askRating, onRate }: Props) {
   const r = result;
   const meta = GAME_META[r.game];
   const [phase, setPhase] = useState<"show" | "cover" | "reveal">("show");
@@ -63,6 +67,7 @@ export default function LevelComplete({ result, medals = [], hasNext, onSwitch, 
   const leaving = useRef<LeaveTo | null>(null); // o primeiro evento vence; os demais são ignorados
   const autoRef = useRef(0);
   const btn = useRef<HTMLButtonElement>(null);
+  const [paused, setPaused] = useState(false); // a pessoa mexeu nas estrelas: não volta sozinha para a jornada
   const sfx = useSfx(r.game);
   const cb = useRef({ onSwitch, onClose });
   cb.current = { onSwitch, onClose };
@@ -74,6 +79,10 @@ export default function LevelComplete({ result, medals = [], hasNext, onSwitch, 
     window.clearTimeout(autoRef.current); // tocou em Continuar: o temporizador para na hora
     setPhase("cover");
   }
+
+  /** Interagiu com a pergunta de nota: o temporizador para (sem pressa para escolher). */
+  function hold() { if (!paused) { window.clearTimeout(autoRef.current); setPaused(true); } }
+  function rate(n: number) { onRate?.(n); leave("feedback"); }
 
   useEffect(() => {
     btn.current?.focus({ preventScroll: true });
@@ -155,6 +164,18 @@ export default function LevelComplete({ result, medals = [], hasNext, onSwitch, 
             </div>
           )}
 
+          {askRating && (
+            <div className="lc-rate" role="group" aria-labelledby="lc-rate-t" onPointerEnter={hold} onPointerDown={hold} onFocus={hold}>
+              <p id="lc-rate-t">Está curtindo o <b>MindLoop</b>?</p>
+              <div className="lc-rate-stars">
+                {[1, 2, 3, 4, 5].map((n) => (
+                  <button key={n} type="button" onClick={() => rate(n)} aria-label={`${n} de 5 estrelas — dar opinião`}><span aria-hidden="true">★</span></button>
+                ))}
+              </div>
+              <small>Toque numa estrela e conte o que achou (leva 1 minuto).</small>
+            </div>
+          )}
+
           <button ref={btn} className="btn cta lc-go" onClick={() => leave(hasNext ? "next" : "journey")}
             aria-describedby="lc-next">{hasNext ? "Continuar" : "Ver jornada"}</button>
           <p className="lc-next" id="lc-next">{hasNext ? `Próximo: Nível ${r.level + 1}` : "Este é o último nível da jornada."}</p>
@@ -162,8 +183,10 @@ export default function LevelComplete({ result, medals = [], hasNext, onSwitch, 
             <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 11 12 4l9 7" /><path d="M5.5 9.5V20h4.5v-6h4v6h4.5V9.5" /></svg>
             <span>Voltar para a tela inicial</span>
           </button>
-          <div className="lc-auto" aria-hidden="true"><i style={{ animationDuration: `${AUTO_CONTINUE_MS}ms` }} /></div>
-          <p className="lc-hint">Sem tocar, voltando para a jornada…</p>
+          {!paused && <>
+            <div className="lc-auto" aria-hidden="true"><i style={{ animationDuration: `${AUTO_CONTINUE_MS}ms` }} /></div>
+            <p className="lc-hint">Sem tocar, voltando para a jornada…</p>
+          </>}
           </div>
         </section>
       )}

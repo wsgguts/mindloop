@@ -19,8 +19,37 @@
   border: 2px solid rgba(255,255,255,.35); background: rgba(255,255,255,.08); color: #fff; -webkit-tap-highlight-color: transparent; }
 .icon-btn:hover { background: rgba(255,255,255,.18); }
 .icon-btn:focus-visible { outline: 3px solid var(--cyan); outline-offset: 2px; }
-.home .home-fb { position: absolute; z-index: 3; top: calc(10px + env(safe-area-inset-top, 0px)); right: calc(10px + env(safe-area-inset-right, 0px));
-  background: rgba(18,6,40,.45); backdrop-filter: blur(4px); }
+/* ---------- Botão "Dar opinião" (FeedbackButton): pílula na cor da marca, com texto ---------- */
+.fb-btn {
+  position: relative; overflow: hidden; flex: none; display: inline-flex; align-items: center; gap: 6px; min-height: 40px; padding: 0 14px 0 11px;
+  border-radius: 999px; border: 2px solid rgba(255, 255, 255, .75); cursor: pointer; -webkit-tap-highlight-color: transparent;
+  background: linear-gradient(135deg, #F05BC8, #9A3CF0 55%, #762CEB); color: #fff;
+  font: 700 14px/1 var(--font-title); letter-spacing: .01em; white-space: nowrap;
+  box-shadow: 0 4px 14px rgba(240, 91, 200, .45), 0 0 0 0 rgba(240, 91, 200, .55);
+  transition: transform .15s, box-shadow .2s;
+}
+.fb-btn svg { flex: none; }
+.fb-btn:hover { transform: translateY(-1px); box-shadow: 0 6px 18px rgba(240, 91, 200, .6); }
+.fb-btn:active { transform: scale(.96); }
+.fb-btn:focus-visible { outline: 3px solid var(--cyan); outline-offset: 2px; }
+.fb-btn.compact { min-height: 36px; padding: 0 12px 0 9px; font-size: 13px; }
+/* Chamar atenção (enquanto nunca enviou opinião): um brilho que atravessa e um "pulso" a cada 7 s. */
+.fb-btn:not(.calm) { animation: fb-pulse 7s ease-in-out 2s infinite; }
+.fb-btn:not(.calm)::after {
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  background: linear-gradient(110deg, transparent 30%, rgba(255, 255, 255, .55) 50%, transparent 70%) -150% 0 / 60% 100% no-repeat;
+  animation: fb-shine 7s ease-in-out 2s infinite;
+}
+@keyframes fb-pulse { 0%, 82%, 100% { box-shadow: 0 4px 14px rgba(240, 91, 200, .45), 0 0 0 0 rgba(240, 91, 200, .55); transform: none; }
+  88% { transform: scale(1.06); } 94% { box-shadow: 0 4px 14px rgba(240, 91, 200, .45), 0 0 0 10px rgba(240, 91, 200, 0); transform: none; } }
+@keyframes fb-shine { 0%, 80% { background-position: -150% 0; } 92%, 100% { background-position: 250% 0; } }
+@media (prefers-reduced-motion: reduce) { .fb-btn:not(.calm), .fb-btn:not(.calm)::after { animation: none; } }
+/* Já enviou: continua visível, mas sem animação e mais discreto. */
+.fb-btn.calm { background: linear-gradient(135deg, rgba(240, 91, 200, .85), rgba(118, 44, 235, .85)); border-color: rgba(255, 255, 255, .45); box-shadow: none; }
+/* No Início: no canto da arte. */
+.home .home-fb { position: absolute; z-index: 3; top: calc(10px + env(safe-area-inset-top, 0px)); right: calc(10px + env(safe-area-inset-right, 0px)); }
+/* Celular (≤ 420 px): no topo das telas, só o ícone dentro da pílula (o nome do app e o apelido precisam do espaço). */
+@media (max-width: 420px) { .fb-btn.compact span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); } .fb-btn.compact { padding: 0 9px; } }
 
 /* ---------- Páginas: título + ação na mesma linha, menos altura perdida ---------- */
 .wrap { gap: var(--sp-3); padding: 18px 16px 24px; }

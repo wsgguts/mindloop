@@ -127,16 +127,16 @@
 .jcard:focus-visible { outline: 3px solid var(--cyan); outline-offset: 2px; }
 
 .jmap { gap: 10px; }
-.jmapbar { position: sticky; top: 0; z-index: 25; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 10px;
-  margin: -12px -16px 0; padding: calc(8px + env(safe-area-inset-top, 0px)) 16px 8px; background: rgba(27,11,63,.94); backdrop-filter: blur(6px); border-bottom: 1px solid rgba(255,255,255,.1); }
-.jmapbar .back { min-height: 40px; padding: 0 12px; }
+.jmapbar { position: sticky; top: 0; z-index: 25; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 8px;
+  margin: -12px -16px 0; padding: calc(6px + env(safe-area-inset-top, 0px)) 12px 6px; background: rgba(27,11,63,.94); backdrop-filter: blur(6px); border-bottom: 1px solid rgba(255,255,255,.1); }
+.jmapbar .back { min-height: 34px; padding: 0 10px; border-radius: 10px; font-size: 14px; }
 .jmap-t { display: grid; min-width: 0; }
-.jmap-t b { font: 700 16px/1.2 var(--font-title); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.jmap-t small { font-size: 12px; color: #E6D9FA; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.jmap-nav { display: inline-flex; gap: 6px; }
-.jmap-nav button { width: 40px; height: 40px; border-radius: 12px; border: 2px solid #8E6BE0; background: transparent; color: #fff; font: 700 20px var(--font-title); cursor: pointer; }
+.jmap-t b { font: 700 15px/1.2 var(--font-title); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.jmap-t small { font-size: 11.5px; color: #E6D9FA; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.jmap-nav { display: inline-flex; gap: 5px; }
+.jmap-nav button { width: 34px; height: 34px; padding: 0; border-radius: 10px; border: 2px solid #8E6BE0; background: transparent; color: #fff; font: 700 17px var(--font-title); cursor: pointer; }
 .jmap-nav button:disabled { opacity: .35; cursor: default; }
-.jmap-tip { font-size: 13px; color: #D8C8F7; } .jmap-tip b { color: #fff; font-weight: 600; }
+.jmap-tip { font-size: 13px; color: #D8C8F7; } .jmap-tip b { color: #fff; font-weight: 600; } /* usado no caderno de investigações */
 @media (min-width: 640px) { .jmapbar { margin-inline: 0; border-radius: 0 0 16px 16px; } }
 
 /* ---- Faixas de botões (categorias, modalidades): quebram linha em vez de rolar de lado — nada fica cortado
@@ -206,3 +206,20 @@
   .journey.fit .jgrid { gap: 6px; }
 }
 @media (max-width: 380px) and (orientation: portrait) { .journey.fit .jcard-word { display: none; } }
+
+/* ---- Mapa do capítulo sem rolar em qualquer tela em pé (celular, tablet ou janela estreita no computador): a tela ocupa a altura entre o cabeçalho e a barra inferior
+   (--fit-h, medido em useFitHeight) e a pintura (900 × 1600) encolhe proporcionalmente até caber, centralizada.
+   As fases usam % da pintura, então acompanham o tamanho dela. ---- */
+@media (orientation: portrait) {
+  .page > .journey.fitmap { padding-bottom: 8px; }
+  .journey.fitmap { height: max(var(--fit-h, 0px), 420px); display: flex; flex-direction: column; gap: 6px; padding: 4px 8px 0; max-width: 760px; }
+  .journey.fitmap .jmapbar { margin: -4px -8px 0; }
+  .journey.fitmap .jmapbar { flex: none; }
+  @media (min-width: 640px) { .journey.fitmap .jmapbar { margin-inline: 0; } }
+  .journey.fitmap .jch { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+  .journey.fitmap .trail-fit { position: relative; flex: 1; min-height: 0; container-type: size; display: grid; place-items: start center; }
+  /* "Ir para o nível N": pílula no topo da pintura (céu), sem cobrir as fases do pé da trilha. */
+  .journey.fitmap .jump { position: absolute; top: 10px; bottom: auto; left: 50%; transform: translateX(-50%); min-height: 34px; padding: 0 14px; font-size: 13px; white-space: nowrap; }
+  .journey.fitmap .trail { width: min(100cqw, 56.25cqh); margin: 0; border-radius: 18px; overflow: hidden;
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--gc) 35%, transparent), 0 12px 30px rgba(0, 0, 0, .4); }
+}

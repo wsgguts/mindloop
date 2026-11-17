@@ -10,6 +10,7 @@
 //   Astros — com alguém selecionado, as linhas/colunas ocupadas apagam e as 8 casas em volta acendem;
 //   Sudoku — linhas, colunas e cômodos já ocupados apagam para quem está selecionado;
 //   Patches — cada cômodo é uma peça colorida com a etiqueta do tamanho (como no jogo).
+import { useEffect, useRef, useState } from "react";
 import { type Model, allowedCells, cellName, propAt, rcOf, roomOf, stopOf } from "../../lib/cases/model";
 import type { Focus } from "../../lib/cases/relations";
 import Art from "../Art";
@@ -30,6 +31,14 @@ export function roomShape(m: Model, k: number): { size: number; kind: "q" | "v" 
   const rs = cells.map((v) => rcOf(m, v)[0]), cs = cells.map((v) => rcOf(m, v)[1]);
   const h = Math.max(...rs) - Math.min(...rs) + 1, w = Math.max(...cs) - Math.min(...cs) + 1;
   return { size: cells.length, kind: h === w ? "q" : h > w ? "v" : "h" };
+}
+
+/** Quantas casas seguidas, a partir de v e para a direita, são do mesmo cômodo (a etiqueta do nome pode usar todas). */
+export function roomRun(m: Model, v: number): number {
+  const [, c] = rcOf(m, v);
+  let span = 1;
+  while (c + span < m.cols && m.scene.room[v + span] === m.scene.room[v]) span++;
+  return span;
 }
 
 export interface BoardProps {
@@ -54,6 +63,30 @@ export default function CaseBoard({ model: m, a, sel, done, showErrors, focus, o
   const allowed = new Set(allowedCells(m));
   const ownerOf = (v: number) => pos.indexOf(v);
   const firstOfRoom = (v: number) => m.scene.room.indexOf(m.scene.room[v]) === v;
+  // Nomes dos cômodos (etiqueta no canto da 1ª casa; no Tango, os lados à esquerda). Se um nome não cabe, a fonte da
+  // etiqueta diminui um pouco; se ainda assim não couber, a legenda "Locais" abaixo do tabuleiro mostra todos por extenso.
+  const boardRef = useRef<HTMLDivElement>(null);
+  const [cut, setCut] = useState(false);
+  useEffect(() => {
+    const box = boardRef.current?.closest<HTMLElement>(".cx-sceneframe");
+    if (!box) return;
+    const over = (el: HTMLElement) => el.scrollWidth > el.clientWidth + 1 || el.scrollHeight > el.clientHeight + 1;
+    const check = () => {
+      const els = [...box.querySelectorAll<HTMLElement>(".cx-room, .cx-sides span")];
+      for (const el of els) {
+        el.style.fontSize = "";
+        let fs = parseFloat(getComputedStyle(el).fontSize);
+        const floor = Math.max(8.5, fs - 2); // reduz no máximo 2px (nunca abaixo de 8,5px): continua legível
+        while (over(el) && fs > floor) { fs -= 0.5; el.style.fontSize = `${fs}px`; }
+      }
+      setCut(els.some(over));
+    };
+    check();
+    const ro = typeof ResizeObserver !== "undefined" ? new ResizeObserver(check) : null;
+    ro?.observe(box);
+    document.fonts?.ready.then(check).catch(() => {});
+    return () => ro?.disconnect();
+  }, [m]);
   // Para quem está selecionado: casas que a regra do lugar já fecha (linha, coluna, cômodo ou lado ocupados).
   const closed = (v: number) => {
     if (sel === null) return false;
@@ -100,7 +133,7 @@ export default function CaseBoard({ model: m, a, sel, done, showErrors, focus, o
         {m.rule === "equilibrio" && (
           <div className="cx-sides" aria-hidden="true">{m.scene.rooms.slice(0, 2).map((r, k) => <span key={k} style={{ background: ROOM_TINTS[k] }}>{r.label}</span>)}</div>
         )}
-        <div className="cx-sceneboard" style={{ gridTemplateColumns: `repeat(${cols}, 1fr)`, aspectRatio: `${cols} / ${rows}` }} role="grid"
+        <div className="cx-sceneboard" ref={boardRef} style={{ gridTemplateColumns: `repeat(${cols}, 1fr)`, aspectRatio: `${cols} / ${rows}` }} role="grid"
           aria-label={`Cenário ${rows} por ${cols} com ${m.scene.rooms.length} ${m.rule === "equilibrio" ? "lados" : "cômodos"}`}>
           {m.trail && (
             <svg className="cx-trail" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
@@ -121,7 +154,7 @@ export default function CaseBoard({ model: m, a, sel, done, showErrors, focus, o
             return (
               <button key={v} role="gridcell" className={cls} disabled={done || blocked || offTrail} aria-label={label} onClick={() => tapCell(v)}
                 style={{ "--floor": floorOf(m, v), ...(m.rule === "comodos" ? { "--piece": PATCH_COLORS[roomOf(m, v) % PATCH_COLORS.length] } : {}) } as React.CSSProperties}>
-                {firstOfRoom(v) && m.rule !== "equilibrio" && <span className="cx-room" aria-hidden="true">{room.label}</span>}
+                {firstOfRoom(v) && m.rule !== "equilibrio" && <span className="cx-room" aria-hidden="true" style={{ "--span": roomRun(m, v) } as React.CSSProperties}>{room.label}</span>}
                 {firstOfRoom(v) && m.rule === "comodos" && (() => { const sh = roomShape(m, roomOf(m, v)); return <span className="cx-ptag ptclue" aria-hidden="true"><PatchesTag v={sh.size} kind={sh.kind} color={PATCH_COLORS[roomOf(m, v) % PATCH_COLORS.length]} /></span>; })()}
                 {m.trail && !offTrail && <span className="cx-stop" aria-hidden="true">{stopOf(m, v) + 1}</span>}
                 {blocked ? <span className="cx-prop" aria-hidden="true"><Art e={p!} className="fill" /></span>
@@ -136,6 +169,12 @@ export default function CaseBoard({ model: m, a, sel, done, showErrors, focus, o
           })}
         </div>
       </div>
+      {cut && (
+        <ul className="cx-roomkey" aria-label="Locais: nomes completos">
+          <li className="cx-roomkey-t">Locais</li>
+          {m.scene.rooms.map((r, k) => { const v = m.scene.room.indexOf(k); return v < 0 ? null : <li key={k}><i style={{ background: floorOf(m, v) }} aria-hidden="true" />{r.label}</li>; })}
+        </ul>
+      )}
       <div className="cx-tray" role="group" aria-label="Personagens: toque num deles e depois na casa">
         {m.people.map((p, i) => (
           <button key={i} className={`cx-piece${sel === i ? " sel" : ""}${focus?.people.has(i) ? " rel" : ""}${pos[i] >= 0 ? " placed" : ""}`} disabled={done} aria-pressed={sel === i}

@@ -39,9 +39,7 @@ p { margin: 0; }
    céu, em cima, preenchida pela própria arte ampliada e desfocada. As áreas clicáveis são em % da arte, então
    acompanham qualquer tamanho. */
 .home { position: relative; isolation: isolate; height: calc(100vh - var(--nav-h)); height: calc(100svh - var(--nav-h));
-  display: flex; flex-direction: column; align-items: center; justify-content: flex-end; background: rgb(18,14,72); overflow: hidden; }
-.home-bg { position: absolute; inset: -6%; z-index: -1; width: 112%; height: 112%; object-fit: cover; object-position: top; pointer-events: none;
-  filter: blur(26px) saturate(1.3) brightness(.6); }
+  display: flex; flex-direction: column; align-items: center; justify-content: flex-end; background: #120E48; overflow: hidden; } /* cor sólida do céu da arte em volta dela (sem imagem borrada) */
 .home .art { position: relative; flex: none; width: min(104vw, calc((100vh - var(--nav-h)) * .5619)); width: min(104vw, calc((100svh - var(--nav-h)) * .5619)); }
 .home .art img { display: block; width: 100%; height: auto;
   -webkit-mask-image: linear-gradient(180deg, transparent 0, #000 5%); mask-image: linear-gradient(180deg, transparent 0, #000 5%); }

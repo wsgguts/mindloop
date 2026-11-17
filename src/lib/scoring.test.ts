@@ -9,9 +9,10 @@ const MIG = join(__dirname, "../../supabase/migrations");
 const sql = readdirSync(MIG).filter((f) => f.endsWith(".sql")).map((f) => readFileSync(join(MIG, f), "utf8")).join("\n");
 
 describe("pontuação normalizada", () => {
-  it("o banco usa exatamente os tempos de referência e mínimos do app (400 níveis)", () => {
+  it("o banco usa exatamente os tempos de referência e mínimos do app (500 níveis: 4 principais + Astros)", () => {
     const rows = [...sql.matchAll(/\('(\w+)',(\d+),(\d+),(\d+)\)/g)];
-    expect(rows).toHaveLength(400);
+    expect(rows).toHaveLength(500);
+    expect(rows.filter((r) => r[1] === "astros")).toHaveLength(100);
     for (const [, g, l, ref, min] of rows) {
       expect(Number(ref), `${g} ${l}`).toBe(refMs(g as never, Number(l)));
       expect(Number(min), `${g} ${l}`).toBe(minMs(g as never, Number(l)));
@@ -31,6 +32,16 @@ describe("pontuação normalizada", () => {
     const max = ALL_GAMES.map((g) => gameScore(g, Object.fromEntries(Array.from({ length: 100 }, (_, i) => [i + 1, 1]))));
     expect(new Set(max).size).toBe(1);
     expect(max[0]).toBe(40000);
+  });
+  it("Astros no ranking: o banco aceita o jogo, só de quem completou as 4 jornadas, sem mudar os outros jogos", () => {
+    const mig = readFileSync(join(MIG, "20261116000100_astros_ranking.sql"), "utf8");
+    expect(mig).toContain("check (game in ('sudoku', 'zip', 'tango', 'patches', 'astros'))");
+    expect(mig).toContain("if p_game not in ('sudoku', 'zip', 'tango', 'patches', 'astros') then raise exception 'BAD_GAME'");
+    expect(mig).toMatch(/p_game = 'astros' and \(select count\(distinct game\) from public\.results\s+where player_id = p_id and level = 100 and game in \('sudoku', 'zip', 'tango', 'patches'\)\) < 4/);
+    expect(mig).not.toMatch(/(drop table|delete from|truncate|drop policy|create policy)/i); // só acrescenta
+    // Mesmo teto de pontos que os outros jogos (ranking geral justo).
+    const max = (g: "astros" | "sudoku") => gameScore(g, Object.fromEntries(Array.from({ length: 100 }, (_, i) => [i + 1, 1])));
+    expect(max("astros")).toBe(max("sudoku"));
   });
   it("tempo de referência maior para grades maiores e níveis mais difíceis", () => {
     for (const g of ALL_GAMES) expect(refMs(g, 100)).toBeGreaterThan(refMs(g, 1));
