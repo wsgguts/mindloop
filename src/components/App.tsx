@@ -13,9 +13,11 @@ import { ACH_KEY, type Achievement, type Unlocked, evaluate, parseUnlocked } fro
 import { HISTORY_KEY, type PlayerLog, addMatch, emptyLog, importLegacy, matchId, parseLog, startMatch } from "../lib/history";
 import { RANK_KEY, RankError, rankingConfig, renamePlayer, syncGame } from "../lib/ranking";
 import { type Identity, STORE_PREFIX, createPlayer, emptySnapshot, hasProgress, issueRecovery, loadRemote, parseIdentityFull, readSnapshot, recoverPlayer, resetPlayer, sameSnapshot, setListed, syncSnapshot, writeSnapshot } from "../lib/cloud";
-import { CodeModal, NickModal, Settings } from "./account/Account";
+import { NickModal, Settings } from "./account/Account";
 import { RulesContent, type RulesGame } from "./Rules";
-import { TUTORIALS, Tutorial } from "./tutorial";
+import GuidedPlay, { type GuidedEnd } from "./guided/GuidedPlay";
+import { guidedScript, guidedTitle } from "./guided/scripts";
+import { GUIDED_KEY, type GuidedPart, guidedFor, parseGuided, serializeGuided } from "../lib/guided";
 import PatchesGame from "./PatchesGame";
 import { initSound } from "../lib/sound/engine";
 import TangoGame from "./TangoGame";
@@ -24,7 +26,7 @@ import AstrosGame from "./AstrosGame";
 import AstrosDemo, { type DemoStage } from "./AstrosDemo";
 import FeedbackButton from "./FeedbackButton";
 import { ASTROS_PUZZLES } from "../lib/astros";
-import { COMMENT_MAX, submitFeedback, validateFeedback } from "../lib/feedback";
+import { ASK_KEY, type AskState, COMMENT_MAX, countWin, decline, parseAsk, submitFeedback, validateFeedback } from "../lib/feedback";
 import { ALL_GAMES, BONUS_GAME, EVERY_GAME, GAME_META, bonusUnlocked, isMainGame, visibleGames } from "../lib/games";
 import { LEVELS_PER_GAME, doneCount, emptyProgress, focusLevel, isComplete, isDone, markDone, parseLevel, parseProgress } from "../lib/journey";
 import { PUZZLES, puzzleGrid } from "../lib/puzzles";
@@ -42,14 +44,14 @@ import CaseOffer from "./cases/CaseOffer";
 import CaseScreen, { type SolveResult } from "./cases/CaseScreen";
 import CaseBook, { CaseSummary } from "./cases/CaseBook";
 import { afterContinue, caseById, casesOf } from "../lib/cases/catalog";
-import { CASES_KEY, type CaseLog, type Draft, emptyCaseLog, parseCaseLog, recordOf, recordSkip, recordSolve, saveDraft, shouldOffer, solvedCount } from "../lib/cases/progress";
+import { CASES_KEY, type CaseLog, type Draft, emptyCaseLog, isSolved, parseCaseLog, recordOf, recordSkip, recordSolve, saveDraft, shouldOffer, solvedCount } from "../lib/cases/progress";
 
 type View = "home" | "journey" | "game" | "rules" | "profile" | "feedback" | "ranking" | "achievements" | "case" | "casebook" | "demo";
 /**
  * Investigação aberta. "offer" = convite depois do Continuar; "play" = investigando.
  * next: a fase tradicional que vem depois (convite da jornada); sem next, veio do caderno de investigações.
  */
-type CaseRun = { id: string; mode: "offer" | "play"; next?: { game: RulesGame; idx: number } };
+type CaseRun = { id: string; mode: "offer" | "play"; next?: { game: RulesGame; idx: number }; /** aberta pelo cristal Extra do mapa: volta para a jornada */ fromMap?: boolean };
 type Save = { id: string; grid: Grid; ms?: number };
 type Session = { game: RulesGame; idx: number; round: number };
 /** Volta à trilha logo após uma vitória: qual nível animar como concluído e qual como recém-liberado. */
@@ -61,8 +63,6 @@ const SYNC_DELAY_MS = 2500; // espera juntar várias gravações antes de enviar
 /** Gravações que não são progresso (identidade, partida em andamento): não disparam sincronização. */
 /** Já enviou ao menos uma opinião (o botão para de chamar atenção e a tela de parabéns para de pedir nota). */
 const FB_SENT_KEY = "mindloop:fb-sent";
-/** Primeira conclusão destes níveis (em qualquer jogo): a tela de parabéns pergunta "Está curtindo?" com 5 estrelas. */
-const ASK_RATING_AT = new Set([3, 10, 25, 50, 100]);
 const NO_SYNC = new Set([RANK_KEY, KEYS.save, KEYS.nick, CODE_UNSEEN_KEY, FB_SENT_KEY]);
 
 // Para onde o "Voltar" da tela de opinião leva (ela pode ser aberta de qualquer tela pelo botão flutuante).
@@ -72,7 +72,7 @@ const BACK_LABEL: Record<Exclude<View, "feedback">, string> = {
 };
 const TAB_OF: Record<View, Tab> = { home: "home", journey: "home", game: "home", rules: "rules", profile: "profile", feedback: "profile", ranking: "ranking", achievements: "achievements", case: "home", casebook: "home", demo: "home" };
 // Chave de "já viu as regras" de cada jogo (a do Sudoku é a original, mantida por compatibilidade).
-// Tutorial de cada jogo: "done" (visto até o fim) ou "skipped" (pulado). Independente por jogo.
+// Tutorial antigo de cada jogo ("done"/"skipped"). Só é lido: quem já viu não é obrigado a ver a partida guiada.
 const TUTORIAL_KEY = (g: RulesGame) => `mindloop:tutorial:${g}`;
 // Progresso salvo no aparelho, por jogo.
 const PROGRESS_KEY = (g: RulesGame) => `mindloop:progress:${g}`;
@@ -82,11 +82,14 @@ const perGame = <T,>(f: (g: RulesGame) => T): PerGame<T> => ({ sudoku: f("sudoku
 
 // Áreas clicáveis sobre os cristais da arte do Início (em % da imagem home-art.webp, 944 × 1680; original em home-art.jpg).
 // Cada área cobre o cristal e a etiqueta com o nome do jogo.
+// A runa do Astros (embaixo da logo) é igual às outras: sem cadeado nem selo. Ao tocar, abre a tela do Astros, que
+// é quem mostra se ele está bloqueado (prévia jogável) ou liberado (jornada).
 const ART_SPOTS: { id: RulesGame; left: number; top: number; width: number; height: number }[] = [
   { id: "sudoku", left: 2, top: 21.5, width: 26, height: 12 },
   { id: "zip", left: 72.5, top: 23.5, width: 26.5, height: 12 },
   { id: "tango", left: 1.5, top: 39.5, width: 22, height: 12 },
   { id: "patches", left: 76, top: 40.5, width: 23, height: 12 },
+  { id: "astros", left: 40.5, top: 52.7, width: 25, height: 12.2 },
 ];
 
 export default function App() {
@@ -96,10 +99,21 @@ export default function App() {
   const [avatarId, setAvatarId] = useState<string | null>(null); // avatar escolhido (validado contra o progresso)
   const [avSeen, setAvSeen] = useState<Set<string>>(() => new Set()); // avatares liberados que já apareceram na coleção
   const [nickModal, setNickModal] = useState<null | { then: () => void }>(null); // o que fazer depois de salvar
-  const [seen, setSeen] = useState<PerGame<boolean>>(() => perGame(() => false)); // tutorial já concluído ou pulado
-  /** Tutorial aberto: primeiro acesso (mostra "Pular") ou aberto pela pessoa (mostra "Fechar"). */
-  /** demo: aberto pela prévia do Astros — fechar o tutorial ali não o marca como visto (a prévia não registra nada). */
-  const [tutorial, setTutorial] = useState<null | { game: RulesGame; first: boolean; finish: string; demo?: boolean }>(null);
+  // ---- Partida guiada (item 3): substitui o tutorial passo a passo ----
+  /** Partes já vistas de cada jogo ("base" = a completa; "c3" = a curta do capítulo 3…). */
+  const [guidedSeen, setGuidedSeen] = useState<PerGame<Set<GuidedPart>>>(() => perGame(() => new Set()));
+  /**
+   * Partida guiada aberta. mode: "first" (primeira vez no jogo: ao terminar conta como partida completa e vai para a
+   * comemoração), "short" (capítulo novo: ao terminar volta ao nível) ou "replay" (pedida pelo "?" ou pela aba Regras).
+   * idx: nível que a pessoa ia jogar (o "Jogar o nível N" da comemoração abre ele).
+   */
+  const [guided, setGuided] = useState<null | { game: RulesGame; part: GuidedPart; mode: "first" | "short" | "replay"; idx?: number; from: "journey" | "game" | "demo" }>(null);
+  const [guidedRun, setGuidedRun] = useState(0); // cada abertura recomeça do zero
+  /** Comemoração do fim da partida guiada (com o nível a abrir no "Jogar o nível N"). */
+  const [guidedWin, setGuidedWin] = useState<null | { game: RulesGame; idx: number }>(null);
+  // ---- Pedido de opinião na comemoração (item 4) ----
+  const askRef = useRef<AskState>({ wins: 0, declinedAt: null });
+  const [askNow, setAskNow] = useState(false); // a comemoração atual pede opinião
   /** Prévia do Astros (jogo bônus bloqueado): etapa e rodada (cada "Jogar de novo" recomeça do zero). */
   const [demo, setDemo] = useState<DemoStage | null>(null);
   const [demoRound, setDemoRound] = useState(0);
@@ -113,8 +127,6 @@ export default function App() {
   const [result, setResult] = useState<LevelResult | null>(null); // vitória recém-conquistada
   const [showComplete, setShowComplete] = useState(false); // tela de parabéns aberta
   const [arrival, setArrival] = useState<Arrival | null>(null);
-  /** A jornada abre na visão geral (vindo do Início ou do caderno) ou direto no mapa (vindo de uma partida). */
-  const [journeyStart, setJourneyStart] = useState<"overview" | "map">("overview");
   const [rating, setRating] = useState<number | null>(null);
   const [comment, setComment] = useState("");
   const [fbStatus, setFbStatus] = useState<"idle" | "sending" | "ok" | "error">("idle");
@@ -122,7 +134,6 @@ export default function App() {
   const [bot, setBot] = useState(""); // campo-armadilha contra robôs
   const [fbFrom, setFbFrom] = useState<Exclude<View, "feedback">>("profile"); // tela de onde a opinião foi aberta
   const [fbSent, setFbSent] = useState(false); // já enviou alguma opinião
-  const rateRef = useRef<number | null>(null); // nota escolhida na tela de parabéns (abre a opinião já com ela)
   // Histórico central de partidas, conquistas e ranking (todos alimentados pelo mesmo evento de vitória).
   const [log, setLog] = useState<PlayerLog>(emptyLog);
   const [unlocked, setUnlocked] = useState<Unlocked>({});
@@ -134,8 +145,6 @@ export default function App() {
   const meRef = useRef(me);
   meRef.current = me;
   const [cloudIssue, setCloudIssue] = useState<null | "taken" | "offline">(null);
-  const [codeModal, setCodeModal] = useState<string | null>(null);
-  const [codeUnseen, setCodeUnseen] = useState(false);
   const [profileTab, setProfileTab] = useState<"desempenho" | "avatares" | "ajustes">("desempenho");
   // Modo Administrador (testes): a conta real fica pausada e o app usa um jogador de teste numa área separada,
   // com tudo liberado e sem servidor (sem sincronização, ranking ou pontuação). Ver lib/admin.ts e lib/storage.ts.
@@ -160,6 +169,7 @@ export default function App() {
   const [bookGame, setBookGame] = useState<RulesGame>("sudoku");
   /** Capítulo aberto no caderno de investigações (null = visão geral); volta a ele ao sair de um mistério. */
   const [bookChapter, setBookChapter] = useState<number | null>(null);
+  const [bookFrom, setBookFrom] = useState<"journey" | "profile">("journey");
   const logRef = useRef(log);
   logRef.current = log;
   const hintsRef = useRef(0); // dicas pedidas na partida atual
@@ -174,7 +184,8 @@ export default function App() {
     setNick(n && !validateNick(n) ? n : "");
     setAvatarId(readStore(AVATAR_KEY));
     setAvSeen(parseSeen(readStore(AVATARS_SEEN_KEY)));
-    setSeen(perGame((g) => !!readStore(TUTORIAL_KEY(g))));
+    setGuidedSeen(perGame((g) => parseGuided(readStore(GUIDED_KEY(g)), readStore(TUTORIAL_KEY(g)))));
+    askRef.current = parseAsk(readStore(ASK_KEY));
     setAdmin(isAdmin());
     const prog = perGame((g) => parseProgress(readStore(PROGRESS_KEY(g))));
     const tms = perGame((g) => parseTimes(readStore(TIMES_KEY(g))));
@@ -202,7 +213,7 @@ export default function App() {
     hydrate();
     const id = parseIdentityFull(readStore(RANK_KEY));
     meRef.current = id; setMe(id);
-    setCodeUnseen(readStore(CODE_UNSEEN_KEY) === "1");
+    if (readStore(CODE_UNSEEN_KEY)) silently(() => writeStore(CODE_UNSEEN_KEY, null)); // aviso antigo: limpa
     setReady(true);
     // Depois de "Reiniciar jogo": começa como na primeira vez, já pedindo o novo apelido.
     let fresh = false;
@@ -224,7 +235,6 @@ export default function App() {
   const syncAgain = useRef(false);
   const silently = (f: () => void) => { quiet.current = true; try { f(); } finally { quiet.current = false; } };
   function saveMe(id: Identity | null) { meRef.current = id; setMe(id); silently(() => writeStore(RANK_KEY, id ? JSON.stringify(id) : null)); }
-  function markCodeUnseen(v: boolean) { setCodeUnseen(v); silently(() => writeStore(CODE_UNSEEN_KEY, v ? "1" : null)); }
   function scheduleSync() {
     if (!meRef.current || offline()) return;
     window.clearTimeout(syncTimer.current);
@@ -259,10 +269,10 @@ export default function App() {
     if (!m) {
       const n = readStore(KEYS.nick);
       if (!n || validateNick(n)) return;
-      try { m = await createPlayer(n, false); saveMe(m); markCodeUnseen(true); setCloudIssue(null); }
+      try { m = await createPlayer(n, false); saveMe(m); setCloudIssue(null); }
       catch (e) { setCloudIssue(e instanceof RankError && e.code === "NICK_TAKEN" ? "taken" : "offline"); return; }
     } else if (!m.recovery) {
-      try { const code = await issueRecovery(m); m = { ...m, recovery: code }; saveMe(m); markCodeUnseen(true); } catch { /* tenta na próxima abertura */ }
+      try { const code = await issueRecovery(m); m = { ...m, recovery: code }; saveMe(m); } catch { /* tenta na próxima abertura */ }
     }
     await syncNow();
   }
@@ -277,7 +287,9 @@ export default function App() {
     if (online && !m) {
       try {
         const id = await createPlayer(v, false);
-        saveMe(id); setCloudIssue(null); markCodeUnseen(true); setCodeModal(id.recovery ?? null);
+        // Item 1: o código de recuperação continua sendo gerado e salvo (id.recovery), mas não aparece mais aqui —
+        // fica em Perfil → Ajustes → "Jogar em outro dispositivo".
+        saveMe(id); setCloudIssue(null);
       } catch (e) {
         if (e instanceof RankError && (e.code === "NICK_TAKEN" || e.code === "NICK_INVALID")) return e.message;
         setCloudIssue("offline"); // sem internet: segue no aparelho e conecta na próxima abertura
@@ -302,7 +314,6 @@ export default function App() {
         writeStore(KEYS.nick, remote.nick);
       });
       saveMe({ ...id, nick: remote.nick, rev: remote.rev, listed: remote.listed });
-      markCodeUnseen(false);
       setCloudIssue(null); setSession(null); setSave(null); setCaseRun(null);
       hydrate();
       const then = nickModal?.then;
@@ -353,13 +364,19 @@ export default function App() {
   /** Card, nome, arte ou "Jogar agora" de um jogo: abre a jornada dele (pedindo o apelido na primeira vez). */
   function openGame(id: RulesGame) {
     if (id === BONUS_GAME && !bonusOpen) return openDemo(); // bloqueado: abre a prévia jogável (nunca as fases oficiais)
-    if (nick) openJourney(id, "overview");
-    else openNick(() => openJourney(id, "overview"));
+    // Item 2: o jogo abre direto no mapa da jornada (sem a tela de capítulos no meio).
+    // Item 1 + 3: logo depois de criar o apelido, a pessoa já cai na partida guiada (primeira vez neste jogo).
+    const go = () => {
+      openJourney(id);
+      if (!guidedSeen[id].has("base")) openGuided({ game: id, part: "base", mode: "first", idx: focusLevel(progress[id], lastPlayed[id]) - 1, from: "journey" });
+    };
+    if (nick) go();
+    else openNick(go);
   }
   /** Prévia do Astros: começa na apresentação. Não depende de apelido e não grava nada. */
   function openDemo() { setDemo("intro"); setView("demo"); }
   function closeDemo() { setDemo(null); setView("home"); }
-  function openJourney(game: RulesGame, start: "overview" | "map" = "map") { setJourneyGame(game); setJourneyStart(start); setArrival(null); setView("journey"); }
+  function openJourney(game: RulesGame) { setJourneyGame(game); setArrival(null); setView("journey"); }
 
   const saveLog = (l: PlayerLog) => { logRef.current = l; setLog(l); writeStore(HISTORY_KEY, JSON.stringify(l)); };
 
@@ -378,7 +395,9 @@ export default function App() {
     writeStore(LAST_KEY(game), String(idx + 1));
     if (!fromCelebration) { setResult(null); setShowComplete(false); }
     setView("game");
-    if (!seen[game]) setTutorial({ game, first: true, finish: "Começar a jogar" }); // primeira vez neste jogo
+    // Partida guiada: a completa na primeira vez neste jogo; a curta no começo de um capítulo que muda algo.
+    const part = guidedFor(game, idx + 1, guidedSeen[game], isDone(progress[game], idx + 1));
+    if (part) openGuided({ game, part, mode: part === "base" ? "first" : "short", idx, from: "game" });
   }
 
   /**
@@ -397,6 +416,7 @@ export default function App() {
     setLastPlayed((l) => ({ ...l, [game]: level }));
     writeStore(LAST_KEY(game), String(level));
     setResult({ game, level, ms, best: t.best, previous: t.previous, isRecord: t.isRecord, before, after });
+    countForOpinion();
 
     const at = Date.now();
     sessionWon.current = true;
@@ -421,6 +441,7 @@ export default function App() {
   function leaveCase(run: CaseRun | null = caseRun) {
     setCaseRun(null);
     if (run?.next) startGame(run.next.game, run.next.idx);
+    else if (run?.fromMap) openJourney(journeyGame);
     else setView("casebook");
   }
   function skipCase() {
@@ -428,7 +449,10 @@ export default function App() {
     saveCases(recordSkip(caseLogRef.current, caseRun.id, Date.now())); // pular nunca tira pontos nem bloqueia nada
     leaveCase();
   }
-  function openCasebook(game: RulesGame) { setBookGame(game); setBookChapter(null); setCaseRun(null); setView("casebook"); }
+  /** Caderno de investigações: aberto pelo Perfil ou pelo ícone do mapa; o "Voltar" leva de volta para lá. */
+  function openCasebook(game: RulesGame, from: "journey" | "profile" = "journey") { setBookGame(game); setBookChapter(null); setCaseRun(null); setBookFrom(from); setView("casebook"); }
+  /** Cristal "Extra" do mapa: abre a investigação daquele nível (opcional; ao sair, volta para a jornada). */
+  function openCaseFromMap(id: string) { setCaseRun({ id, mode: "play", fromMap: true }); setView("case"); }
   function openCaseFromBook(id: string) { setCaseRun({ id, mode: "play" }); setView("case"); }
   function caseDraft(id: string, d: Draft | null) { saveCases(saveDraft(caseLogRef.current, id, d)); }
   /** Mistério resolvido — ponto único de registro: progresso da investigação → XP → conquistas. */
@@ -468,10 +492,10 @@ export default function App() {
     }
     if (to === "achievements") return openAchievements();
     if (to === "home") return goHome();
-    if (to === "feedback") { setJourneyGame(game); setJourneyStart("map"); setArrival(null); return openFeedback(rateRef.current, "journey"); } // nota da tela de parabéns
+    if (to === "feedback") { setJourneyGame(game); setArrival(null); return openFeedback(null, "journey"); } // "Dar opinião" da comemoração
+    if (askNow) declineOpinion(); // seguiu sem responder: conta como "Agora não"
     const firstTime = !isDone(before, level);
     setJourneyGame(game);
-    setJourneyStart("map");
     setView("journey");
     setArrival({ game, justDone: level, justUnlocked: firstTime && level < LEVELS_PER_GAME ? level + 1 : undefined });
   }
@@ -498,16 +522,53 @@ export default function App() {
     setView("feedback");
   }
 
-  /** Abre o tutorial a pedido da pessoa (botão "?", "Como jogar", jornada ou aba Regras). */
-  function openTutorial(game: RulesGame, finish = "Continuar jogando") { setTutorial({ game, first: false, finish }); }
-  /** Fim do tutorial: no primeiro acesso, registra se foi concluído ou pulado (só para este jogo). */
-  function closeTutorial(how: "done" | "skipped" | "closed") {
-    const t = tutorial;
-    setTutorial(null);
-    if (t && !t.demo && (t.first || !seen[t.game]) && how !== "closed") {
-      setSeen((s) => ({ ...s, [t.game]: true }));
-      writeStore(TUTORIAL_KEY(t.game), how);
+  // ---- Pedido de opinião (item 4): regra de frequência em lib/feedback.ts ----
+  /** Mais uma partida completa (a guiada também conta): decide se esta comemoração pede opinião. */
+  function countForOpinion() {
+    const r = countWin(askRef.current, fbSent);
+    askRef.current = r.state; writeStore(ASK_KEY, JSON.stringify(r.state));
+    setAskNow(r.ask && !admin); // no Modo Administrador (testes) não pede
+  }
+  /** "Agora não" (ou seguiu sem responder): só volta a pedir depois de algumas partidas. */
+  function declineOpinion() {
+    askRef.current = decline(askRef.current); writeStore(ASK_KEY, JSON.stringify(askRef.current));
+    setAskNow(false);
+  }
+
+  // ---- Partida guiada (item 3) ----
+  function openGuided(g: NonNullable<typeof guided>) { setGuided(g); setGuidedRun((n) => n + 1); }
+  /** "?" do jogo e da jornada, e a aba Regras: rever a partida guiada completa (não muda nada salvo). */
+  function replayGuided(game: RulesGame) { openGuided({ game, part: "base", mode: "replay", from: view === "game" ? "game" : view === "demo" ? "demo" : "journey" }); }
+  function markGuided(game: RulesGame, part: GuidedPart) {
+    const s = new Set(guidedSeen[game]); s.add(part);
+    setGuidedSeen((all) => ({ ...all, [game]: s }));
+    writeStore(GUIDED_KEY(game), serializeGuided(s));
+  }
+  /** Fim da partida guiada: concluída ou pulada. */
+  function endGuided(how: GuidedEnd) {
+    const g = guided;
+    setGuided(null);
+    if (!g) return;
+    if (g.mode !== "replay") markGuided(g.game, g.part);
+    if (how === "skipped") {
+      if (g.mode === "first") openJourney(g.game); // pular a partida guiada leva para a jornada
+      return;
     }
+    if (g.mode === "first") {
+      // Conta como partida completa: comemoração (com o pedido de opinião) e, depois, o nível de verdade.
+      countForOpinion();
+      setGuidedWin({ game: g.game, idx: g.idx ?? 0 });
+    }
+  }
+  /** Saída da comemoração da partida guiada. */
+  function leaveGuidedWin(to: LeaveTo) {
+    const w = guidedWin;
+    if (!w) return;
+    if (to === "feedback") { setJourneyGame(w.game); return openFeedback(null, "journey"); }
+    if (askNow) declineOpinion();
+    if (to === "next") return startGame(w.game, w.idx, true);
+    if (to === "home") return goHome();
+    openJourney(w.game);
   }
 
   const CARDS: { id: RulesGame; name: string; text: string; kind: GemKind; color: string }[] = ALL_GAMES.map((g) => ({ id: g, kind: g, ...GAME_META[g] }));
@@ -517,13 +578,13 @@ export default function App() {
   const visible = visibleGames(bonusOpen);
 
   const inGame = !!session && view === "game";
-  // O cronômetro só corre com a partida na tela e nada por cima.
-  const playing = inGame && !tutorial && !nickModal && !showComplete;
+  // O cronômetro só corre com a partida na tela e nada por cima (nem a partida guiada).
+  const playing = inGame && !guided && !guidedWin && !nickModal && !showComplete;
   const activeSession = session;
   const sessionProps = (game: RulesGame, idx: number) => ({
     active: playing,
     onMenu: () => openJourney(game),
-    onRules: () => openTutorial(game),
+    onRules: () => replayGuided(game),
     onFeedback: () => openFeedback(),
     onWin: (ms: number) => winLevel(game, idx + 1, ms),
     onCelebrated: celebrated,
@@ -545,6 +606,8 @@ export default function App() {
     return () => setAvSeen(all);
   }, [view, profileTab, avFresh, avSeen]);
   const runCase = caseRun ? caseById(caseRun.id) : undefined;
+  // O roteiro da partida guiada aberta (montado uma vez por abertura).
+  const guidedScriptMemo = useMemo(() => (guided ? guidedScript(guided.game, guided.part) : null), [guided]);
   function openAchievements() { setToasts([]); setView("achievements"); }
 
   return (
@@ -570,20 +633,15 @@ export default function App() {
             <section className="home" aria-label="Início">
               <FeedbackButton className="home-fb" calm={fbSent} onClick={() => openFeedback()} />
               <div className="art">
-                <img src="/home-art.webp" width={944} height={1680} decoding="async" alt="MindLoop — Desafie sua mente. Um cubo mágico de quebra-cabeça sobre ilhas flutuantes, com os cristais dos jogos Mini Sudoku, Zip, Tango, Patches e, embaixo, o cristal verde do Astros." fetchPriority="high" />
+                {/* Runa do Astros: azul-noite enquanto o jogo está bloqueado; verde (a cor do jogo) depois de liberado.
+                    São duas versões da mesma arte (scripts/recolor_astros_rune.py), sem efeitos por cima. */}
+                <img src={bonusOpen ? "/home-art-open.webp" : "/home-art.webp"} width={944} height={1680} decoding="async" fetchPriority="high"
+                  alt={`MindLoop — Desafie sua mente. Um cubo mágico de quebra-cabeça sobre ilhas flutuantes, com os cristais dos jogos Mini Sudoku, Zip, Tango, Patches e, embaixo, o cristal ${bonusOpen ? "verde" : "azul-noite"} do Astros.`} />
                 {ART_SPOTS.map((s) => (
                   <button key={s.id} className="gspot" onClick={() => openGame(s.id)}
                     style={{ left: `${s.left}%`, top: `${s.top}%`, width: `${s.width}%`, height: `${s.height}%` }}
                     aria-label={`Jogar ${GAME_META[s.id].name}`} />
                 ))}
-                {/* Cristal verde do jogo bônus, pintado na arte sob a logo: apagado e com cadeado até liberar; liberado, brilha e abre o jogo. */}
-                <button type="button" className={`bonus-spot${bonusOpen ? " open" : ""}`}
-                  onClick={() => openGame(BONUS_GAME)}
-                  aria-label={bonusOpen ? `Jogar ${GAME_META[BONUS_GAME].name}, o jogo bônus` : `${GAME_META[BONUS_GAME].name}: jogo bônus bloqueado. Abrir a prévia jogável.`}>
-                  {bonusOpen ? <><span className="bs-halo" aria-hidden="true" /><span className="bs-ring" aria-hidden="true" />
-                    {[0, 1, 2, 3, 4, 5].map((i) => <span key={i} className="bs-spark" style={{ "--i": i } as React.CSSProperties} aria-hidden="true" />)}</>
-                    : <><span className="bs-veil" aria-hidden="true" /><span className="bs-lock" aria-hidden="true">🔒</span><span className="bs-demo" aria-hidden="true">Prévia</span></>}
-                </button>
                 <button className="hotspot" onClick={() => document.getElementById("jogos")?.scrollIntoView({ behavior: "smooth", block: "start" })} aria-label="Jogar agora: ver os jogos">
                   <span aria-hidden="true">Jogar agora</span>
                 </button>
@@ -656,27 +714,28 @@ export default function App() {
             </section>
           </>
         ) : view === "journey" ? (
-          <Journey key={`${journeyGame}-${journeyStart}`} game={journeyGame} done={progress[journeyGame]} start={journeyStart} admin={admin}
+          <Journey key={journeyGame} game={journeyGame} done={progress[journeyGame]} admin={admin}
             focus={focusLevel(progress[journeyGame], lastPlayed[journeyGame])}
             justDone={arrival?.game === journeyGame ? arrival.justDone : undefined}
             justUnlocked={arrival?.game === journeyGame ? arrival.justUnlocked : undefined}
-            onBack={() => goHome(true)} onHelp={() => openTutorial(journeyGame, "Concluir")} onFeedback={() => openFeedback()} onPlay={(n) => startGame(journeyGame, n - 1)}
-            cases={{ solved: solvedCount(caseLog, journeyGame), total: casesOf(journeyGame).length }} onCases={() => openCasebook(journeyGame)} />
+            onBack={() => goHome(true)} onHelp={() => replayGuided(journeyGame)} onFeedback={() => openFeedback()} onPlay={(n) => startGame(journeyGame, n - 1)}
+            cases={{ solved: solvedCount(caseLog, journeyGame), total: casesOf(journeyGame).length }} onCases={() => openCasebook(journeyGame)}
+            caseAt={Object.fromEntries(casesOf(journeyGame).map((c) => [c.level, { id: c.id, solved: isSolved(caseLog, c.id) }]))} onCase={openCaseFromMap} />
         ) : view === "case" && caseRun && runCase ? (
           caseRun.mode === "offer" ? (
             <CaseOffer key={runCase.id} c={runCase} nextLevel={(caseRun.next?.idx ?? 0) + 1}
               onInvestigate={() => setCaseRun({ ...caseRun, mode: "play" })} onSkip={skipCase} />
           ) : (
             <CaseScreen key={runCase.id} c={runCase} record={recordOf(caseLog, runCase.id)}
-              active={view === "case" && !tutorial && !nickModal && !showComplete}
-              continueLabel={caseRun.next ? `Continuar para o nível ${caseRun.next.idx + 1}` : "Voltar às investigações"}
+              active={view === "case" && !guided && !nickModal && !showComplete}
+              continueLabel={caseRun.next ? `Continuar para o nível ${caseRun.next.idx + 1}` : caseRun.fromMap ? "Voltar à jornada" : "Voltar às investigações"}
               onContinue={() => leaveCase()}
-              exitLabel={caseRun.next ? "Ir para a jornada" : "Voltar às investigações"}
-              onExit={() => { const run = caseRun; setCaseRun(null); if (run.next) openJourney(run.next.game, "map"); else setView("casebook"); }}
+              exitLabel={caseRun.next || caseRun.fromMap ? "Ir para a jornada" : "Voltar às investigações"}
+              onExit={() => { const run = caseRun; setCaseRun(null); if (run.next) openJourney(run.next.game); else if (run.fromMap) openJourney(journeyGame); else setView("casebook"); }}
               onDraft={(d) => caseDraft(runCase.id, d)} onSolve={(ms, h) => solveCase(runCase.id, ms, h)} />
           )
         ) : view === "casebook" ? (
-          <CaseBook game={bookGame} log={caseLog} progress={progress} admin={admin} games={visible} onGame={(g) => { setBookGame(g); setBookChapter(null); }} chapter={bookChapter} onChapter={setBookChapter} onOpen={openCaseFromBook} onBack={() => openJourney(bookGame, "overview")} />
+          <CaseBook game={bookGame} log={caseLog} progress={progress} admin={admin} games={visible} onGame={(g) => { setBookGame(g); setBookChapter(null); }} chapter={bookChapter} onChapter={setBookChapter} onOpen={openCaseFromBook} onBack={() => (bookFrom === "profile" ? setView("profile") : openJourney(bookGame))} />
         ) : view === "rules" ? (
           <div className="wrap">
             <h1>Regras</h1>
@@ -689,8 +748,8 @@ export default function App() {
             </div>
             <div className="tut-cta">
               <Gem kind={rulesTab} size={44} />
-              <div><b>Tutorial animado do {GAME_META[rulesTab].name}</b><span>Aprenda vendo as jogadas acontecerem, passo a passo.</span></div>
-              <button type="button" className="btn cta" onClick={() => openTutorial(rulesTab, "Concluir")}>Ver tutorial</button>
+              <div><b>Partida guiada do {GAME_META[rulesTab].name}</b><span>Jogue uma partida curtinha com o personagem do jogo, que explica cada regra na hora.</span></div>
+              <button type="button" className="btn cta" onClick={() => replayGuided(rulesTab)}>Rever partida guiada</button>
             </div>
             <h2>Como jogar o {GAME_META[rulesTab].name}</h2>
             <RulesContent game={rulesTab} />
@@ -705,24 +764,24 @@ export default function App() {
             <div className="tabs" role="tablist" aria-label="Seções do perfil">
               {([["desempenho", "Desempenho"], ["avatares", "Avatares"], ["ajustes", "Ajustes"]] as const).map(([id, label]) => (
                 <button key={id} role="tab" id={`tab-${id}`} aria-selected={profileTab === id} aria-controls={`panel-${id}`} className={profileTab === id ? "on" : ""} onClick={() => setProfileTab(id)}>
-                  {label}{id === "ajustes" && codeUnseen && <i className="dot" aria-label="(pendente)" />}{id === "avatares" && avFresh.size > 0 && <i className="dot" aria-label="(novos avatares)" />}
+                  {label}{id === "avatares" && avFresh.size > 0 && <i className="dot" aria-label="(novos avatares)" />}
                 </button>
               ))}
             </div>
             <div role="tabpanel" id={`panel-${profileTab}`} aria-labelledby={`tab-${profileTab}`} className="stack">
               {profileTab === "desempenho" ? (
                 <>
-                  <CaseSummary log={caseLog} onOpen={() => openCasebook(journeyGame)} />
+                  <CaseSummary log={caseLog} onOpen={() => openCasebook(journeyGame, "profile")} />
                   <Stats log={log} progress={progress} games={visible} />
                 </>
               ) : profileTab === "avatares" ? (
                 <AvatarsPanel stats={avStats} current={avatar.id} fresh={avFresh} onPick={pickAvatar} />
               ) : (
-                <Settings nick={nick} me={me} online={!!rankingConfig()} issue={cloudIssue} codeUnseen={codeUnseen}
-                  onRename={() => openNick(() => {})} onShowCode={() => me?.recovery && setCodeModal(me.recovery)}
+                <Settings nick={nick} me={me} online={!!rankingConfig()} issue={cloudIssue} localProgress={hasProgress(readSnapshot(readStore))}
+                  onRename={() => openNick(() => {})} onRecoverCode={recoverWith}
                   onNewCode={async () => {
                     const m = meRef.current; if (!m) return null;
-                    try { const code = await issueRecovery(m); saveMe({ ...m, recovery: code }); setCodeModal(code); return null; }
+                    try { const code = await issueRecovery(m); saveMe({ ...m, recovery: code }); return null; }
                     catch (e) { return e instanceof RankError ? e.message : "Não foi possível gerar agora."; }
                   }}
                   onRecover={() => setNickModal({ then: () => {} })} onRetry={() => connect()} onReset={resetAll} onFeedback={() => openFeedback()}
@@ -820,38 +879,47 @@ export default function App() {
           </div>
         )}
         {demo && (<div hidden={view !== "demo"}>
-          <AstrosDemo stage={demo} round={demoRound} progress={progress} active={view === "demo" && !tutorial && !nickModal}
+          <AstrosDemo stage={demo} round={demoRound} progress={progress} active={view === "demo" && !guided && !nickModal}
             onStage={(st) => { if (st === "play") setDemoRound((r) => r + 1); setDemo(st); }}
             onClose={closeDemo} onFeedback={() => openFeedback()}
-            onRules={() => setTutorial({ game: BONUS_GAME, first: false, finish: "Voltar à prévia", demo: true })} />
+            onRules={() => replayGuided(BONUS_GAME)} />
         </div>)}
       </main>
 
       {result && showComplete && (
         <LevelComplete key={`${result.game}-${result.level}-${result.ms}`} result={result} medals={winMedals} hasNext={result.level < LEVELS_PER_GAME}
-          askRating={!fbSent && !admin && ASK_RATING_AT.has(result.level) && !isDone(result.before, result.level)} onRate={(n) => { rateRef.current = n; }}
+          askOpinion={askNow} onDecline={declineOpinion}
           onSwitch={leaveCelebration} onClose={() => { setShowComplete(false); setResult(null); setWinMedals([]); }} />
       )}
 
       {/* Medalhas novas fora da tela de parabéns: uma de cada vez e nunca por cima da partida ou de tutoriais. */}
-      {ready && toasts.length > 0 && view !== "game" && view !== "case" && view !== "demo" && !showComplete && !tutorial && !nickModal && (
+      {ready && toasts.length > 0 && view !== "game" && view !== "case" && view !== "demo" && !showComplete && !guided && !guidedWin && !nickModal && (
         <AchievementToast key={toasts[0].id} a={toasts[0]} left={toasts.length - 1}
           onDone={() => setToasts((q) => q.slice(1))} onOpen={openAchievements} />
       )}
 
-      {tutorial && (
-        <Tutorial key={`${tutorial.game}-${tutorial.first}`} game={tutorial.game} steps={TUTORIALS[tutorial.game]} first={tutorial.first}
-          finishLabel={tutorial.finish} onDone={closeTutorial} onHome={() => { closeTutorial("closed"); goHome(); }} />
+      {guided && (
+        <GuidedPlay key={`${guided.game}-${guided.part}-${guidedRun}`} game={guided.game} script={guidedScriptMemo!}
+          title={guidedTitle(guided.part)} finish={guided.mode === "first" ? "Continuar" : guided.mode === "short" ? "Jogar" : "Concluir"} onEnd={endGuided} />
+      )}
+      {guidedWin && (
+        <LevelComplete key={`guided-${guidedWin.game}-${guidedRun}`} hasNext medals={[]} guided={{ label: `Jogar o nível ${guidedWin.idx + 1}` }}
+          result={{ game: guidedWin.game, level: guidedWin.idx + 1, ms: 0, best: 0, previous: null, isRecord: false, before: progress[guidedWin.game], after: progress[guidedWin.game] }}
+          askOpinion={askNow} onDecline={declineOpinion} onSwitch={leaveGuidedWin} onClose={() => setGuidedWin(null)} />
       )}
 
       {nickModal && (
         <NickModal initial={nick} renaming={!!nick} online={!!rankingConfig()} localProgress={hasProgress(readSnapshot(readStore))}
           onSave={saveNick} onRecover={recoverWith} onClose={() => setNickModal(null)} />
       )}
-      {codeModal && <CodeModal code={codeModal} onClose={() => { setCodeModal(null); markCodeUnseen(false); }} />}
 
-      <BottomNav active={TAB_OF[view]} onChange={(t) => (t === "achievements" ? openAchievements() : onTab(t))} inGame={view === "game" || view === "case" || view === "demo"}
-        badges={{ achievements: newMedals, profile: codeUnseen ? 1 : 0 }} />
+      <BottomNav active={TAB_OF[view]} onChange={(t) => {
+          // Tocar no menu com algo por cima: fecha (a partida guiada conta como vista; a vitória já está salva).
+          if (guided) { if (guided.mode !== "replay") markGuided(guided.game, guided.part); setGuided(null); }
+          if (showComplete || guidedWin) { if (askNow) declineOpinion(); setShowComplete(false); setResult(null); setWinMedals([]); setGuidedWin(null); }
+          if (t === "achievements") openAchievements(); else onTab(t);
+        }} inGame={view === "game" || view === "case" || view === "demo"}
+        badges={{ achievements: newMedals }} />
     </>
   );
 }

@@ -68,7 +68,7 @@ export function NickModal({ initial, renaming, localProgress, online, onSave, on
           </div>
           <button className="btn cta" type="submit" disabled={busy}>{busy ? "Salvando…" : renaming ? "Salvar" : "Começar"}</button>
           {!renaming && online && (
-            <button type="button" className="linkish" onClick={() => { setMode("recover"); setError(null); }}>Já jogou antes? Recuperar com código</button>
+            <button type="button" className="linkish" onClick={() => { setMode("recover"); setError(null); }}>Já jogou antes? Recuperar conta</button>
           )}
         </form>
       ) : (
@@ -91,28 +91,6 @@ export function NickModal({ initial, renaming, localProgress, online, onSave, on
   );
 }
 
-// ---------------------------------------------------------------- código de recuperação
-
-export function CodeModal({ code, onClose }: { code: string; onClose: () => void }) {
-  const [copied, setCopied] = useState(false);
-  async function copy() {
-    try { await navigator.clipboard.writeText(code); setCopied(true); } catch { setCopied(false); }
-  }
-  return (
-    <Modal title="Guarde seu código" onClose={onClose} closeLabel="Fechar">
-      <div className="stack">
-        <p>Com este código você recupera seu progresso em outro aparelho ou se os dados do navegador forem apagados.</p>
-        <div className="code-box" aria-label={`Código: ${code.split("").join(" ")}`}><code>{code}</code></div>
-        <div className="row">
-          <button className="btn cta" onClick={copy}>{copied ? "✓ Copiado" : "Copiar código"}</button>
-          <button className="btn sec" onClick={onClose}>Já guardei</button>
-        </div>
-        <p className="muted small">Guarde num lugar seguro (anote ou tire um print). Sem ele, não é possível recuperar o progresso. Não compartilhe.</p>
-      </div>
-    </Modal>
-  );
-}
-
 // ---------------------------------------------------------------- Ajustes
 
 interface SettingsProps {
@@ -121,10 +99,12 @@ interface SettingsProps {
   online: boolean;
   /** O servidor já tem esse apelido registrado por outra conta (ou não deu para conectar ainda). */
   issue: null | "taken" | "offline";
-  codeUnseen: boolean;
+  /** O aparelho tem progresso que seria substituído ao recuperar outra conta. */
+  localProgress: boolean;
   onRename: () => void;
-  onShowCode: () => void;
   onNewCode: () => Outcome;
+  /** Recupera a conta com um código digitado aqui mesmo (seção "Jogar em outro dispositivo"). */
+  onRecoverCode: (code: string) => Outcome;
   onRecover: () => void;
   onRetry: () => void;
   onReset: () => Outcome;
@@ -136,9 +116,8 @@ interface SettingsProps {
 
 export const RESET_WORD = "REINICIAR";
 
-export function Settings({ nick, me, online, issue, codeUnseen, onRename, onShowCode, onNewCode, onRecover, onRetry, onReset, onFeedback, admin, onAdmin }: SettingsProps) {
+export function Settings({ nick, me, online, issue, localProgress, onRename, onNewCode, onRecoverCode, onRecover, onRetry, onReset, onFeedback, admin, onAdmin }: SettingsProps) {
   const [resetOpen, setResetOpen] = useState(false);
-  const [codeMsg, setCodeMsg] = useState<string | null>(null);
   // Modo Administrador: a conta real está pausada; apelido, nuvem e reinício ficam fora de alcance até desligar.
   if (admin) {
     return (
@@ -158,26 +137,12 @@ export function Settings({ nick, me, online, issue, codeUnseen, onRename, onShow
         <button className="btn sec sm" onClick={onRename}>{nick ? "Alterar" : "Escolher"}</button>
       </section>
 
-      {online && (
+      {online && (me ? (
+        <OtherDevice code={me.recovery ?? null} localProgress={localProgress} onNewCode={onNewCode} onRecoverCode={onRecoverCode} />
+      ) : (
         <section className="card stack" aria-labelledby="acc-t">
-          <h2 id="acc-t">Progresso na nuvem</h2>
-          {me ? (
-            <>
-              <p className="muted small">Seu progresso fica salvo com segurança no servidor, sem e-mail ou senha.</p>
-              {me.recovery ? (
-                <div className={`set-row${codeUnseen ? " attention" : ""}`}>
-                  <div><b>Código de recuperação</b><span className="muted small">{codeUnseen ? "Guarde-o: é a única forma de recuperar seu progresso." : "Para recuperar seu progresso em outro aparelho."}</span></div>
-                  <button className="btn cta sm" onClick={onShowCode}>Ver código</button>
-                </div>
-              ) : (
-                <div className="set-row">
-                  <div><b>Código de recuperação</b><span className="muted small">Gere um código para não perder seu progresso.</span></div>
-                  <button className="btn cta sm" onClick={async () => setCodeMsg(await onNewCode())}>Gerar</button>
-                </div>
-              )}
-              {codeMsg && <p className="err" role="alert">{codeMsg}</p>}
-            </>
-          ) : issue === "taken" ? (
+          <h2 id="acc-t">Jogar em outro dispositivo</h2>
+          {issue === "taken" ? (
             <div className="note warn" role="note"><b aria-hidden="true">!</b>
               <span>O apelido <b>{nick}</b> já está registrado por outra conta. Se é você, use seu código; se não, escolha outro apelido.
                 <span className="row" style={{ marginTop: 8 }}>
@@ -189,9 +154,9 @@ export function Settings({ nick, me, online, issue, codeUnseen, onRename, onShow
               <span>{nick ? "Sem conexão com o servidor agora: seu progresso continua salvo neste aparelho." : "Escolha um apelido para salvar seu progresso."}
                 {nick && <button className="linkish" onClick={onRetry}> Tentar de novo</button>}</span></div>
           )}
-          {!me && <button className="linkish" onClick={onRecover}>Recuperar progresso com um código</button>}
+          <button className="linkish" onClick={onRecover}>Já tenho um código</button>
         </section>
-      )}
+      ))}
 
       <section className="card stack" aria-labelledby="snd-title">
         <h2 id="snd-title">Sons</h2>
@@ -213,6 +178,63 @@ export function Settings({ nick, me, online, issue, codeUnseen, onRename, onShow
 
       {resetOpen && <ResetModal online={online} hasCloud={!!me} onReset={onReset} onClose={() => setResetOpen(false)} />}
     </div>
+  );
+}
+
+/**
+ * "Jogar em outro dispositivo" (Perfil → Ajustes). O código de recuperação NÃO aparece mais logo depois de criar o
+ * apelido (isso confundia quem estava começando): ele é gerado e salvo do mesmo jeito, e fica aqui para quando
+ * a pessoa quiser continuar em outro aparelho.
+ *  • Ver meu código: mostra o código, com botão de copiar.
+ *  • Já tenho um código: recupera a conta neste aparelho.
+ */
+function OtherDevice({ code, localProgress, onNewCode, onRecoverCode }: { code: string | null; localProgress: boolean; onNewCode: () => Outcome; onRecoverCode: (code: string) => Outcome }) {
+  const [show, setShow] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const [typed, setTyped] = useState("");
+  const [msg, setMsg] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [confirm, setConfirm] = useState(false);
+  async function copy() { try { await navigator.clipboard.writeText(code ?? ""); setCopied(true); } catch { setCopied(false); } }
+  async function recover(e: React.FormEvent) {
+    e.preventDefault();
+    const c = normalizeCode(typed);
+    if (!c) return setMsg("O código tem 16 letras e números (ex.: ABCD-EFGH-JKMN-PQRS).");
+    if (localProgress && !confirm) return setConfirm(true); // o progresso daqui seria substituído: pergunta antes
+    setBusy(true); setMsg(null);
+    const r = await onRecoverCode(c);
+    setBusy(false);
+    if (r) { setMsg(r); setConfirm(false); }
+  }
+  return (
+    <section className="card stack" aria-labelledby="other-t">
+      <h2 id="other-t">Jogar em outro dispositivo</h2>
+      <div className="stack">
+        <b>Ver meu código</b>
+        <p className="muted small">Use este código para continuar seu progresso em outro celular ou computador. Não compartilhe com ninguém.</p>
+        {!code ? (
+          <button className="btn sec sm" onClick={async () => setMsg(await onNewCode())}>Gerar meu código</button>
+        ) : show ? (
+          <>
+            <div className="code-box" aria-label={`Código: ${code.split("").join(" ")}`}><code>{code}</code></div>
+            <button className="btn cta sm" onClick={copy}>{copied ? "✓ Copiado" : "Copiar código"}</button>
+          </>
+        ) : (
+          <button className="btn cta sm" onClick={() => setShow(true)}>Ver meu código</button>
+        )}
+      </div>
+      <form className="stack" onSubmit={recover} noValidate>
+        <label htmlFor="other-code"><b>Já tenho um código</b></label>
+        <input id="other-code" className="code-input" value={typed} maxLength={24} autoComplete="off" autoCapitalize="characters" spellCheck={false}
+          placeholder="ABCD-EFGH-JKMN-PQRS" onChange={(e) => { setTyped(e.target.value); setMsg(null); setConfirm(false); }} />
+        {confirm && (
+          <div className="note warn" role="alert"><b aria-hidden="true">!</b>
+            <span>O progresso deste aparelho será <b>substituído</b> pelo da conta do código (eles não se misturam).</span></div>
+        )}
+        <button className="btn sec sm" type="submit" disabled={busy || !typed.trim()}>{busy ? "Recuperando…" : confirm ? "Substituir e recuperar" : "Recuperar conta"}</button>
+      </form>
+      {msg && <p className="err" role="alert"><b aria-hidden="true">! </b>{msg}</p>}
+    </section>
   );
 }
 

@@ -1,7 +1,8 @@
 "use client";
 // Mini tabuleiros das demonstrações. Usam as MESMAS classes visuais das partidas (board/cell, tboard/tcell,
 // zboard/zcell, ptboard/ptpiece…), então o tutorial mostra exatamente o que a pessoa vai ver ao jogar.
-// Não são interativos: cada elemento tem data-t="..." para o dedo da demonstração apontar.
+// Usados pela partida guiada (components/guided): cada parte tem data-t="..." — é onde a pessoa toca e onde o
+// holofote ilumina.
 
 import TangoSymbol from "../TangoSymbol";
 import PatchesTag from "../PatchesTag";
@@ -10,6 +11,11 @@ import { SKY_COLORS } from "../../lib/astros";
 import { area, type Kind, type Rect } from "../../lib/patchesLogic";
 
 export type RC = [number, number];
+/** Faixas pintadas em TODO o tabuleiro (partida guiada): cada linha, coluna ou bloco ganha uma cor. */
+export type Bands = "row" | "col" | "box";
+const BAND_COLORS = ["#FFD6EC", "#CDEFFF", "#FFF0B8", "#D7F7E5", "#E6DAFF", "#FFE0CC"];
+const bandStyle = (bands: Bands | undefined, r: number, c: number, bh: number, bw: number, n: number): React.CSSProperties =>
+  bands ? { "--band": BAND_COLORS[(bands === "row" ? r : bands === "col" ? c : Math.floor(r / bh) * Math.ceil(n / bw) + Math.floor(c / bw)) % BAND_COLORS.length] } as React.CSSProperties : {};
 const has = (list: RC[] | undefined, r: number, c: number) => !!list?.some(([a, b]) => a === r && b === c);
 const cls = (...xs: (string | false | undefined)[]) => xs.filter(Boolean).join(" ");
 
@@ -23,15 +29,18 @@ export interface SudokuP {
   pad?: boolean; press?: number;
   /** Possibilidades de uma casa (números riscados = eliminados). */
   cands?: { out: number[]; keep?: number };
+  /** Números que já apareceram em todas as linhas: o botão fica apagado (igual à partida). */
+  used?: number[];
+  bands?: Bands;
 }
-export function MiniSudoku({ vals, given, sel, bad, hl, ok, pop, win, pad, press, cands }: SudokuP) {
+export function MiniSudoku({ vals, given, sel, bad, hl, ok, pop, win, pad, press, cands, used = [], bands }: SudokuP) {
   const n = vals.length, bh = 2, bw = n === 4 ? 2 : 3;
   return (
     <div className="tut-col">
       <div className={cls("board", `n${n}`, win && "win", "tut-board")} style={{ gridTemplateColumns: `repeat(${n}, 1fr)` }}>
         {vals.map((row, r) => row.map((v, c) => (
-          <div key={`${r}-${c}`} data-t={`c-${r}-${c}`} style={{ "--r": r, "--c": c, "--b": Math.floor(r / bh) * (n / bw) + Math.floor(c / bw) } as React.CSSProperties}
-            className={cls("cell", given[r][c] && "given", has([sel!].filter(Boolean) as RC[], r, c) && "sel", has(bad, r, c) && "bad",
+          <div key={`${r}-${c}`} data-t={`c-${r}-${c}`} style={{ "--r": r, "--c": c, "--b": Math.floor(r / bh) * (n / bw) + Math.floor(c / bw), ...bandStyle(bands, r, c, bh, bw, n) } as React.CSSProperties}
+            className={cls("cell", bands && "tut-band", given[r][c] && "given", has([sel!].filter(Boolean) as RC[], r, c) && "sel", has(bad, r, c) && "bad",
               has(hl, r, c) && "tut-hl", has(ok, r, c) && "tut-ok", has([pop!].filter(Boolean) as RC[], r, c) && "tut-pop",
               (c + 1) % bw === 0 && c < n - 1 && "bx-r", (r + 1) % bh === 0 && r < n - 1 && "bx-b")}>
             {v || ""}
@@ -47,7 +56,7 @@ export function MiniSudoku({ vals, given, sel, bad, hl, ok, pop, win, pad, press
       )}
       {pad && (
         <div className={`pad n${n} tut-pad`} style={{ gridTemplateColumns: `repeat(${n + 1}, 1fr)` }}>
-          {Array.from({ length: n }, (_, k) => k + 1).map((d) => <span key={d} data-t={`pad-${d}`} className={cls("btn", press === d && "tut-press")}>{d}</span>)}
+          {Array.from({ length: n }, (_, k) => k + 1).map((d) => <span key={d} data-t={`pad-${d}`} aria-disabled={used.includes(d) || undefined} className={cls("btn", used.includes(d) && "used", press === d && "tut-press")}>{d}</span>)}
           <span data-t="pad-0" className={cls("btn sec erase", press === 0 && "tut-press")}>Apagar</span>
         </div>
       )}
@@ -66,16 +75,17 @@ export interface TangoP {
   pad?: boolean; press?: "c" | "o" | "x";
   /** Contagem da linha 0 (exemplo do equilíbrio). */
   count?: boolean;
+  bands?: Bands;
 }
-export function MiniTango({ grid, given, signs = [], sel, bad, hl, ok, win, pad, press, count }: TangoP) {
+export function MiniTango({ grid, given, signs = [], sel, bad, hl, ok, win, pad, press, count, bands }: TangoP) {
   const rows = grid.length, cols = grid[0].length;
   const nC = grid[0].filter((v) => v === 1).length, nO = grid[0].filter((v) => v === 2).length;
   return (
     <div className="tut-col">
       <div className={cls("tboard", win && "win", "tut-board")} style={{ gridTemplateColumns: `repeat(${cols}, 1fr)`, width: `min(100%, ${cols * 64}px)` }}>
         {grid.map((row, r) => row.map((v, c) => (
-          <div key={`${r}-${c}`} data-t={`c-${r}-${c}`} style={{ "--r": r, "--c": c } as React.CSSProperties}
-            className={cls("tcell", given?.[r][c] && "given", sel && sel[0] === r && sel[1] === c && "sel", has(bad, r, c) && "bad", has(hl, r, c) && "tut-hl", has(ok, r, c) && "tut-ok")}>
+          <div key={`${r}-${c}`} data-t={`c-${r}-${c}`} style={{ "--r": r, "--c": c, ...bandStyle(bands, r, c, 1, 1, cols) } as React.CSSProperties}
+            className={cls("tcell", bands && "tut-band", given?.[r][c] && "given", sel && sel[0] === r && sel[1] === c && "sel", has(bad, r, c) && "bad", has(hl, r, c) && "tut-hl", has(ok, r, c) && "tut-ok")}>
             {v ? <TangoSymbol v={v} size="68%" /> : null}
           </div>
         )))}
@@ -183,7 +193,7 @@ export interface AstrosP {
   grid: number[][];
   sel?: RC; bad?: RC[]; hl?: RC[]; ok?: RC[];
   win?: boolean;
-  pad?: boolean; press?: "a" | "m" | "x";
+  pad?: boolean; press?: "a" | "m" | "x" | "v";
 }
 export function MiniAstros({ regions, grid, sel, bad, hl, ok, win, pad, press }: AstrosP) {
   const n = regions.length;
@@ -204,6 +214,7 @@ export function MiniAstros({ regions, grid, sel, bad, hl, ok, win, pad, press }:
           <span data-t="pad-a" className={cls("btn sec", press === "a" && "tut-press")}><AstroSymbol size={22} />Astro</span>
           <span data-t="pad-m" className={cls("btn sec", press === "m" && "tut-press")}><MarkSymbol size={14} />Marcar</span>
           <span data-t="pad-x" className={cls("btn sec", press === "x" && "tut-press")}>Apagar</span>
+          <span data-t="pad-v" className={cls("btn sec", press === "v" && "tut-press")}>Em volta</span>
         </div>
       )}
     </div>

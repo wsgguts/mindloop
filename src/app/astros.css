@@ -61,43 +61,6 @@
 /* Modo Administrador: selo no topo no lugar do apelido. */
 .chip.admin-chip { background: #FFF1C2; color: #6B4A00; border: 1px solid #E8C25A; }
 
-/* ---------- Cristal do Astros na arte do Início (parte de baixo, sob a logo) ---------- */
-/* O cristal verde já está pintado na arte (home-art, 944 × 1680): ocupa x 382–562 e y 885–1090 px.
-   O botão cobre o cristal; bloqueado, um véu apaga só o cristal e mostra o cadeado; liberado, ele ganha halo e faíscas. */
-.bonus-spot {
-  position: absolute; left: 40.5%; top: 52.7%; width: 19%; height: 12.2%;
-  border: 0; padding: 0; background: transparent; border-radius: 40%; cursor: pointer; z-index: 2;
-  display: grid; place-items: center; -webkit-tap-highlight-color: transparent;
-}
-.bonus-spot > * { grid-area: 1 / 1; }
-.bonus-spot:focus-visible { outline: 3px solid var(--cyan); outline-offset: 2px; }
-
-/* Bloqueado: o cristal pintado fica cinza e escuro (véu no formato do cristal), com o cadeado no centro. */
-.bonus-spot .bs-veil {
-  width: 100%; height: 100%; pointer-events: none;
-  clip-path: polygon(50% 0, 84% 20%, 100% 48%, 86% 82%, 50% 100%, 14% 82%, 0 48%, 16% 20%);
-  -webkit-backdrop-filter: grayscale(1) brightness(.5); backdrop-filter: grayscale(1) brightness(.5);
-  background: rgba(20, 12, 40, .25); transition: background .2s;
-}
-.bonus-spot .bs-lock { font-size: clamp(18px, 5vw, 30px); filter: drop-shadow(0 2px 3px rgba(0,0,0,.7)); }
-@media (hover: hover) { .bonus-spot:not(.open):hover .bs-veil { background: rgba(20, 12, 40, .05); } }
-
-/* Liberado: halo esmeralda pulsando, anel girando e faíscas em volta do cristal. */
-.bonus-spot .bs-halo { width: 150%; aspect-ratio: 1; border-radius: 50%; background: radial-gradient(closest-side, rgba(216, 255, 176, .5), rgba(61, 220, 90, .3) 55%, transparent 72%); animation: bs-pulse 2.4s ease-in-out infinite; pointer-events: none; mix-blend-mode: screen; }
-.bonus-spot .bs-ring { width: 125%; aspect-ratio: 1; border-radius: 50%; border: 2px dashed rgba(216, 255, 176, .8); animation: bs-spin 9s linear infinite; pointer-events: none; }
-.bonus-spot .bs-spark {
-  width: 6%; aspect-ratio: 1; border-radius: 50%; background: #FFFBD6; box-shadow: 0 0 6px 2px #3DDC5A; pointer-events: none;
-  transform: rotate(calc(var(--i) * 60deg)) translateY(-1000%); animation: bs-twinkle 1.8s ease-in-out calc(var(--i) * .3s) infinite;
-}
-@media (hover: hover) { .bonus-spot.open:hover .bs-halo { animation-duration: 1.2s; } }
-.bonus-spot.open:active .bs-halo { transform: scale(.9); }
-@keyframes bs-pulse { 0%, 100% { transform: scale(.85); opacity: .6; } 50% { transform: scale(1.06); opacity: 1; } }
-@keyframes bs-spin { to { transform: rotate(360deg); } }
-@keyframes bs-twinkle { 0%, 100% { opacity: 0; scale: .4; } 50% { opacity: 1; scale: 1.2; } }
-@media (prefers-reduced-motion: reduce) {
-  .bonus-spot .bs-halo, .bonus-spot .bs-ring, .bonus-spot .bs-spark { animation: none; }
-  .bonus-spot .bs-spark { opacity: .8; }
-}
 
 /* Na grade de 2 colunas do Início, o card do bônus (5º) ocupa a linha inteira em vez de ficar sozinho numa coluna. */
 @media (min-width: 341px) and (not ((orientation: landscape) and (max-height: 540px))) {
@@ -106,12 +69,6 @@
 }
 
 /* ---------- Prévia do Astros (jogo bônus bloqueado) ---------- */
-/* Na arte do Início: cristal apagado com cadeado + etiqueta "Prévia" (tocar abre a prévia jogável). */
-.bonus-spot .bs-demo {
-  align-self: end; transform: translateY(45%); padding: 1px 8px; border-radius: 999px; white-space: nowrap; pointer-events: none;
-  font: 700 clamp(9px, 2.4vw, 12px) / 1.5 var(--font-title); letter-spacing: .05em; text-transform: uppercase;
-  color: #0B3D2A; background: linear-gradient(180deg, #D8FFB0, #3DDC5A); box-shadow: 0 2px 6px rgba(0, 0, 0, .4);
-}
 /* Card bloqueado no Início: inteiro clicável, abre a prévia. */
 .gcard.bonus.locked { cursor: pointer; }
 .gcard.bonus.locked .ademo-cta { border-color: var(--gc); color: #0B5A33; background: #EFFFE6; }

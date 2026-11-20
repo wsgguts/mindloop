@@ -6,8 +6,9 @@ import { emptyLog } from "../history";
 import { allCases, caseAfter, casesOf, firstBroken, isComplete, isCorrect } from "./catalog";
 import { caseLevels, difficultyOf, xpFor } from "./config";
 import { CASES_DATA } from "./data";
-import { generateGame } from "./generate";
-import { allAnswers, clueState, deduce, evalClue, posList, ruleOk } from "./model";
+import { MAX_CLUES, MIN_CLUES, checkCase, generateGame } from "./generate";
+import { runLogic } from "./logic";
+import { allAnswers, clueState, evalClue, isNegative, isRule, posList, ruleOk } from "./model";
 import { emptyCaseLog, parseCaseLog, recordSkip, recordSolve, saveDraft, shouldOffer, solvedCount, xpTotal } from "./progress";
 import { RULE_OF } from "./themes";
 
@@ -41,10 +42,32 @@ describe("banco de mistérios", () => {
     }
   });
 
-  it("todo mistério se resolve só com dedução (sem tentativa e erro)", () => {
+  it("todo mistério se resolve só com dedução, aplicando as pistas NA ORDEM (marcações diretas + última opção)", () => {
     for (const c of CASES_DATA) {
-      const d = deduce(c.model, c.clues);
-      expect(d.solved, c.id).toBe(true);
+      const r = runLogic(c.model, c.clues);
+      expect(r.stuck, `${c.id}: pista usada antes da hora`).toBeNull();
+      expect(r.solved, c.id).toBe(true);
+    }
+  });
+
+  it("toda pista gera pelo menos uma conclusão (um ✓) no quadro, na hora em que aparece", () => {
+    for (const c of CASES_DATA) runLogic(c.model, c.clues).steps.forEach((s) => expect(s.concl.length, `${c.id} pista ${s.clue}`).toBeGreaterThan(0));
+  });
+
+  it("de 5 a 7 pistas por investigação, todo personagem citado, e todas as conferências do gerador", () => {
+    for (const c of CASES_DATA) {
+      const own = c.clues.filter((k) => !isRule(k)).length;
+      expect(own, c.id).toBeGreaterThanOrEqual(MIN_CLUES);
+      expect(own, c.id).toBeLessThanOrEqual(MAX_CLUES);
+      expect(checkCase(c), c.id).toBeNull();
+    }
+  });
+
+  it("só pistas diretas: nada de casa exata, móvel decorativo ou relação com quem ainda não foi descoberto", () => {
+    const allowed = new Set(["rule", "row", "notRow", "col", "notCol", "room", "notRoom", "side", "stop", "notStop", "stopAfter", "stopBefore", "size", "next", "sameSide", "oppSide", "has", "hasNot"]);
+    for (const c of CASES_DATA) {
+      for (const k of c.clues) expect(allowed.has(k.k), `${c.id}: ${k.k}`).toBe(true);
+      expect(c.model.scene.props.every((p) => p.block), `${c.id}: só móveis que bloqueiam (nada decorativo)`).toBe(true);
     }
   });
 
@@ -67,14 +90,16 @@ describe("banco de mistérios", () => {
     for (const g of EVERY_GAME) expect(generateGame(g)).toEqual(CASES_DATA.filter((c) => c.game === g));
   });
 
-  it("a dificuldade cresce: mais pessoas, mais pistas e pistas cruzadas nos capítulos finais", () => {
+  it("a dificuldade cresce: mais negações e mais conclusões pelo raciocínio nos capítulos finais", () => {
     for (const g of EVERY_GAME) {
       const cs = CASES_DATA.filter((c) => c.game === g);
       cs.forEach((c) => expect(c.difficulty, c.id).toBe(difficultyOf(c.chapter)));
-      const via = (c: (typeof cs)[number]) => c.clues.filter((k) => k.k === "via").length;
-      const late = cs.filter((c) => c.difficulty >= 3), early = cs.filter((c) => c.difficulty === 1);
-      expect(late.every((c) => c.model.people.length === 4), g).toBe(true);
-      expect(late.every((c) => via(c) >= 2), g).toBe(true);
+      const negs = (c: (typeof cs)[number]) => c.clues.filter(isNegative).length;
+      const derived = (c: (typeof cs)[number]) => runLogic(c.model, c.clues).steps.flatMap((s) => s.concl).filter((x) => x.why !== "pista").length;
+      const avg = (xs: number[]) => xs.reduce((a, b) => a + b, 0) / xs.length;
+      const early = cs.filter((c) => c.difficulty === 1), late = cs.filter((c) => c.difficulty === 4);
+      expect(avg(late.map(negs)), g).toBeGreaterThanOrEqual(avg(early.map(negs)));
+      expect(avg(late.map(derived)), g).toBeGreaterThanOrEqual(avg(early.map(derived)));
       expect(Math.min(...late.map((c) => c.model.rows * c.model.cols)), g).toBeGreaterThanOrEqual(Math.min(...early.map((c) => c.model.rows * c.model.cols)));
     }
   });
@@ -90,9 +115,12 @@ describe("catálogo (textos, dicas e explicação)", () => {
       expect(c.ending, c.id).not.toMatch(/\{com:/);
       expect(c.ruleTexts).toHaveLength(1);
       expect(c.clueTexts.length, c.id).toBe(c.clues.length);
-      for (const t of c.clueTexts) expect(t, c.id).toMatch(/^[A-ZÀ-Ú].+\.$/);
+      for (const t of c.clueTexts) expect(t, c.id).toMatch(/^[A-ZÀ-Ú].+[.!?]”?$/);
       expect(c.hints).toHaveLength(3);
-      expect(c.explanation.length, c.id).toBeGreaterThanOrEqual(c.model.people.length);
+      expect(c.explanation.length, c.id).toBe(c.clues.length);
+      // Cada pista tem a grade que ela afeta (a etiqueta 📍 Linha, 🏛️ Cômodo, 🎁 Objeto…).
+      c.clueDims.forEach((d, k) => expect(d, `${c.id} pista ${k + 1}`).toBeGreaterThanOrEqual(0));
+      expect(c.cast.every((p) => p.bio.length > 5), `${c.id}: personagens com personalidade`).toBe(true);
       expect(c.narrator.name.length).toBeGreaterThan(2);
     }
   });

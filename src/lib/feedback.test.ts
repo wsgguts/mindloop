@@ -39,3 +39,24 @@ describe("opinião: envio", () => {
     expect(f).not.toHaveBeenCalled();
   });
 });
+
+import { ASK_EVERY, countWin, decline, parseAsk } from "./feedback";
+
+describe("pedido de opinião na comemoração", () => {
+  it("aparece na primeira partida completa", () => {
+    expect(countWin(parseAsk(null), false).ask).toBe(true);
+  });
+  it("depois de recusado, só volta a cada 5 partidas", () => {
+    let s = countWin(parseAsk(null), false).state;
+    s = decline(s);
+    for (let k = 1; k < ASK_EVERY; k++) { const r = countWin(s, false); expect(r.ask, `partida ${k}`).toBe(false); s = r.state; }
+    expect(countWin(s, false).ask).toBe(true);
+  });
+  it("depois de enviada a opinião, nunca mais aparece", () => {
+    expect(countWin(parseAsk(null), true).ask).toBe(false);
+    expect(countWin({ wins: 40, declinedAt: 1 }, true).ask).toBe(false);
+  });
+  it("valor estragado no aparelho recomeça do zero", () => {
+    expect(parseAsk("{oops")).toEqual({ wins: 0, declinedAt: null });
+  });
+});

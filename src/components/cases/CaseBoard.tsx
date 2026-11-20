@@ -15,6 +15,7 @@ import { type Model, allowedCells, cellName, propAt, rcOf, roomOf, stopOf } from
 import type { Focus } from "../../lib/cases/relations";
 import Art from "../Art";
 import PatchesTag from "../PatchesTag";
+import TangoSymbol from "../TangoSymbol";
 
 /** Cores de piso de cada cômodo (claras, para os ícones contrastarem). */
 export const ROOM_TINTS = ["#EDE2FB", "#D8F3F7", "#FDEBC8", "#DDF4E4", "#FFE0EC"];
@@ -51,12 +52,14 @@ export interface BoardProps {
   /** Marcas de erro da regra do lugar (só depois de reveladas, como no resto do jogo). */
   showErrors?: boolean;
   focus?: Focus;
+  /** Sugestões do quadro: casa → personagem cujos ✓ de lugar apontam só essa casa (não preenche a resposta). */
+  suggest?: Map<number, number>;
   onSelect: (s: number | null) => void;
   /** Coloca a pessoa s na casa v (-1 = tira do tabuleiro). */
   onPlace: (s: number, v: number) => void;
 }
 
-export default function CaseBoard({ model: m, a, sel, done, showErrors, focus, onSelect, onPlace }: BoardProps) {
+export default function CaseBoard({ model: m, a, sel, done, showErrors, focus, suggest, onSelect, onPlace }: BoardProps) {
   const n = m.people.length;
   const { rows, cols } = m;
   const pos = a.slice(0, n), obj = a.slice(n);
@@ -131,7 +134,9 @@ export default function CaseBoard({ model: m, a, sel, done, showErrors, focus, o
     <div className="cx-scenebox">
       <div className={`cx-sceneframe rule-${m.rule}`} style={{ "--cols": cols } as React.CSSProperties}>
         {m.rule === "equilibrio" && (
-          <div className="cx-sides" aria-hidden="true">{m.scene.rooms.slice(0, 2).map((r, k) => <span key={k} style={{ background: ROOM_TINTS[k] }}>{r.label}</span>)}</div>
+          <div className="cx-sides" aria-hidden="true">{m.scene.rooms.slice(0, 2).map((r, k) => (
+            <span key={k} style={{ background: ROOM_TINTS[k] }} title={`Lado do ${k === 0 ? "Cristal" : "Orbe"}: ${r.label}`}><TangoSymbol v={k === 0 ? 1 : 2} size={20} /><b>{k === 0 ? "Cristal" : "Orbe"}</b></span>
+          ))}</div>
         )}
         <div className="cx-sceneboard" ref={boardRef} style={{ gridTemplateColumns: `repeat(${cols}, 1fr)`, aspectRatio: `${cols} / ${rows}` }} role="grid"
           aria-label={`Cenário ${rows} por ${cols} com ${m.scene.rooms.length} ${m.rule === "equilibrio" ? "lados" : "cômodos"}`}>
@@ -146,7 +151,8 @@ export default function CaseBoard({ model: m, a, sel, done, showErrors, focus, o
             const offTrail = !!m.trail && !m.trail.includes(v);
             const shut = !blocked && !offTrail && o < 0 && closed(v);
             const room = m.scene.rooms[roomOf(m, v)];
-            const cls = ["cx-sc", blocked ? "block" : offTrail ? "offtrail" : o >= 0 ? "full" : "free", o >= 0 && o === sel && "sel",
+            const ghost = o < 0 && !blocked && !offTrail ? suggest?.get(v) : undefined;
+            const cls = ["cx-sc", ghost !== undefined && "sugg", blocked ? "block" : offTrail ? "offtrail" : o >= 0 ? "full" : "free", o >= 0 && o === sel && "sel",
               sel !== null && o < 0 && allowed.has(v) && !shut && "target", shut && "off", inRay(v) && "ray", clash(v) && "bad",
               focus?.cells.has(v) && "rel", o >= 0 && focus?.people.has(o) && "relp",
               edge(v, -1, 0) && "bt", edge(v, 0, 1) && "br", edge(v, 1, 0) && "bb", edge(v, 0, -1) && "bl"].filter(Boolean).join(" ");
@@ -163,12 +169,20 @@ export default function CaseBoard({ model: m, a, sel, done, showErrors, focus, o
                     {obj[o] >= 0 && <span className="cx-hold" aria-hidden="true"><Art e={m.objects[obj[o]]} className="fill" /></span>}
                     <small>{m.people[o].label}</small>
                   </>
+                  : ghost !== undefined ? <><span className="cx-ghost" aria-hidden="true"><Art e={m.people[ghost]} className="fill" /></span><small className="cx-cell">{cellName(m, v)}</small></>
                   : <>{p && <span className="cx-seat" aria-hidden="true"><Art e={p} className="fill" /></span>}{!offTrail && <small className="cx-cell">{cellName(m, v)}</small>}</>}
               </button>
             );
           })}
         </div>
       </div>
+      {/* Legenda dos móveis: ninguém fica numa casa bloqueada (nada pequeno ou só desenhado decide o caso). */}
+      {m.scene.props.some((p) => p.block) && (
+        <ul className="cx-blocks" aria-label="Casas bloqueadas">
+          {m.scene.props.filter((p) => p.block).map((p) => <li key={p.cell}><span className="cx-blocks-pic" aria-hidden="true"><Art e={p} className="fill" /></span><b>{cellName(m, p.cell)}</b> {p.label}</li>)}
+          <li className="cx-blocks-note">casas bloqueadas: ninguém fica ali</li>
+        </ul>
+      )}
       {cut && (
         <ul className="cx-roomkey" aria-label="Locais: nomes completos">
           <li className="cx-roomkey-t">Locais</li>

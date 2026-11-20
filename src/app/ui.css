@@ -87,7 +87,7 @@
 .code-input { font-family: ui-monospace, Consolas, monospace; letter-spacing: .08em; text-transform: uppercase; }
 
 /* ---------- Modais: nunca maiores que a tela ---------- */
-.modal { max-height: calc(100svh - 24px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)); padding: 18px; }
+.modal { max-height: calc(100svh - 24px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)); max-height: calc(100dvh - 24px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)); padding: 18px; }
 .modal-head h2 { font-size: 20px; color: var(--cosmic); }
 .modal .list { padding-left: 18px; }
 

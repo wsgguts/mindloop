@@ -41,3 +41,32 @@ export async function submitFeedback(f: Feedback, doFetch: typeof fetch = fetch)
   });
   if (!res.ok) throw new Error(`Falha no envio (${res.status}).`);
 }
+
+// ---------------- Pedido de opinião na tela de comemoração (item 4 do teste com alunos) ----------------
+// O personagem do jogo pede a opinião ao fim de uma partida completa (a partida guiada também conta).
+//  • Aparece na primeira partida completa.
+//  • Se a pessoa recusar ("Agora não", ou seguir sem responder), só volta depois de ASK_EVERY partidas.
+//  • Depois que ela enviar uma opinião, nunca mais aparece (FB_SENT_KEY, em App.tsx).
+// Guardado no aparelho: mindloop:fb-ask = {"wins":n,"declinedAt":n|null}.
+
+export const ASK_KEY = "mindloop:fb-ask";
+export const ASK_EVERY = 5;
+export interface AskState { wins: number; declinedAt: number | null }
+
+export function parseAsk(raw: string | null): AskState {
+  try {
+    const o = raw ? JSON.parse(raw) : null;
+    if (o && Number.isInteger(o.wins) && o.wins >= 0) return { wins: o.wins, declinedAt: Number.isInteger(o.declinedAt) ? o.declinedAt : null };
+  } catch { /* valor estragado: recomeça */ }
+  return { wins: 0, declinedAt: null };
+}
+
+/** Mais uma partida completa: devolve o novo estado e se o pedido de opinião deve aparecer nesta comemoração. */
+export function countWin(s: AskState, sent: boolean): { state: AskState; ask: boolean } {
+  const state = { ...s, wins: s.wins + 1 };
+  const ask = !sent && (state.declinedAt === null || state.wins - state.declinedAt >= ASK_EVERY);
+  return { state, ask };
+}
+
+/** A pessoa recusou (ou seguiu sem responder): o pedido só volta depois de ASK_EVERY partidas. */
+export const decline = (s: AskState): AskState => ({ ...s, declinedAt: s.wins });

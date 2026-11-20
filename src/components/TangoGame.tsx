@@ -2,6 +2,7 @@
 import GameHeader from "./GameHeader";
 import ZoomBoard from "./ZoomBoard";
 import GameToolbar from "./GameToolbar";
+import ConfirmDialog from "./ConfirmDialog";
 import { useHintNudge, useLevelPlay } from "./useLevelPlay";
 import { useSfx } from "./useSound";
 import { useRevealedErrors } from "./useRevealedErrors";
@@ -231,24 +232,17 @@ export default function TangoGame({ puzzle, active, onMenu, onRules, onFeedback,
 
       <div className={`note ${msg.tone}`} role="status" aria-live="polite"><b aria-hidden="true">{ICON[msg.tone]}</b><span>{msg.text}</span></div>
 
-      {confirm && (
-        <div className="note warn gconfirm" role="alertdialog" aria-label="Confirmação">
-          <div style={{ display: "grid", gap: 8 }}>
-            <span>Reiniciar apaga os símbolos que você colocou. Continuar?</span>
-            <div className="row"><button className="btn" onClick={restart}>Sim, reiniciar</button><button className="btn sec" onClick={() => setConfirm(false)}>Cancelar</button></div>
-          </div>
-        </div>
-      )}
+      {confirm && <ConfirmDialog text="Reiniciar apaga os símbolos que você colocou. Continuar?" confirm="Sim, reiniciar" onConfirm={restart} onCancel={() => setConfirm(false)} />}
 
       {!won && (
         <GameToolbar
           main={[
           { label: "Desfazer", icon: "undo", onClick: undo, disabled: !history.length },
           { label: "Dica", icon: "hint", onClick: hint, nudge: !won && nudge.show(play.ms) ? "Precisa de ajuda?" : undefined },
-          { label: "Reiniciar", icon: "restart", onClick: () => { if (history.length) { sfx("ui"); setConfirm(true); } else restart(); } },
-          { label: "Ajuda", ariaLabel: "Como jogar", icon: "help", onClick: onRules },
+          { label: "Tutorial", ariaLabel: "Tutorial: rever a partida guiada", icon: "help", onClick: onRules },
           ]}
           more={[
+          { label: "Reiniciar", icon: "restart", onClick: () => { if (history.length) { sfx("ui"); setConfirm(true); } else restart(); } },
           { label: "Níveis", icon: "levels", onClick: onMenu },
           { label: "Dar opinião", icon: "feedback", onClick: onFeedback },
           ]}

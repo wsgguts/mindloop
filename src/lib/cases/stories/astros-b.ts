@@ -1,4 +1,4 @@
-// Astros (bônus) — segunda investigação de cada capítulo ("Céu": uma pessoa por linha e coluna, pistas de proximidade).
+// Astros (bônus) — segunda investigação de cada capítulo ("Céu": uma pessoa por linha, coluna e região).
 
 import type { Ent } from "../model";
 import type { Story } from "../story";

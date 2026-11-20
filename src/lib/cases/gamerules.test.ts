@@ -98,15 +98,17 @@ describe("as investigações seguem as regras de cada jogo", () => {
     }
   });
 
-  it("o motor aceita exatamente as posições que a regra do jogo permite", () => {
+  it("o motor aceita exatamente as posições que a regra do jogo permite (no Patches, conta só o cômodo)", () => {
     for (const c of CASES_DATA) {
       const n = c.model.people.length;
-      const engine = posList(c.model).map((p) => p.join(",")).sort();
-      expect(engine, c.id).toEqual(brute(c.model, n));
+      const key = (cells: number[]) => (c.model.rule === "comodos" ? cells.map((v) => c.model.scene.room[v]) : cells).join(",");
+      const engine = [...new Set(posList(c.model).map(key))].sort();
+      const all = [...new Set(brute(c.model, n).map((p) => key(p.split(",").map(Number))))].sort();
+      expect(engine, c.id).toEqual(all);
     }
   });
 
-  it("Astros: nenhuma pista fala em encostar (é proibido); as distâncias são em passos", () => {
+  it("Astros: nenhuma pista fala em encostar (é proibido) e a regra continua valendo", () => {
     for (const c of allCases().filter((x) => x.model.rule === "ceu")) {
       for (const t of c.clueTexts) expect(t, c.id).not.toMatch(/encost/i);
       expect(c.ruleTexts[0], c.id).toMatch(/ninguém encostava/);

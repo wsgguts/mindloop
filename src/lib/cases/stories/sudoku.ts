@@ -41,9 +41,9 @@ const SUDOKU_A: Story[] = [
   },
   {
     key: "guardioes-templo", title: "Os guardiões do eclipse", universe: "magia", tone: "misterio",
-    intro: "No Templo das Estrelas, os guardiões vigiam a noite com objetos sagrados. Um eclipse escureceu tudo por um minuto e, quando a luz voltou, o sumo-sacerdote precisou registrar a posição de cada um.",
-    goal: "Onde estava cada guardião e que objeto sagrado tinha?",
-    ending: "Registro completo. O eclipse passou, e {com:Sino de Prata} tocou o sino para avisar que as estrelas tinham voltado.",
+    intro: "Durante o eclipse, o Templo das Estrelas ficou um minuto no escuro total. Quando a luz voltou, os quatro guardiões estavam espalhados pelo templo, cada um segurando um objeto sagrado.",
+    goal: "Onde estava cada guardião e o que ele segurava?",
+    ending: "A luz voltou e {com:Sino de Prata}, lá da Torre, tocou o Sino de Prata três vezes. O eclipse tinha passado, e cada guardião estava exatamente no seu posto.",
     objects: [e("Sino de Prata", M, "🔔"), e("Pergaminho", M, "📜"), e("Incensário", M, "🪔"), e("Cajado", M, "🦯")],
     rooms: [e("Nave Estelar", F), e("Altar da Lua", M), e("Claustro", M), e("Torre do Sino", F)],
     blocks: [e("Coluna de Mármore", F, "🏛️"), e("Estátua Antiga", F, "🗿"), e("Fonte Sagrada", F, "⛲")],

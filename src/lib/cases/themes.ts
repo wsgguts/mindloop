@@ -5,7 +5,7 @@
 //   Tango       → "equilibrio" : dois lados, uma pessoa por coluna, metade de cada lado;
 //   Zip         → "trilha"     : uma trilha numerada; cada pessoa numa parada (antes, depois, logo depois);
 //   Patches     → "comodos"    : exatamente uma pessoa em cada cômodo;
-//   Astros      → "ceu"        : uma pessoa por linha, coluna e região, sem ninguém se encostar (como os astros), com pistas de distância.
+//   Astros      → "ceu"        : uma pessoa por linha, coluna e região, sem ninguém se encostar (como os astros).
 
 import type { JourneyGame } from "../journey";
 import type { Rule } from "./model";
@@ -21,7 +21,7 @@ export const RULE_OF: Record<JourneyGame, Rule> = { sudoku: "regioes", tango: "e
 export const KIND_OF = RULE_OF;
 export const KIND_NAME: Record<Rule, string> = {
   regioes: "Investigação de regiões", equilibrio: "Investigação de equilíbrio", trilha: "Investigação de trilha",
-  comodos: "Investigação de cômodos", ceu: "Investigação de proximidade",
+  comodos: "Investigação de cômodos", ceu: "Investigação do céu",
 };
 
 /** O narrador de cada jogo (conta a história no balão). */
@@ -41,9 +41,9 @@ export const storyByKey = (key: string): Story | undefined => BY_KEY.get(key);
 
 /** Lembrete do jeito de pensar de cada regra (quando a estrutura do caso não traz uma dica própria). */
 export const GENERAL_HINT: Record<Rule, string> = {
-  regioes: "Cada linha, cada coluna e cada cômodo tem uma pessoa só. Quem já tem casa “fecha” a linha, a coluna e o cômodo dela para os outros.",
-  equilibrio: "Uma pessoa por coluna e metade de cada lado. Quando um lado enche, todos os que faltam estão do outro.",
-  trilha: "As pessoas estão em paradas diferentes da trilha. Organize da primeira à última: “antes” e “logo depois” encaixam umas nas outras.",
-  comodos: "Cada cômodo tem uma pessoa só. Descubra primeiro o cômodo de cada um; depois, os móveis e vizinhos dizem a casa exata.",
-  ceu: "Uma pessoa por linha, coluna e região, e ninguém se encosta (nem na diagonal). Descubra primeiro quais casas podem estar ocupadas; depois use as distâncias em passos.",
+  regioes: "Cada linha, cada coluna e cada cômodo tem uma pessoa só. Marque ✓ no quadro e risque o resto da fileira e da coluna da grade.",
+  equilibrio: "Uma pessoa por coluna e metade de cada lado (Cristal e Orbe). Quando um lado enche, todos os que faltam estão do outro.",
+  trilha: "Cada pessoa está numa parada diferente da trilha. Marque na grade Parada o que cada pista diz — “depois da 4ª parada” risca da 1ª à 4ª.",
+  comodos: "Cada cômodo tem uma pessoa só. O número no canto é o tamanho do cômodo: pistas de tamanho apontam os cômodos daquele tamanho.",
+  ceu: "Uma pessoa por linha, coluna e região. Marque ✓ no quadro e risque o resto da fileira e da coluna da grade.",
 };

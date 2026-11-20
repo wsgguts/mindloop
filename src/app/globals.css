@@ -599,7 +599,11 @@ label { font-weight: 600; display: block; margin-bottom: 4px; }
 .ptcell.edge-c { border-right: 0; } .ptcell.edge-r { border-bottom: 0; }
 
 /* (O antigo botão flutuante de opinião virou um ícone no cabeçalho: nada flutua sobre o conteúdo.) */
-@media (orientation: landscape) and (max-height: 360px) { .bnav ul { margin-top: -40px; } }
+@media (orientation: landscape) and (max-height: 360px) {
+  .bnav ul { margin-top: 0; gap: 0; }
+  .bnav::before { display: none; } /* sem o cubo da marca: os 5 botões cabem inteiros na altura */
+  .bnav button { min-height: 52px; font-size: 11px; }
+}
 /* ===================== Tutoriais animados ===================== */
 .tut-scrim { z-index: 65; padding: 12px; background: rgba(15,6,40,.82); }
 .tut { position: relative; width: min(100%, 560px); max-height: calc(100vh - 24px); max-height: calc(100svh - 24px); display: flex; flex-direction: column;
@@ -815,7 +819,7 @@ label { font-weight: 600; display: block; margin-bottom: 4px; }
   .wrap.play:has(.tpad) { --extra: 76px; } /* + texto de progresso do Tango em 2 linhas */
   .wrap.play:has(.ptlegend) { --extra: 46px; }
   /* tabuleiro: o maior possível, mas deixando caber todo o resto da partida na altura da tela */
-  .wrap.play > .zoom-area { width: min(var(--zw, 360px), 100%, calc(100vh - 300px - var(--extra))); width: min(var(--zw, 360px), 100%, calc(100dvh - 300px - var(--extra))); }
+  .wrap.play > .zoom-area { width: min(var(--zw, 360px), 100%, calc(100vh - 300px - var(--extra) - var(--gnav, 0px))); width: min(var(--zw, 360px), 100%, calc(100dvh - 300px - var(--extra) - var(--gnav, 0px))); }
   .wrap.play > .paused { width: min(360px, 100%); }
   .wrap.play .gtimer-slot { top: 6px; margin-bottom: -8px; }
   .wrap.play .gtimer { margin-top: 2px; padding: 5px 10px 5px 8px; font-size: 15px; }
@@ -836,9 +840,15 @@ label { font-weight: 600; display: block; margin-bottom: 4px; }
   .wrap.play .note { padding: 7px 10px; font-size: 14px; line-height: 1.35; height: calc(4.05em + 18px); overflow-y: auto; align-items: flex-start; overscroll-behavior: contain; }
   .wrap.play .ptlegend { font-size: 12px; }
 }
+/* Item 5 (teste com alunos): antes, na partida, a barra de navegação SUMIA no celular em pé (para o tabuleiro
+   ganhar altura) e muitos alunos achavam que o menu tinha quebrado. Agora ela continua lá, só mais baixa (52px),
+   e o tabuleiro desconta essa altura (--gnav) para a partida continuar cabendo na tela sem rolar. */
 @media (max-width: 760px) and (not ((orientation: landscape) and (max-height: 540px))) {
-  .bnav.in-game { display: none; } /* volta pelo ‹ do cabeçalho; a altura vai para o tabuleiro */
-  .page.in-game { padding-bottom: calc(8px + env(safe-area-inset-bottom, 0px)); }
+  :root:has(.bnav.in-game) { --gnav: calc(52px + env(safe-area-inset-bottom, 0px)); }
+  .bnav.in-game button { min-height: 52px; gap: 0; }
+  .bnav.in-game button svg { width: 20px; height: 20px; }
+  .bnav.in-game button > span:last-child { font-size: 11px; }
+  .page.in-game { padding-bottom: calc(var(--gnav, 0px) + 8px); }
 }
 
 /* ---- Tutorial no celular em pé: compacto, demonstração ajustada à altura (ver Tutorial.tsx) ---- */

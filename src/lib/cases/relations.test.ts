@@ -3,7 +3,7 @@ import { allCases } from "./catalog";
 import { CASES_DATA } from "./data";
 import { allowedCells, blockedCells, objectsOf, peopleOf, rcOf, sideNeighbors } from "./model";
 import { roomRun } from "../../components/cases/CaseBoard";
-import { GRID_NO, GRID_YES, cellNote, cellsOfClue, focusOf, gridNote, nextGrid, nextNote, readNote, validMark } from "./relations";
+import { MARK_NO, MARK_YES, autoMarks, cellsOfClue, clueTarget, decodeMark, encodeMark, focusOf, markKey, marksFrom, marksTo, nextMark, suggestions, validMark } from "./relations";
 
 describe("investigação: ligações entre pistas, personagens, objetos e casas", () => {
   it("toda pista cita alguém ou algum objeto, e selecionar a pista acende exatamente isso", () => {
@@ -30,35 +30,56 @@ describe("investigação: ligações entre pistas, personagens, objetos e casas"
     }
   });
 
-  it("quadro de decisões: anotações de casa (✕ ou personagem) e da tabela (✕ ou ✓); versões antigas são descartadas", () => {
+  it("tocar numa pista acende a grade que ela afeta, na fileira de quem ela fala", () => {
+    for (const c of allCases()) c.clues.forEach((k, i) => {
+      const t = clueTarget(c.model, c.dims, k)!;
+      expect(t.d, `${c.id} pista ${i + 1}`).toBe(c.clueDims[i]);
+      expect(peopleOf(c.model, k), c.id).toContain(t.s);
+      expect(focusOf(c.model, c.clues, { t: "clue", i }, c.dims).grid, c.id).toEqual(t);
+      if (!("a" in k)) expect(t.vs.length, `${c.id} pista ${i + 1}: valores citados`).toBeGreaterThan(0);
+    });
+  });
+
+  it("quadro de decisões: anotações por grade (✕ ou ✓) vão e voltam do rascunho; versões antigas são descartadas", () => {
     for (const c of allCases()) {
-      const m = c.model, n = m.people.length, V = m.rows * m.cols;
-      for (const who of [-1, 0, n - 1]) {
-        expect(readNote(cellNote(V - 1, who))).toEqual({ t: "cell", i: V - 1, who });
-        expect(validMark(m, cellNote(V - 1, who))).toBe(true);
-      }
-      for (const st of [GRID_NO, GRID_YES]) {
-        expect(readNote(gridNote(n - 1, n - 1, st))).toMatchObject({ t: "grid", s: n - 1, o: n - 1, state: st });
-        expect(validMark(m, gridNote(n - 1, n - 1, st))).toBe(true);
-      }
-      expect(validMark(m, cellNote(V, 0))).toBe(false);
-      expect(validMark(m, cellNote(0, n))).toBe(false);
-      expect(validMark(m, gridNote(n, 0, GRID_NO))).toBe(false);
-      expect(validMark(m, gridNote(0, n, GRID_YES))).toBe(false);
-      for (const old of [0, 5, 100000, 100003, 200000, 200007, 500001, 500017]) expect(validMark(m, old)).toBe(false);
+      const m = c.model, n = m.people.length;
+      c.dims.forEach((dim, d) => {
+        const v = dim.values.length - 1;
+        for (const st of [MARK_NO, MARK_YES]) {
+          expect(decodeMark(encodeMark(d, n - 1, v, st))).toEqual({ d, s: n - 1, v, state: st });
+          expect(validMark(m, c.dims, encodeMark(d, n - 1, v, st))).toBe(true);
+        }
+        expect(validMark(m, c.dims, encodeMark(d, n, 0, MARK_NO))).toBe(false);
+        expect(validMark(m, c.dims, encodeMark(d, 0, dim.values.length, MARK_NO))).toBe(false);
+      });
+      expect(validMark(m, c.dims, encodeMark(c.dims.length, 0, 0, MARK_YES))).toBe(false);
+      for (const old of [0, 5, 100000, 400017, 600009, 500017]) expect(validMark(m, c.dims, old)).toBe(false);
+      const marks = new Map([[markKey(0, 0, 0), MARK_YES], [markKey(c.dims.length - 1, n - 1, 1), MARK_NO]]);
+      expect(marksFrom(m, c.dims, marksTo(marks))).toEqual(marks);
     }
   });
 
-  it("tabela O quê?: cada toque alterna vazio → ✕ → ✓ → vazio", () => {
-    expect([nextGrid(undefined), nextGrid(GRID_NO), nextGrid(GRID_YES)]).toEqual([GRID_NO, GRID_YES, undefined]);
+  it("cada toque numa célula: vazio → ✕ → ✓ → vazio", () => {
+    expect([nextMark(undefined), nextMark(MARK_NO), nextMark(MARK_YES)]).toEqual([MARK_NO, MARK_YES, undefined]);
   });
 
-  it("cada toque: vazio → ✕ → personagens (pulando quem já está anotado em outro espaço) → vazio", () => {
-    const notes = new Map<number, number>([[7, 1]]);
-    const seq: (number | undefined)[] = [];
-    let cur: number | undefined;
-    for (let i = 0; i < 5; i++) { const nx = nextNote(cur === undefined ? new Map([...notes]) : new Map([...notes, [3, cur]]), 3, 3); seq.push(nx); cur = nx; if (nx === undefined) break; }
-    expect(seq).toEqual([-1, 0, 2, undefined]);
+  it("ajuda automática: um ✓ risca o resto da fileira e (valor de uma pessoa só) o resto da coluna", () => {
+    const c = allCases().find((x) => x.id === "sudoku-33")!;
+    const marks = new Map([[markKey(0, 2, 0), MARK_YES]]); // Neve ✓ linha 1
+    const auto = autoMarks(c.dims, marks, 4);
+    expect([...auto].sort()).toEqual([markKey(0, 0, 0), markKey(0, 1, 0), markKey(0, 2, 1), markKey(0, 2, 2), markKey(0, 2, 3), markKey(0, 3, 0)].sort());
+    // Tango: lado com as 2 pessoas que cabem nele fecha o lado para os outros.
+    const t = allCases().find((x) => x.model.rule === "equilibrio")!;
+    const side = t.dims.findIndex((d) => d.id === "side");
+    const a2 = autoMarks(t.dims, new Map([[markKey(side, 0, 0), MARK_YES], [markKey(side, 1, 0), MARK_YES]]), 4);
+    expect(a2.has(markKey(side, 2, 0)) && a2.has(markKey(side, 3, 0))).toBe(true);
+  });
+
+  it("linha + coluna com ✓ sugerem a casa no tabuleiro (sem preencher a resposta)", () => {
+    const c = allCases().find((x) => x.id === "sudoku-33")!;
+    // Neve: linha 1 e coluna C → casa C1 (2).
+    expect(suggestions(c.model, c.dims, new Map([[markKey(0, 2, 0), MARK_YES], [markKey(1, 2, 2), MARK_YES]]))).toEqual(new Map([[2, 2]]));
+    expect(suggestions(c.model, c.dims, new Map([[markKey(0, 2, 0), MARK_YES]])).size).toBe(0);
   });
 });
 
@@ -115,21 +136,22 @@ describe("cenários: o lugar de cada caso é coerente", () => {
     }
   });
 
-  it("cada jogo raciocina diferente: proximidade só no Astros, trilha só no Zip, lados só no Tango", () => {
-    const kinds = (rule: string) => new Set(CASES_DATA.filter((c) => c.model.rule === rule).flatMap((c) => c.clues.map((k) => (k.k === "via" ? k.c.k : k.k))));
-    for (const r of ["regioes", "equilibrio", "trilha", "comodos"]) for (const k of ["near", "far", "alone", "nearN"]) expect(kinds(r).has(k as never), `${r}: ${k}`).toBe(false);
-    for (const r of ["regioes", "equilibrio", "comodos", "ceu"]) for (const k of ["before", "next", "stop", "notStop"]) expect(kinds(r).has(k as never), `${r}: ${k}`).toBe(false);
+  it("cada jogo raciocina com a sua mecânica: ordem só no Zip, Cristal/Orbe só no Tango, tamanho só no Patches", () => {
+    const kinds = (rule: string) => new Set(CASES_DATA.filter((c) => c.model.rule === rule).flatMap((c) => c.clues.map((k) => k.k)));
+    for (const r of ["regioes", "equilibrio", "comodos", "ceu"]) for (const k of ["next", "stop", "notStop", "stopAfter", "stopBefore"]) expect(kinds(r).has(k as never), `${r}: ${k}`).toBe(false);
     for (const r of ["regioes", "trilha", "comodos", "ceu"]) for (const k of ["side", "sameSide", "oppSide"]) expect(kinds(r).has(k as never), `${r}: ${k}`).toBe(false);
-    expect(["near", "far", "alone", "nearN"].some((k) => kinds("ceu").has(k as never))).toBe(true);
-    expect(["before", "next"].some((k) => kinds("trilha").has(k as never))).toBe(true);
-    expect(["side", "sameSide", "oppSide"].some((k) => kinds("equilibrio").has(k as never))).toBe(true);
+    for (const r of ["regioes", "equilibrio", "trilha", "ceu"]) expect(kinds(r).has("size"), `${r}: size`).toBe(false);
+    expect(["next", "stopAfter", "stopBefore"].some((k) => kinds("trilha").has(k as never))).toBe(true);
+    expect(["sameSide", "oppSide"].some((k) => kinds("equilibrio").has(k as never))).toBe(true);
+    expect(kinds("comodos").has("size")).toBe(true);
   });
 
-  it("as pistas cruzadas (“quem tinha o X…”) estão em todos os jogos", () => {
-    for (const rule of ["regioes", "equilibrio", "trilha", "comodos", "ceu"]) {
-      const cs = CASES_DATA.filter((c) => c.model.rule === rule);
-      expect(cs.filter((c) => c.clues.some((k) => k.k === "via")).length, rule).toBeGreaterThanOrEqual(8);
-    }
+  it("relações entre duas pessoas só aparecem depois que a primeira já foi descoberta", () => {
+    for (const c of allCases()) c.clues.forEach((k, i) => {
+      if (!("a" in k)) return;
+      const before = c.trace.filter((st) => st.clue < i).flatMap((st) => st.concl);
+      expect(before.some((x) => x.s === k.a && x.d === c.clueDims[i]), `${c.id} pista ${i + 1}`).toBe(true);
+    });
   });
   it("o nome do cômodo só se estende sobre casas seguidas do MESMO cômodo, na mesma linha", () => {
     for (const c of CASES_DATA) {

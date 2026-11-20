@@ -22,13 +22,14 @@ O projeto fica no OneDrive; `scripts/link-next.mjs` (rodado antes do `dev` e do 
 - **Partida (todos os jogos):** cronômetro (pausa com a aba em segundo plano), desfazer, dica com explicação, reiniciar com confirmação, regras sem perder o progresso, zoom por pinça/botões (60% a 300%), animação de conclusão no tabuleiro e tela de parabéns com tempo, recorde e progresso da jornada.
 - **Celular deitado:** a navegação vira um trilho lateral e o tabuleiro fica ao lado dos controles, do tamanho da tela.
 - **Tutoriais animados:** cada jogo tem o seu, com passos curtos (explicação, demonstração animada no tabuleiro real do jogo, “Observe”), barra de passos tocável, Voltar/Próximo, Repetir animação, Recomeçar e Pular. Abre sozinho na primeira partida de cada jogo e pode ser reaberto pelo “?” ao lado do título, pelo botão “Como jogar” da partida, pela jornada e pela aba Regras.
-- **Jornada em duas etapas:** ao abrir um jogo pelo Início aparece a **visão geral** (progresso, “Continuar a jornada”, Investigações e os 10 capítulos em cartões com a pintura de cada mundo). Tocar num capítulo abre o **mapa**, só com uma barra compacta fixa no topo (‹ Capítulos, nome do mundo, capítulo anterior/seguinte) e a trilha. Ao voltar de uma partida, a jornada abre direto no mapa.
+- **Jornada direto no mapa:** ao abrir um jogo, a pessoa cai no mapa do capítulo em que está, com o próximo nível em “JOGAR”. Cabeçalho: ‹ Início · nome do capítulo (toque = lista de capítulos) · caderno de investigações com contador · ? (rever a partida guiada) · ‹ ›. As investigações aparecem como um **cristal âmbar menor, com lupa**, ao lado do caminho entre o nível que as libera e o seguinte (ligado a ele por uma linha pontilhada); são opcionais.
+- **Partida guiada:** na primeira vez em cada jogo, o personagem do jogo conduz uma partida de verdade num tabuleiro pequeno (holofote no que tocar, exemplo errado em vermelho, dicas gentis). Versão curta quando um capítulo muda o tamanho ou a regra. “Pular” sempre visível. Detalhes em `DOCUMENTACAO_ALTERACOES_MINDLOOP.md`.
 - **Tela de parabéns:** **Continuar** abre o **próximo nível** da jornada; se a pessoa não tocar em nada, ao fim do temporizador (6,5 s) ela volta para a **jornada**. As duas ações são independentes: o primeiro evento vence e os demais são ignorados (sem navegação dupla). No nível 100 o botão vira “Ver jornada”. Medalhas ganhas na vitória aparecem ali mesmo, com “Ver todas as conquistas”.
 - **Ranking** (aba própria): ranking geral e por jogo (com filtro de dificuldade), pódio, lista, posição e destaque da própria pessoa. Sem login. Veja “Conta anônima, progresso no servidor e ranking”.
 - **Conquistas** (aba própria): 74 medalhas em 6 categorias (incluindo Investigação) e 4 raridades, com progresso, data de obtenção e o que falta.
 - **Meu desempenho** (Perfil): partidas, fases, aproveitamento, jornadas, ritmo, recordes, atividade dos últimos 14 dias, comparação entre jogos e, por jogo, tempo médio, melhor tempo, tentativas por vitória, evolução e histórico.
 - **Regras:** aba própria com o texto de referência de cada jogo.
-- **Perfil:** abas Desempenho (estatísticas e investigações) e Ajustes (apelido, código de recuperação, sons, opinião, Modo Administrador e Reiniciar jogo).
+- **Perfil:** abas Desempenho (estatísticas e investigações) e Ajustes (apelido, **Jogar em outro dispositivo** — ver/copiar o código de recuperação ou usar um código —, sons, opinião, Modo Administrador e Reiniciar jogo). O código não aparece mais logo depois de criar o apelido.
 - **Modo Administrador** (Perfil → Ajustes, senha `admin`): a conta real fica **pausada** e o app passa a usar um jogador de teste ("Administrador") com tudo liberado (todos os níveis, capítulos, investigações e o jogo bônus). Enquanto ele está ligado, nada vai para o servidor: sem sincronização, **sem ranking e sem pontuação**. Os dados de teste ficam numa área separada do aparelho (`mindloop-admin:*`, em `src/lib/storage.ts`) e as chaves reais não são lidas nem gravadas. Ao tocar em **Desligar**, a área de testes é apagada e a pessoa volta para a própria conta, do ponto em que parou (cada vez que o modo é ligado, o teste começa do zero). A senha fica no código (`src/lib/admin.ts`): ela evita ativação por engano, mas não protege nada.
 - **Opinião** (ícone de balão no cabeçalho, ou Perfil → Ajustes): nota e comentário anônimos, enviados ao Netlify Forms (veja abaixo).
 
@@ -48,7 +49,7 @@ Todos os níveis têm **solução única** e se resolvem **só com lógica** —
 ### Astros, o jogo bônus
 - **Identidade:** cristal verde-esmeralda com a estrela de oito pontas (recortado da arte do Início em `public/gem-astros.webp`); verde em jornada, tabuleiro, botões, conclusão, investigações e no narrador Lumen (o retrato dourado original fica em `art/cast/`).
 - **Liberação:** o card do Astros aparece no Início desde o começo, com cadeado e o progresso de cada jornada principal. Ele abre quando as 4 jornadas (Mini Sudoku, Zip, Tango e Patches) estão completas, junto com a medalha “Senhor dos Quatro Mundos”. No **Modo Administrador** ele já vem liberado, com todos os níveis abertos.
-- **Prévia (bloqueado):** tocar no cristal do Astros na arte do Início ou no card abre uma prévia jogável — a partida real do jogo num céu 5×5 exclusivo (`ASTROS_DEMO`, fora dos 100 níveis), com apresentação e convite no fim. A prévia não grava nada: nem progresso, tempo, histórico, conquistas, tutorial visto nem ranking.
+- **Prévia (bloqueado):** tocar na runa do Astros na arte do Início (azul-noite, igual às outras, sem cadeado) ou no card abre uma prévia jogável — a partida real do jogo num céu 5×5 exclusivo (`ASTROS_DEMO`, fora dos 100 níveis), com apresentação e convite no fim. A prévia não grava nada: nem progresso, tempo, histórico, conquistas, tutorial visto nem ranking.
 - **Ranking:** depois de liberado, o Astros entra no ranking como jogo próprio e soma no geral, com a mesma fórmula de pontos. No servidor, a migração `20261116000100_astros_ranking.sql` (gerada por `scripts/gen_ranking_sql.ts`) aceita o jogo e só grava resultados do Astros de quem já tem o nível 100 das 4 jornadas registrado.
 - **Como se joga:** tocar numa casa alterna vazia → × (anotação) → astro. O botão “Em volta” (marcar × em volta dos astros) faz as marcações óbvias de uma vez. Os erros (linha, coluna ou constelação com dois astros, ou astros encostados) aparecem com o mesmo atraso dos outros jogos.
 - **Níveis e dicas:** `src/lib/astrosLogic.ts` tem as regras, o resolvedor (unicidade) e um motor de dedução em 4 níveis de raciocínio: casa única, constelação presa numa linha/coluna, bloqueio e faixas em dupla/trio. O gerador usa esse motor para medir a dificuldade, e a Dica mostra o próximo passo dele, com a explicação. Um teste confere que seguir só as dicas resolve os 100 céus.
@@ -61,40 +62,42 @@ Todos os níveis têm **solução única** e se resolvem **só com lógica** —
 | `mindloop:progress:<jogo>` | 100 caracteres “0”/“1” (níveis concluídos) |
 | `mindloop:times:<jogo>` | melhor tempo (ms) de cada nível |
 | `mindloop:last:<jogo>` | último nível jogado |
-| `mindloop:tutorial:<jogo>` | tutorial já visto: `done` (até o fim) ou `skipped` (pulado) |
+| `mindloop:tutorial:<jogo>` | tutorial antigo já visto (só lido: quem já viu não precisa ver a partida guiada) |
+| `mindloop:guided:<jogo>` | partida guiada já vista: `{"base":1,"c3":1,...}` (completa e versões curtas de cada capítulo) |
+| `mindloop:fb-ask` | pedido de opinião na comemoração: partidas completas e quando a pessoa recusou |
 | `mindloop:save` | partida de Mini Sudoku em andamento |
 | `mindloop:history` | histórico central de vitórias (jogo, nível, tempo, data, dicas, 1ª vez, recorde), sequência de vitórias e partidas iniciadas por jogo |
 | `mindloop:achievements` | conquistas obtidas: id → data |
 | `mindloop:rank` | identidade anônima (id, token, apelido, código de recuperação, participa do ranking, revisão do progresso no servidor) |
-| `mindloop:code-unseen` | o código de recuperação ainda não foi visto (selo no Perfil) |
+| `mindloop:code-unseen` | (antigo; é apagado ao abrir) o código de recuperação ainda não tinha sido visto |
 | `mindloop:cases` | Mindloop Investigação: por mistério, 1ª solução, melhor tempo, menor nº de dicas, XP, se foi pulado e o andamento salvo; histórico de soluções |
 
 **Um evento, todos os sistemas.** Cada vitória passa por um único ponto (`winLevel` em `App.tsx`), chamado uma vez por partida: progresso da jornada → recorde → histórico (`lib/history.ts`) → conquistas (`lib/achievements.ts`) → ranking (`lib/ranking.ts`). Estatísticas (`lib/stats.ts`) são calculadas desse histórico. Cada registro tem id próprio, então recarregar a página não duplica partidas, conquistas ou pontos.
 Na primeira abertura desta versão, os melhores tempos já salvos viram registros “importados” (sem data): ninguém perde o que já jogou. Eles contam para médias, recordes e quantidades, mas não para dias jogados nem sessões.
 
 ## Mindloop Investigação
-Mistérios **opcionais** entre as fases das jornadas: **duas investigações por capítulo, no mundo daquele capítulo** (uma no começo e outra no fim) (capítulo 1 no Reino Celestial … capítulo 10 no Trono do Infinito) — 20 por jogo, 100 no total; as primeiras se resolvem lendo uma pista por vez, sem precisar cruzar duas ao mesmo tempo. Em todas, a pergunta é a mesma: **onde cada personagem estava e que objeto tinha nas mãos**. Cada jogo leva a sua lógica para o cenário:
+Mistérios **opcionais** entre as fases das jornadas: **duas investigações por capítulo, no mundo daquele capítulo** — 20 por jogo, 100 no total. Em todas, a pergunta é a mesma: **onde cada um dos 4 personagens estava e que objeto segurava**. Feitas para iniciantes: uma história curta, poucas regras e a sensação de "fui juntando as pistas e descobri" — **sem guardar hipóteses na cabeça**. Detalhes da reformulação em `DOCUMENTACAO_ALTERACOES_MINDLOOP.md`. Cada caso conta uma pequena história completa — ambientação, introdução, **fichas dos personagens e dos objetos** (tocar no desenho de um objeto abre a ficha), pistas narrativas e desfecho —, escrita em `src/lib/cases/narrativas/<jogo>.ts`, separada da lógica; `src/lib/cases/narrative.test.ts` garante que a lógica (pistas, solução e quadro) é idêntica à fotografia `logic-snapshot.json`.
 
-O cenário segue **as regras do jogo de verdade** (conferido por `gamerules.test.ts`, escrito sem usar o motor):
+O cenário segue **as regras do jogo de verdade** (conferido por `gamerules.test.ts`, escrito sem usar o motor), e o **quadro de decisões** tem as grades da mecânica de cada jogo:
 
-| Jogo | Regra do cenário (como no jogo) | Pistas típicas |
-|---|---|---|
-| Mini Sudoku | 4×4 com regiões = os quatro quadrados 2×2; uma pessoa por linha, coluna e região | linha, coluna, cômodo, “numa linha acima de…” |
-| Tango | dois lados (2×4); uma pessoa por coluna e metade de cada lado — equilíbrio, nunca três iguais seguidos | lado, “do mesmo lado”, “em lados opostos”, colunas vizinhas |
-| Zip | a trilha numerada passa por **todas** as casas livres, uma vez cada (móveis são obstáculos); cada pessoa numa parada | “antes de…”, “logo depois de…”, parada, cômodo |
-| Patches | o lugar é coberto por cômodos **retangulares** de **tamanhos variados**, cada um com uma cor do Patches e a etiqueta do tamanho (como as peças); uma pessoa em cada | cômodo, “ao lado do Sofá”, assentos, casas vizinhas |
-| Astros (bônus) | 4×4: uma pessoa por linha, coluna e região, e **ninguém encosta em ninguém** (nem na diagonal) | distância em passos (“a 2 passos de…” = o mais perto permitido; “a 3 passos ou mais”), cantos, diagonal |
+| Jogo | Regra do cenário (como no jogo) | Grades do quadro | Pistas típicas |
+|---|---|---|---|
+| Mini Sudoku | 4×4, cômodos = os quadrados 2×2; uma pessoa por linha, coluna e cômodo | Linha · Coluna · Cômodo · Objeto | "estava na coluna A", "não estava na linha 3", "estava no Claustro" |
+| Tango | dois lados (2×4): **Cristal** em cima, **Orbe** embaixo; uma por coluna, metade de cada lado | Lado · Coluna · Objeto | "estava no lado do Cristal", "do mesmo lado do Theo (=)", "no lado oposto (×)" |
+| Zip | trilha numerada por todas as casas livres; cada pessoa numa parada | Parada · Objeto | "na 3ª parada", "depois da 4ª parada", "logo depois do Theo" |
+| Patches | cômodos retangulares com o tamanho no canto; uma pessoa por cômodo (só importa o cômodo) | Cômodo · Objeto | "no cômodo de 4 casas", "não estava na Cozinha" |
+| Astros (bônus) | 4×4: uma pessoa por linha, coluna e região, sem ninguém se encostar | Linha · Coluna · Região · Objeto | "estava na linha 4", "não estava no Braço do Norte" |
 
-Em todos há **pistas cruzadas** entre lugar e objeto (“Quem tinha a Lupa estava na Cozinha”) e pistas de objeto (“A Ana não tinha o Mapa”).
-
-- **Tela:** a história é contada pelo **narrador** antes de começar (e volta no botão 📖). Na investigação: o **Tabuleiro** do cenário, onde os personagens são encaixados (toque no personagem da fileira e depois na casa); o **Quadro de decisões**, com as anotações da pessoa — **Onde?** (um mapa só) e **O quê?** (tabela personagens × objetos) — no mapa, cada casa alterna, a cada toque, **vazio → ✕ → personagem**; na tabela, **vazio → ✕ (não tinha) → ✓ (tinha)** (anotações não contam como resposta), com Desfazer e Limpar quadro —; as **Pistas**; e **Sua resposta** (local e objeto de cada um) com o botão **Verificar**. No computador, tabuleiro e quadro à esquerda, pistas e resposta à direita; no celular em pé, uma coluna com o cabeçalho fixo. Cada jogo pinta a tela com a sua cor (Mini Sudoku magenta, Tango âmbar, Zip ciano, Patches violeta, Astros dourado) — `src/app/cases-theme.css`. Tocar numa pista acende quem e o que ela cita.
-- **Verificar:** errou, a tela avisa que há uma inconsistência (e qual pista conferir) sem revelar a solução; acertou, o narrador conta o desfecho.
-- **Quando aparece:** só ao tocar em **Continuar** na tela de parabéns, depois da fase agendada do capítulo (`src/lib/cases/config.ts`). Pular segue direto para a próxima fase — nunca tira pontos nem bloqueia nada. Resolvidos e pulados ficam no **caderno de investigações**.
-- **Dicas progressivas:** até 3 (como pensar → que pistas juntar → uma dedução explicada). Cada dica reduz 20% do XP.
+- **Pistas:** de 5 a 7, escritas como **depoimentos ou achados** ("Pegadas no chão mostram que a Mel estava na coluna A."). Toda pista vira, direto, ✓ ou ✗ numa grade — e mostra qual (📍 etiqueta da grade). Relações entre duas pessoas (só "logo depois de", "=" e "×") aparecem **depois** que a primeira já foi descoberta. Nada de casa exata, móvel decorativo ou distância.
+- **Quadro de decisões:** uma grade por tipo de informação, em abas (personagens × valores); cada toque: **vazio → ✕ → ✓**. A **Ajuda automática** (ligada nos capítulos iniciais) preenche, mais claros, os ✕ óbvios de cada ✓. Quando linha e coluna (ou lado e coluna, parada, cômodo) de alguém estão com ✓, o tabuleiro **sugere a casa** (sem preencher a resposta). Grades largas (as 8 paradas do Zip) aparecem invertidas para caber no celular. Tocar numa pista abre a grade dela e acende as células.
+- **Tabuleiro:** nomes dos cômodos legíveis; **casas bloqueadas** com nome e legenda; no Tango, os lados com o símbolo do Cristal e do Orbe.
+- **Dicas (até 3):** sempre sobre o próximo passo que a pessoa ainda não marcou — 1) qual pista usar; 2) qual grade e fileira (a célula pisca); 3) a conclusão daquele passo. Nunca a solução inteira. Cada dica reduz 20% do XP.
+- **Verificar:** errou, a tela aponta a pista a conferir, sem revelar a solução; acertou, o narrador conta o desfecho e mostra quem estava onde, com qual objeto.
+- **Quando aparece:** só ao tocar em **Continuar** na tela de parabéns, depois da fase agendada do capítulo (`src/lib/cases/config.ts`). Pular nunca tira nada. Resolvidos e pulados ficam no **caderno de investigações**.
 - **Recompensas:** XP na primeira solução (80 a 220, pela dificuldade), Lupa de Ouro/Prata/Bronze (0, 1 ou 2–3 dicas), melhor tempo e as conquistas da categoria Investigação. Nada disso entra no ranking.
-- **Histórias** (`src/lib/cases/stories/`): escritas à mão, uma por capítulo e jogo — título, introdução, pergunta, desfecho, 4 personagens, 4 objetos e o lugar (cômodos, móveis e assentos com nome e ícone). O desfecho pode citar quem tinha um objeto (`{com:Lupa}`), então nunca contradiz a solução.
-- **Motor** (`src/lib/cases/model.ts`): pistas como dados estruturados — o mesmo objeto confere a resposta, prova a solução única, simula a dedução (cada pista com a regra do lugar; cada objeto é de uma pessoa só; quando trava, junta duas pistas) e escreve os textos. Cenários em `scenery.ts`, estruturas de raciocínio em `structures.ts` (6 comuns + 1 própria de cada jogo), gerador em `generate.ts`.
-- **Banco:** `src/lib/cases/data.ts`, gerado por `npx vite-node scripts/gen_cases.ts` — não edite à mão. Os testes conferem, para todos os mistérios: solução única (lugar + objeto), resolução só por dedução, nenhuma pista sobrando, a estrutura declarada, a regra de cada jogo, cenários coerentes (cômodos contínuos, solução fora dos móveis, trilha contínua), textos, telas e — em `diversity.test.ts` — histórias e títulos sem repetição.
+- **Arquivos fáceis de editar:** histórias em `src/lib/cases/stories/` (introdução, pergunta, desfecho, objetos, cômodos e móveis); casos escritos à mão em `src/lib/cases/authored.ts` (o Templo das Estrelas, `sudoku-33`, é o modelo); quem conta as pistas em `src/lib/cases/witness.ts`; personagens e a linha de personalidade em `src/lib/cast.ts`.
+- **Motor:** `model.ts` (pistas e conferência), `grids.ts` (as grades de cada jogo), `logic.ts` (o passo a passo: pista → marcações → "última opção"), `generate.ts` (o gerador: escolhe as pistas uma a uma, na ordem, cada uma gerando um ✓ novo), `structures.ts` (formas de raciocínio: 4 comuns + 1 de cada jogo).
+- **Banco e validação:** `src/lib/cases/data.ts`, gerado por `npx vite-node scripts/gen_cases.ts` — não edite à mão. `npx vite-node scripts/validate_cases.ts` confere cada caso (solução única, todas as pistas necessárias, resolvível na ordem só com marcações diretas + última opção) e gera `docs/INVESTIGACOES_PISTAS.md` com a tabela **pista → marcações → conclusões** de todos os casos. Os testes (`src/lib/cases/*.test.ts`) conferem o mesmo, mais a regra de cada jogo, cenários coerentes, textos e telas.
 
 ## Elenco e avatares
 
@@ -171,10 +174,11 @@ Erros (número repetido, três símbolos iguais, peça errada, pista contrariada
 ```
 src/app/            layout (fontes, metadados), página e estilos globais
 src/components/     App (telas e fluxo), Journey, LevelComplete, Celebration, ZoomBoard, GameHeader,
-                    useLevelPlay (cronômetro e vitória), um componente por jogo e tutorial/ (sistema de
-                    tutoriais: Tutorial.tsx, mini tabuleiros e os passos de cada jogo)
+                    useLevelPlay (cronômetro e vitória), um componente por jogo, guided/ (partida guiada:
+                    motor e roteiros de cada jogo) e tutorial/minis.tsx (mini tabuleiros)
 src/lib/            regras e solucionadores de cada jogo, níveis (data/), jornada, recordes, armazenamento,
-                    tutorialData.ts (exemplos dos tutoriais, conferidos pelos testes contra as regras reais)
+                    tutorialData.ts (tabuleiros da partida guiada, conferidos pelos testes contra as regras reais)
+                    guided.ts (quando mostrar a partida guiada e o que já foi visto)
 scripts/            geradores de níveis
 public/             artes (.webp servidas pelo app; .jpg/.png originais guardados como matriz)
 ```

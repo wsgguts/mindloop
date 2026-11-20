@@ -1,4 +1,4 @@
-// Mindloop Investigação — motor lógico (funções puras, sem React).
+// Mindloop Investigação — modelo do caso (funções puras, sem React).
 //
 // Toda investigação é um CENÁRIO em grade com personagens e objetos. A resposta tem duas partes:
 //   • ONDE cada personagem estava (uma casa livre do tabuleiro);
@@ -6,26 +6,27 @@
 // A resposta é guardada como a = [casa do 1º, casa do 2º, …, objeto do 1º, objeto do 2º, …] (-1 = vazio).
 //
 // Cada jogo dá ao cenário a SUA regra (a mesma lógica do jogo, levada para um lugar):
-//   regioes    (Mini Sudoku) — uma pessoa por linha, por coluna e por cômodo;
-//   equilibrio (Tango)       — dois lados (linhas), uma pessoa por coluna e metade de cada lado;
+//   regioes    (Mini Sudoku) — uma pessoa por linha, por coluna e por cômodo 2×2;
+//   equilibrio (Tango)       — dois lados (Cristal em cima, Orbe embaixo), uma pessoa por coluna, metade de cada lado;
 //   trilha     (Zip)         — uma trilha numerada atravessa o lugar; cada pessoa numa parada diferente;
-//   comodos    (Patches)     — exatamente uma pessoa em cada cômodo;
-//   ceu        (Astros)      — uma pessoa por linha e por coluna, com pistas de proximidade.
+//   comodos    (Patches)     — exatamente uma pessoa em cada cômodo (só importa o cômodo, não a casa);
+//   ceu        (Astros)      — uma pessoa por linha, coluna e região, sem ninguém se encostar.
 //
-// As pistas são dados estruturados: o mesmo objeto confere a resposta, prova que a solução é única, simula a
-// dedução sem chute e escreve o texto. Assim o texto nunca diverge da lógica.
+// As pistas são DIRETAS: cada uma vira marcações (✓ ou ✗) numa grade do quadro de decisões (grids.ts). Relações
+// entre duas pessoas só existem no Zip ("logo depois de") e no Tango (= e ×), e só depois que a outra pessoa já foi
+// descoberta — então elas também viram marcações simples. A dedução passo a passo fica em logic.ts.
 
 export type Rule = "regioes" | "equilibrio" | "trilha" | "comodos" | "ceu";
 /** Nome antigo, mantido para quem só precisa do "tipo" do caso. */
 export type CaseKind = Rule;
 
 /** Uma entidade com nome. g = gênero gramatical ("o/a", "do/da"). */
-export interface Ent { label: string; g?: "m" | "f"; icon?: string; pl?: string }
+export interface Ent { label: string; g?: "m" | "f"; icon?: string; pl?: string; /** Nome curto para o cabeçalho da grade. */ short?: string }
 
-/** Móvel (bloqueia a casa: ninguém fica ali) ou assento (a casa pode ser ocupada e as pistas podem citá-lo). */
+/** Móvel (bloqueia a casa: ninguém fica ali). Assentos antigos (block: false) não são mais gerados. */
 export interface Prop { cell: number; label: string; g?: "m" | "f"; icon: string; block: boolean }
 export interface Scene {
-  /** Cômodo de cada casa (índice em `rooms`). */
+  /** Cômodo de cada casa (índice em `rooms`). No Tango, os "cômodos" 0 e 1 são os lados (Cristal e Orbe). */
   room: number[];
   rooms: Ent[];
   props: Prop[];
@@ -42,45 +43,45 @@ export interface Model {
   trail?: number[];
 }
 
-/** Pistas de posição. Pessoa -1 = "quem tinha o objeto" (usado dentro de uma pista cruzada `via`). */
+/** Pistas de lugar (s = pessoa). Todas viram marcações diretas numa grade do quadro. */
 export type PosClue =
-  | { k: "at" | "notAt"; s: number; v: number }
+  | { k: "row" | "notRow"; s: number; r: number }
+  | { k: "col" | "notCol"; s: number; c: number }
+  /** Cômodo (Sudoku, Patches), região (Astros) ou trecho da trilha (Zip). */
   | { k: "room" | "notRoom"; s: number; r: number }
-  | { k: "eitherRoom"; s: number; r: [number, number] }
-  | { k: "seat" | "by"; s: number; p: string }
-  | { k: "row"; s: number; r: number }
-  | { k: "col"; s: number; c: number }
-  | { k: "corner" | "alone"; s: number }
-  | { k: "nearN"; s: number; n: number }
-  | { k: "stop" | "notStop"; s: number; n: number }
+  /** Tango: lado 0 = Cristal (linha de cima), 1 = Orbe (linha de baixo). */
   | { k: "side"; s: number; r: number }
-  | { k: "left" | "above" | "near" | "far" | "diag" | "touch" | "apart" | "before" | "next" | "sameSide" | "oppSide" | "beside"; a: number; b: number };
+  /** Zip: parada n (0 = primeira); depois/antes da parada n (sem contar ela). */
+  | { k: "stop" | "notStop" | "stopAfter" | "stopBefore"; s: number; n: number }
+  /** Patches: cômodo com n casas. */
+  | { k: "size"; s: number; n: number }
+  /** Zip: b passou logo depois de a. Tango: a e b do mesmo lado (=) ou em lados opostos (×). a já está descoberto. */
+  | { k: "next" | "sameSide" | "oppSide"; a: number; b: number };
 
 export type Clue =
   | PosClue
   | { k: "has" | "hasNot"; s: number; o: number }
-  /** Pista cruzada: "quem tinha o objeto o" satisfaz a pista de posição c (pessoa -1 = quem tinha). */
-  | { k: "via"; o: number; c: PosClue }
   /** A regra do lugar (cada jogo tem a sua). */
   | { k: "rule" };
 
 export type ClueKind = Clue["k"];
 export const isRule = (c: Clue) => c.k === "rule";
-export const isPos = (c: Clue): c is PosClue => c.k !== "has" && c.k !== "hasNot" && c.k !== "via" && c.k !== "rule";
+export const isPos = (c: Clue): c is PosClue => c.k !== "has" && c.k !== "hasNot" && c.k !== "rule";
+/** Pistas que falam de duas pessoas (só valem quando a primeira já foi descoberta). */
+export const isRelational = (c: Clue): c is Extract<PosClue, { a: number }> => c.k === "next" || c.k === "sameSide" || c.k === "oppSide";
+/** Pistas que dizem o que NÃO era. */
+/** "Depois/antes da parada N" e "lados opostos (×)" são pistas de ordem e de símbolo (a mecânica do Zip e do Tango), não negações. */
+export const isNegative = (c: Clue) => ["notRow", "notCol", "notRoom", "notStop", "hasNot"].includes(c.k);
 
 // ---------------------------------------------------------------- geometria do cenário
 
 export const rcOf = (m: Model, v: number): [number, number] => [Math.floor(v / m.cols), v % m.cols];
-export const cellName = (m: Model, v: number) => { const [r, c] = rcOf(m, v); return `${"ABCDEF"[c]}${r + 1}`; };
+export const COLS = "ABCDEF";
+export const cellName = (m: Model, v: number) => { const [r, c] = rcOf(m, v); return `${COLS[c]}${r + 1}`; };
 export const blockedCells = (m: Model): Set<number> => new Set(m.scene.props.filter((p) => p.block).map((p) => p.cell));
 export const propAt = (m: Model, v: number) => m.scene.props.find((p) => p.cell === v);
 export const roomOf = (m: Model, v: number) => m.scene.room[v];
 export const kingDist = (m: Model, v: number, w: number) => { const [r1, c1] = rcOf(m, v), [r2, c2] = rcOf(m, w); return Math.max(Math.abs(r1 - r2), Math.abs(c1 - c2)); };
-/**
- * Astros ("ceu"): ninguém encosta em ninguém (1 passo, inclusive na diagonal, é proibido), então a proximidade
- * se mede em PASSOS: "perto" = a 2 passos (o mais perto permitido); "longe" = a 3 passos ou mais.
- */
-export const NEAR_STEPS = 2;
 export const sideNeighbors = (m: Model, v: number): number[] => {
   const [r, c] = rcOf(m, v);
   return [[r - 1, c], [r + 1, c], [r, c - 1], [r, c + 1]].filter(([y, x]) => y >= 0 && y < m.rows && x >= 0 && x < m.cols).map(([y, x]) => y * m.cols + x);
@@ -92,53 +93,51 @@ export function allowedCells(m: Model): number[] {
   return base.filter((v) => !bl.has(v));
 }
 export const stopOf = (m: Model, v: number) => (m.trail ? m.trail.indexOf(v) : -1);
+/** Casas de cada cômodo e o tamanho dele (Patches: o número da etiqueta). */
+export const roomCells = (m: Model, r: number) => m.scene.room.flatMap((x, v) => (x === r ? [v] : []));
+export const roomSize = (m: Model, r: number) => roomCells(m, r).length;
+
+/**
+ * Unidades de lugar: o que a resposta precisa acertar. Na maioria dos jogos, a casa; no Patches, só o cômodo
+ * (qualquer casa livre dele vale). Cada unidade é representada por uma casa (a primeira livre do cômodo).
+ */
+export function units(m: Model): number[] {
+  const cells = allowedCells(m);
+  if (m.rule !== "comodos") return cells;
+  return m.scene.rooms.map((_, r) => cells.find((v) => roomOf(m, v) === r)!).filter((v) => v !== undefined);
+}
+/** A unidade de uma casa (no Patches, a casa representante do cômodo; nos outros, a própria casa). */
+export const unitOf = (m: Model, v: number) => (m.rule === "comodos" && v >= 0 ? units(m)[roomOf(m, v)] : v);
 
 // ---------------------------------------------------------------- conferência
 
 const N = (m: Model) => m.people.length;
-/** Quem tinha o objeto o (ou -1 se ninguém ainda). */
-const holderOf = (m: Model, a: number[], o: number) => { for (let i = 0; i < N(m); i++) if (a[N(m) + i] === o) return i; return -1; };
 
-/** Confere uma pista de posição, dadas as casas (pos[i]) e quem é a pessoa -1. */
+/** Confere uma pista de lugar, dadas as casas (pos[i]). */
 function posOk(m: Model, c: PosClue, pos: (i: number) => number): boolean {
   if ("s" in c) {
     const v = pos(c.s);
+    const [r, col] = rcOf(m, v);
     switch (c.k) {
-      case "at": return v === c.v;
-      case "notAt": return v !== c.v;
+      case "row": return r === c.r;
+      case "notRow": return r !== c.r;
+      case "col": return col === c.c;
+      case "notCol": return col !== c.c;
       case "room": return roomOf(m, v) === c.r;
       case "notRoom": return roomOf(m, v) !== c.r;
-      case "eitherRoom": return c.r.includes(roomOf(m, v));
-      case "seat": { const p = propAt(m, v); return !!p && !p.block && p.label === c.p; }
-      case "by": return sideNeighbors(m, v).some((w) => { const p = propAt(m, w); return !!p && p.block && p.label === c.p; });
-      case "row": return rcOf(m, v)[0] === c.r;
-      case "col": return rcOf(m, v)[1] === c.c;
-      case "corner": { const [r, col] = rcOf(m, v); return (r === 0 || r === m.rows - 1) && (col === 0 || col === m.cols - 1); }
-      case "side": return rcOf(m, v)[0] === c.r;
+      case "side": return r === c.r;
       case "stop": return stopOf(m, v) === c.n;
       case "notStop": return stopOf(m, v) !== c.n;
-      case "alone": case "nearN": {
-        let k = 0;
-        for (let j = 0; j < N(m); j++) { const w = pos(j); if (w !== v && w >= 0 && kingDist(m, v, w) === NEAR_STEPS) k++; }
-        return c.k === "alone" ? k === 0 : k === (c as { n: number }).n;
-      }
+      case "stopAfter": return stopOf(m, v) > c.n;
+      case "stopBefore": return stopOf(m, v) < c.n;
+      case "size": return roomSize(m, roomOf(m, v)) === c.n;
     }
   }
   const x = pos(c.a), y = pos(c.b);
-  const [r1, c1] = rcOf(m, x), [r2, c2] = rcOf(m, y);
   switch (c.k) {
-    case "left": return c1 < c2;
-    case "above": return r1 < r2;
-    case "near": return kingDist(m, x, y) === NEAR_STEPS;
-    case "far": return kingDist(m, x, y) > NEAR_STEPS;
-    case "diag": return Math.abs(r1 - r2) === Math.abs(c1 - c2);
-    case "touch": return Math.abs(r1 - r2) + Math.abs(c1 - c2) === 1;
-    case "apart": return Math.abs(r1 - r2) + Math.abs(c1 - c2) !== 1;
-    case "before": return stopOf(m, x) < stopOf(m, y);
     case "next": return stopOf(m, y) === stopOf(m, x) + 1;
-    case "sameSide": return r1 === r2;
-    case "oppSide": return r1 !== r2;
-    case "beside": return Math.abs(c1 - c2) === 1;
+    case "sameSide": return rcOf(m, x)[0] === rcOf(m, y)[0];
+    case "oppSide": return rcOf(m, x)[0] !== rcOf(m, y)[0];
   }
   return false;
 }
@@ -165,22 +164,16 @@ export function evalClue(m: Model, c: Clue, a: number[]): boolean {
     case "rule": return ruleOk(m, a.slice(0, n));
     case "has": return a[n + c.s] === c.o;
     case "hasNot": return a[n + c.s] !== c.o;
-    case "via": { const h = holderOf(m, a, c.o); return h >= 0 && posOk(m, c.c, (i) => a[i === -1 ? h : i]); }
     default: return posOk(m, c, (i) => a[i]);
   }
 }
 
-/** Personagens e objetos citados por uma pista (para destacar ligações e numerar depoimentos). */
+/** Personagens citados por uma pista (para destacar ligações). */
 export function peopleOf(m: Model, c: Clue): number[] {
   if (c.k === "rule") return m.people.map((_, i) => i);
-  if (c.k === "has" || c.k === "hasNot") return [c.s];
-  const p = c.k === "via" ? c.c : c;
-  const xs = "s" in p ? [p.s] : [p.a, p.b];
-  return xs.filter((i) => i >= 0);
+  return "s" in c ? [c.s] : [c.a, c.b];
 }
-export const objectsOf = (c: Clue): number[] => (c.k === "has" || c.k === "hasNot" || c.k === "via" ? [c.o] : []);
-/** Compatível com o código antigo: pessoas envolvidas. */
-export const involved = peopleOf;
+export const objectsOf = (c: Clue): number[] => (c.k === "has" || c.k === "hasNot" ? [c.o] : []);
 
 /**
  * Estado de uma pista com a resposta parcial da pessoa (-1 = vazio): true = cumprida, false = já contrariada,
@@ -194,29 +187,20 @@ export function clueState(m: Model, c: Clue, a: number[]): boolean | null {
     const rows = placed.map((v) => rcOf(m, v)[0]), cols = placed.map((v) => rcOf(m, v)[1]), rooms = placed.map((v) => roomOf(m, v));
     const dup = (xs: number[]) => new Set(xs).size < xs.length;
     if ((m.rule === "regioes" || m.rule === "ceu") && (dup(rows) || dup(cols))) return false;
-    if ((m.rule === "regioes" || m.rule === "comodos") && dup(rooms)) return false;
+    if ((m.rule === "regioes" || m.rule === "comodos" || m.rule === "ceu") && dup(rooms)) return false;
     if (m.rule === "equilibrio" && (dup(cols) || rows.filter((r) => r === 0).length > n / 2 || rows.filter((r) => r === 1).length > n / 2)) return false;
     return a.slice(0, n).includes(-1) ? null : ruleOk(m, a.slice(0, n));
   }
   if (c.k === "has" || c.k === "hasNot") return a[n + c.s] < 0 ? null : evalClue(m, c, a);
-  if (c.k === "via") {
-    const h = holderOf(m, a, c.o);
-    if (h < 0) return null;
-    const inner = c.c;
-    const need = [h, ...peopleOf(m, inner)];
-    if (inner.k === "alone" || inner.k === "nearN") return a.slice(0, n).includes(-1) ? null : evalClue(m, c, a);
-    return need.some((i) => a[i] < 0) ? null : evalClue(m, c, a);
-  }
-  if (c.k === "alone" || c.k === "nearN") return a.slice(0, n).includes(-1) ? null : evalClue(m, c, a);
   return peopleOf(m, c).some((i) => a[i] < 0) ? null : evalClue(m, c, a);
 }
 
 // ---------------------------------------------------------------- todas as possibilidades
 
-/** Todas as formas de colocar as pessoas no cenário respeitando a regra do lugar. */
+/** Todas as formas de colocar as pessoas no cenário respeitando a regra do lugar (uma casa por unidade). */
 export function posList(m: Model): number[][] {
   const n = N(m);
-  const cells = allowedCells(m);
+  const cells = units(m);
   const out: number[][] = [];
   const cur: number[] = [];
   const usedR = new Set<number>(), usedC = new Set<number>(), usedRoom = new Set<number>(), usedCell = new Set<number>();
@@ -267,195 +251,79 @@ export function solveAll(m: Model, clues: Clue[], limit = Infinity): number[][] 
   return sols;
 }
 
-// ---------------------------------------------------------------- dedução (sem chute)
-
-/** Motivo de uma descoberta: a pista (índice), a regra do lugar ou "objetos": cada objeto é de uma pessoa só. */
-export type Reason = number | "rule" | "objetos";
-/** Uma descoberta: a pessoa s estava na casa v (cat "p") ou tinha o objeto v (cat "o"). */
-export interface Step { cat: "p" | "o"; s: number; v: number; by: Reason; uses: number[] }
-/** pairs: quantas vezes foi preciso cruzar duas pistas ao mesmo tempo (o passo mais difícil). */
-export interface Deduction { solved: boolean; steps: Step[]; rounds: number; pairs: number; P: boolean[][]; O: boolean[][] }
-
-/**
- * Raciocínio de uma pessoa, simulado: cada pista, junto com a regra do lugar, elimina casas e objetos que ela torna
- * impossíveis; cada objeto é de uma pessoa só (quem já tem objeto libera os outros; o objeto que só cabe numa
- * pessoa é dela). Repete até nada mudar. Se termina com uma única possibilidade para tudo, o caso se resolve só
- * por dedução.
- */
-export function deduce(m: Model, clues: Clue[]): Deduction {
-  const n = N(m), V = m.rows * m.cols;
-  const allowed = new Set(allowedCells(m));
-  const P = Array.from({ length: n }, () => Array.from({ length: V }, (_, v) => allowed.has(v)));
-  const O = Array.from({ length: n }, () => new Array(n).fill(true));
-  const L = posList(m);
-  const usesP: Set<number>[] = Array.from({ length: n }, () => new Set());
-  const usesO: Set<number>[] = Array.from({ length: n }, () => new Set());
-  const fixedP = new Array(n).fill(false), fixedO = new Array(n).fill(false);
-  const steps: Step[] = [];
-  const size = (row: boolean[]) => row.filter(Boolean).length;
-  const mark = (by: Reason) => {
-    for (let s = 0; s < n; s++) {
-      if (!fixedP[s] && size(P[s]) === 1) { fixedP[s] = true; steps.push({ cat: "p", s, v: P[s].indexOf(true), by, uses: [...usesP[s]] }); }
-      if (!fixedO[s] && size(O[s]) === 1) { fixedO[s] = true; steps.push({ cat: "o", s, v: O[s].indexOf(true), by, uses: [...usesO[s]] }); }
-    }
-  };
-  const live = () => L.filter((pos) => pos.every((v, i) => P[i][v]));
-  /** Mantém só as casas que aparecem em alguma posição válida que cumpre `ok`. */
-  const prune = (ok: (pos: number[]) => boolean, by: number | "rule"): boolean => {
-    const keep = Array.from({ length: n }, () => new Array(V).fill(false));
-    for (const pos of live()) if (ok(pos)) pos.forEach((v, i) => { keep[i][v] = true; });
-    let ch = false;
-    for (let i = 0; i < n; i++) for (let v = 0; v < V; v++) if (P[i][v] && !keep[i][v]) { P[i][v] = false; ch = true; if (by !== "rule") usesP[i].add(by); }
-    return ch;
-  };
-  const order = clues.map((_, i) => i).filter((i) => !isRule(clues[i])).sort((i, j) => peopleOf(m, clues[i]).length - peopleOf(m, clues[j]).length);
-  let rounds = 0, pairs = 0;
-  for (let changed = true; changed && rounds < 60;) {
-    changed = false; rounds++;
-    for (const i of order) {
-      const c = clues[i];
-      if (c.k === "has") {
-        for (let o = 0; o < n; o++) if (o !== c.o && O[c.s][o]) { O[c.s][o] = false; usesO[c.s].add(i); changed = true; }
-      } else if (c.k === "hasNot") {
-        if (O[c.s][c.o]) { O[c.s][c.o] = false; usesO[c.s].add(i); changed = true; }
-      } else if (c.k === "via") {
-        // Quem não pode estar onde a pista diz não pode ter o objeto.
-        const can = (h: number) => O[h][c.o] && live().some((pos) => posOk(m, c.c, (j) => pos[j === -1 ? h : j]));
-        for (let h = 0; h < n; h++) if (O[h][c.o] && !can(h)) { O[h][c.o] = false; usesO[h].add(i); changed = true; }
-        // As posições precisam cumprir a pista para pelo menos um dos possíveis donos do objeto.
-        const H = Array.from({ length: n }, (_, h) => h).filter((h) => O[h][c.o]);
-        if (H.length && prune((pos) => H.some((h) => posOk(m, c.c, (j) => pos[j === -1 ? h : j])), i)) changed = true;
-      } else if (isPos(c)) {
-        if (prune((pos) => posOk(m, c, (j) => pos[j]), i)) changed = true;
-      }
-      mark(i);
-    }
-    // A regra do lugar sozinha (linhas, colunas, cômodos, lados ocupados…).
-    if (prune(() => true, "rule")) changed = true;
-    mark("rule");
-    // Cada objeto é de uma pessoa só.
-    for (let s = 0; s < n; s++) if (size(O[s]) === 1) {
-      const o = O[s].indexOf(true);
-      for (let t = 0; t < n; t++) if (t !== s && O[t][o]) { O[t][o] = false; changed = true; }
-    }
-    for (let o = 0; o < n; o++) {
-      const who = Array.from({ length: n }, (_, s) => s).filter((s) => O[s][o]);
-      if (who.length === 1 && size(O[who[0]]) > 1) { O[who[0]].fill(false); O[who[0]][o] = true; changed = true; }
-    }
-    mark("objetos");
-    // Travou? Junta duas pistas: só fica o que as DUAS permitem ao mesmo tempo (como quem lê uma pista à luz da outra).
-    if (!changed) {
-      const OP = perms(n);
-      const answers = () => live().flatMap((pos) => OP.filter((o) => o.every((x, s) => O[s][x])).map((o) => [...pos, ...o]));
-      outer: for (let x = 0; x < order.length; x++) for (let y = x + 1; y < order.length; y++) {
-        const ci = clues[order[x]], cj = clues[order[y]];
-        const ok = answers().filter((a) => evalClue(m, ci, a) && evalClue(m, cj, a));
-        const keepP = Array.from({ length: n }, () => new Array(V).fill(false));
-        const keepO = Array.from({ length: n }, () => new Array(n).fill(false));
-        for (const a of ok) for (let s = 0; s < n; s++) { keepP[s][a[s]] = true; keepO[s][a[n + s]] = true; }
-        for (let s = 0; s < n; s++) {
-          for (let v = 0; v < V; v++) if (P[s][v] && !keepP[s][v]) { P[s][v] = false; usesP[s].add(order[x]); usesP[s].add(order[y]); changed = true; }
-          for (let o = 0; o < n; o++) if (O[s][o] && !keepO[s][o]) { O[s][o] = false; usesO[s].add(order[x]); usesO[s].add(order[y]); changed = true; }
-        }
-        if (changed) { pairs++; mark(order[y]); break outer; }
-      }
-    }
-  }
-  const solved = P.every((r) => size(r) === 1) && O.every((r) => size(r) === 1);
-  return { solved, steps, rounds, pairs, P, O };
-}
-
 // ---------------------------------------------------------------- texto
-// Todas as frases saem daqui.
+// Todas as frases das pistas saem daqui (o "quem conta" de cada pista vem de witness.ts).
 
-const cap = (t: string) => t.charAt(0).toUpperCase() + t.slice(1);
+export const cap = (t: string) => t.charAt(0).toUpperCase() + t.slice(1);
 const art = (e: Ent) => (e.g === "f" ? "a" : "o");
 export const the = (e: Ent) => `${art(e)} ${e.label}`;
-const de = (e: Ent) => `${e.g === "f" ? "da" : "do"} ${e.label}`;
-const em = (e: Ent) => `${e.g === "f" ? "na" : "no"} ${e.label}`;
-const um = (e: { g?: "m" | "f" }) => (e.g === "f" ? "uma" : "um");
+export const de = (e: Ent) => `${e.g === "f" ? "da" : "do"} ${e.label}`;
+export const em = (e: Ent) => `${e.g === "f" ? "na" : "no"} ${e.label}`;
 const ord = (k: number) => `${k}ª`;
-
-/** "a Ana", ou "quem tinha a Lupa" (pessoa -1 numa pista cruzada). */
-const who = (m: Model, i: number, o?: number) => (i === -1 ? `quem tinha ${the(m.objects[o!])}` : the(m.people[i]));
-const whoDe = (m: Model, i: number, o?: number) => (i === -1 ? `de quem tinha ${the(m.objects[o!])}` : de(m.people[i]));
-const whoEm = (m: Model, i: number, o?: number) => (i === -1 ? `em quem tinha ${the(m.objects[o!])}` : em(m.people[i]));
+/** Nome dos lados do Tango (o símbolo do jogo) e o lugar da história que cada lado representa. */
+export const SIDE_NAMES = ["Cristal", "Orbe"] as const;
+export const sideText = (m: Model, r: number) => `no lado do ${SIDE_NAMES[r]} (${m.scene.rooms[r].label})`;
 
 /** Nome de uma casa para o texto: "a casa B2 (Cozinha)". */
 export const cellText = (m: Model, v: number) => `a casa ${cellName(m, v)} (${m.scene.rooms[roomOf(m, v)].label})`;
 
-function posText(m: Model, c: PosClue, o?: number): string {
-  const S = (i: number) => who(m, i, o);
-  const prop = (label: string) => m.scene.props.find((p) => p.label === label)!;
-  switch (c.k) {
-    case "at": return `${S(c.s)} estava ${cellText(m, c.v).replace(/^a /, "na ")}`;
-    case "notAt": return `${S(c.s)} não estava ${cellText(m, c.v).replace(/^a /, "na ")}`;
-    case "room": return `${S(c.s)} estava ${em(m.scene.rooms[c.r])}`;
-    case "notRoom": return `${S(c.s)} não estava ${em(m.scene.rooms[c.r])}`;
-    case "eitherRoom": return `${S(c.s)} estava ${em(m.scene.rooms[c.r[0]])} ou ${em(m.scene.rooms[c.r[1]])}`;
-    case "seat": { const p = prop(c.p); return `${S(c.s)} estava ${p.g === "f" ? "numa" : "num"} ${p.label}`; }
-    case "by": { const p = prop(c.p); return `${S(c.s)} estava ao lado ${p.g === "f" ? "de uma" : "de um"} ${p.label}`; }
-    case "row": return `${S(c.s)} estava na linha ${c.r + 1}`;
-    case "col": return `${S(c.s)} estava na coluna ${"ABCDEF"[c.c]}`;
-    case "corner": return `${S(c.s)} estava num dos cantos`;
-    case "alone": return `ninguém estava a 2 passos ${whoDe(m, c.s, o)}`;
-    case "nearN": return `exatamente ${c.n === 1 ? "uma pessoa estava" : `${c.n === 2 ? "duas" : c.n} pessoas estavam`} a 2 passos ${whoDe(m, c.s, o)}`;
-    case "stop": return `${S(c.s)} estava na ${ord(c.n + 1)} parada da trilha`;
-    case "notStop": return `${S(c.s)} não estava na ${ord(c.n + 1)} parada da trilha`;
-    case "side": return `${S(c.s)} estava ${em(m.scene.rooms[c.r])}`;
-    case "left": return `${S(c.a)} estava numa coluna à esquerda ${whoDe(m, c.b, o)}`;
-    case "above": return `${S(c.a)} estava numa linha acima ${whoDe(m, c.b, o)}`;
-    case "near": return `${S(c.a)} estava a 2 passos ${whoDe(m, c.b, o)}`;
-    case "far": return `${S(c.a)} e ${S(c.b)} estavam a 3 passos ou mais um do outro`;
-    case "diag": return `${S(c.a)} e ${S(c.b)} estavam na mesma diagonal`;
-    case "touch": return `${S(c.a)} e ${S(c.b)} estavam em casas vizinhas (lado a lado ou uma em cima da outra)`;
-    case "apart": return `${S(c.a)} e ${S(c.b)} não estavam em casas vizinhas`;
-    case "before": return `${S(c.a)} estava antes ${whoDe(m, c.b, o)} na trilha`;
-    case "next": return `${S(c.b)} estava logo depois ${whoDe(m, c.a, o)} na trilha`;
-    case "sameSide": return `${S(c.a)} e ${S(c.b)} estavam do mesmo lado`;
-    case "oppSide": return `${S(c.a)} e ${S(c.b)} estavam em lados opostos`;
-    case "beside": return `${S(c.a)} e ${S(c.b)} estavam em colunas vizinhas`;
+/** A frase da pista, sem quem conta (minúscula no começo, sem ponto final): "a Mel estava na coluna A". */
+export function clueClause(m: Model, c: Clue): string {
+  if (c.k === "rule") return RULE_TEXT[m.rule](m);
+  if (c.k === "has") return `${the(m.people[c.s])} segurava ${the(m.objects[c.o])}`;
+  if (c.k === "hasNot") return `${the(m.people[c.s])} não segurava ${the(m.objects[c.o])}`;
+  if ("a" in c) {
+    const A = m.people[c.a], B = m.people[c.b];
+    switch (c.k) {
+      case "next": return `${the(B)} passou logo depois ${de(A)} na trilha`;
+      case "sameSide": return `${the(B)} estava do mesmo lado ${de(A)} (=)`;
+      case "oppSide": return `${the(B)} estava no lado oposto ao ${de(A)} (×)`;
+    }
   }
+  const S = the(m.people[(c as { s: number }).s]);
+  const place = (r: number) => em(m.scene.rooms[r]);
+  switch (c.k) {
+    case "row": return `${S} estava na linha ${c.r + 1}`;
+    case "notRow": return `${S} não estava na linha ${c.r + 1}`;
+    case "col": return `${S} estava na coluna ${COLS[c.c]}`;
+    case "notCol": return `${S} não estava na coluna ${COLS[c.c]}`;
+    case "room": return `${S} estava ${place(c.r)}`;
+    case "notRoom": return `${S} não estava ${place(c.r)}`;
+    case "side": return `${S} estava ${sideText(m, c.r)}`;
+    case "stop": return `${S} estava na ${ord(c.n + 1)} parada da trilha`;
+    case "notStop": return `${S} não estava na ${ord(c.n + 1)} parada da trilha`;
+    case "stopAfter": return `${S} estava depois da ${ord(c.n + 1)} parada`;
+    case "stopBefore": return `${S} estava antes da ${ord(c.n + 1)} parada`;
+    case "size": return `${S} estava no cômodo de ${c.n} casas`;
+  }
+  return "";
 }
 
-/** Texto da pista (frase completa, com ponto final). */
-export function clueText(m: Model, c: Clue): string {
-  switch (c.k) {
-    case "rule": return RULE_TEXT[m.rule](m);
-    case "has": return `${cap(the(m.people[c.s]))} tinha ${the(m.objects[c.o])}.`;
-    case "hasNot": return `${cap(the(m.people[c.s]))} não tinha ${the(m.objects[c.o])}.`;
-    case "via": return `${cap(posText(m, c.c, c.o))}.`;
-    default: return `${cap(posText(m, c))}.`;
-  }
+/** Texto da pista (frase completa, com ponto final). voice = quem conta ("O vigia jura que"). */
+export function clueText(m: Model, c: Clue, voice?: string): string {
+  const body = clueClause(m, c);
+  if (c.k === "rule") return body;
+  return voice ? `${voice} ${body}.` : `${cap(body)}.`;
 }
 
 /** A regra do lugar, em palavras (uma por jogo). */
 export const RULE_TEXT: Record<Rule, (m: Model) => string> = {
   regioes: () => "Como no Mini Sudoku: havia exatamente uma pessoa em cada linha, em cada coluna e em cada cômodo (os quatro quadrados 2×2).",
-  equilibrio: (m) => `Como no Tango, tudo equilibrado: havia uma pessoa em cada coluna, e metade delas ${em(m.scene.rooms[0])}, a outra metade ${em(m.scene.rooms[1])}.`,
+  equilibrio: (m) => `Como no Tango, tudo em equilíbrio: uma pessoa em cada coluna, metade delas no lado do Cristal (${m.scene.rooms[0].label}) e metade no lado do Orbe (${m.scene.rooms[1].label}).`,
   trilha: () => "Como no Zip: a trilha numerada passa por todas as casas livres, uma vez cada, e cada pessoa estava numa parada diferente.",
-  comodos: () => "Como as peças do Patches: cada cômodo é um retângulo, e havia exatamente uma pessoa em cada cômodo.",
-  ceu: () => "Como os astros: havia exatamente uma pessoa em cada linha, em cada coluna e em cada região, e ninguém encostava em ninguém (nem ao lado, nem na diagonal).",
+  comodos: () => "Como as peças do Patches: cada cômodo é um retângulo com o tamanho escrito no canto, e havia exatamente uma pessoa em cada cômodo.",
+  ceu: () => "Como os astros: havia exatamente uma pessoa em cada linha, em cada coluna e em cada região, e ninguém encostava em ninguém.",
 };
 /** Lembretes que valem para todo caso (★). */
 export function ruleNotes(m: Model): string[] {
-  const out = ["Cada pessoa estava numa casa livre (ninguém fica em cima de um móvel) e tinha um objeto diferente."];
-  if (m.rule === "comodos") out.push("Cada cômodo é uma peça colorida; o número no canto é o tamanho dele (quantas casas tem), como no Patches.");
-  if (m.rule === "ceu") out.push("Passos: andando uma casa por vez em qualquer direção, inclusive na diagonal. A 1 passo seria encostar, o que a regra proíbe; então “perto” é a 2 passos.");
+  const out = ["Cada pessoa estava numa casa livre (ninguém fica em cima de um móvel) e segurava um objeto diferente."];
+  if (m.rule === "comodos") out.push("Aqui só importa o cômodo: qualquer casa livre dele vale como resposta.");
   return out;
 }
 
-/** "a Ana estava na casa B2 (Cozinha)" / "a Ana tinha a Lupa". */
+/** "a Ana estava na casa B2 (Cozinha)" / "a Ana segurava a Lupa". */
 export function assignText(m: Model, st: { cat: "p" | "o"; s: number; v: number }): string {
-  return st.cat === "p" ? `${the(m.people[st.s])} estava ${cellText(m, st.v).replace(/^a /, "na ")}` : `${the(m.people[st.s])} tinha ${the(m.objects[st.v])}`;
-}
-
-/** Explica uma dedução: "Pela pista 3, a Ana tinha a Lupa." */
-export function stepText(m: Model, st: Step, label: (i: number) => string = (i) => `pista ${i + 1}`): string {
-  const what = assignText(m, st);
-  if (st.by === "rule") return `Pela regra do lugar, só sobra uma casa: ${what}.`;
-  if (st.by === "objetos") return `Como cada objeto é de uma pessoa só, sobra uma opção: ${what}.`;
-  const others = st.uses.filter((u) => u !== st.by);
-  const by = others.length ? `Juntando a ${label(others[0])} com a ${label(st.by)}` : `Pela ${label(st.by)}`;
-  return `${by}, ${what}.`;
+  if (st.cat === "o") return `${the(m.people[st.s])} segurava ${the(m.objects[st.v])}`;
+  if (m.rule === "comodos") return `${the(m.people[st.s])} estava ${em(m.scene.rooms[roomOf(m, st.v)])}`;
+  return `${the(m.people[st.s])} estava ${cellText(m, st.v).replace(/^a /, "na ")}`;
 }

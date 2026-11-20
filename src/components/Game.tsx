@@ -2,6 +2,7 @@
 import GameHeader from "./GameHeader";
 import ZoomBoard from "./ZoomBoard";
 import GameToolbar from "./GameToolbar";
+import ConfirmDialog from "./ConfirmDialog";
 import { useHintNudge, useLevelPlay } from "./useLevelPlay";
 import { useSfx } from "./useSound";
 import { useRevealedErrors } from "./useRevealedErrors";
@@ -206,15 +207,9 @@ export default function Game({ puzzle, initialGrid, initialMs = 0, active, onSav
       </div>
 
       {confirm && (
-        <div className="note warn gconfirm" role="alertdialog" aria-label="Confirmação">
-          <div style={{ display: "grid", gap: 8 }}>
-            <span>{confirm === "restart" ? "Reiniciar volta o puzzle ao começo e apaga suas jogadas. Continuar?" : "Encerrar descarta o progresso desta partida. Continuar?"}</span>
-            <div className="row">
-              <button className="btn" onClick={() => { if (confirm === "restart") restart(); else { onSave(null); onMenu(); } }}>Sim, continuar</button>
-              <button className="btn sec" onClick={() => setConfirm(null)}>Cancelar</button>
-            </div>
-          </div>
-        </div>
+        <ConfirmDialog text={confirm === "restart" ? "Reiniciar volta o puzzle ao começo e apaga suas jogadas." : "Encerrar descarta o progresso desta partida."}
+          confirm={confirm === "restart" ? "Sim, reiniciar" : "Sim, encerrar"}
+          onConfirm={() => { if (confirm === "restart") restart(); else { onSave(null); onMenu(); } }} onCancel={() => setConfirm(null)} />
       )}
 
       {!won && (
@@ -223,10 +218,10 @@ export default function Game({ puzzle, initialGrid, initialMs = 0, active, onSav
           { label: "Desfazer", icon: "undo", onClick: undo, disabled: !history.length || paused },
           { label: "Dica", icon: "hint", onClick: hint, disabled: paused, nudge: !won && nudge.show(play.ms) ? "Precisa de ajuda?" : undefined },
           { label: paused ? "Retomar" : "Pausar", icon: paused ? "play" : "pause", onClick: () => { sfx("ui"); setPaused((p) => !p); } },
-          { label: "Reiniciar", icon: "restart", onClick: () => { sfx("ui"); setConfirm("restart"); } },
+          { label: "Tutorial", ariaLabel: "Tutorial: rever a partida guiada", icon: "help", onClick: onRules },
           ]}
           more={[
-          { label: "Como jogar", icon: "help", onClick: onRules },
+          { label: "Reiniciar", icon: "restart", onClick: () => { sfx("ui"); setConfirm("restart"); } },
           { label: "Níveis (guardar)", icon: "levels", onClick: onMenu },
           { label: "Dar opinião", icon: "feedback", onClick: onFeedback },
           { label: "Encerrar", icon: "end", onClick: () => setConfirm("end") },

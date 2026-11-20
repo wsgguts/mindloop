@@ -23,7 +23,7 @@ export default function GameHeader({ kind, title, subtitle, ms, done, children, 
       </div>
       <div className="ghead">
       <div className="title game-title">{onBack && <button type="button" className="gback" onClick={onBack} aria-label="Voltar aos níveis da jornada" title="Níveis"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"><path d="M15 5l-7 7 7 7" /></svg></button>}<Gem kind={kind} size={48} /><div>
-        <h1>{title}{onHelp && <button type="button" className="ghelp" onClick={onHelp} aria-label="Como jogar: abrir o tutorial" title="Como jogar"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9.5" /><path d="M9.3 9.2a2.8 2.8 0 0 1 5.4 1c0 1.9-2.7 2.4-2.7 4" /><path d="M12 17.6h.01" /></svg></button>}</h1>
+        <h1>{title}{onHelp && <button type="button" className="ghelp" onClick={onHelp} aria-label="Tutorial: rever a partida guiada" title="Tutorial"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9.5" /><path d="M9.3 9.2a2.8 2.8 0 0 1 5.4 1c0 1.9-2.7 2.4-2.7 4" /><path d="M12 17.6h.01" /></svg></button>}</h1>
         <p className="muted">{subtitle}</p>
       </div></div>
       {children && <div className="gprogress">{children}</div>}
