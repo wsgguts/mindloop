@@ -40,12 +40,75 @@ p { margin: 0; }
    acompanham qualquer tamanho. */
 .home { position: relative; isolation: isolate; height: calc(100vh - var(--nav-h)); height: calc(100svh - var(--nav-h));
   display: flex; flex-direction: column; align-items: center; justify-content: flex-end; background: #120E48; overflow: hidden; } /* cor sólida do céu da arte em volta dela (sem imagem borrada) */
-.home .art { position: relative; flex: none; width: min(104vw, calc((100vh - var(--nav-h)) * .5619)); width: min(104vw, calc((100svh - var(--nav-h)) * .5619)); }
+.home .art { position: relative; flex: none; width: min(112vw, calc((100vh - var(--nav-h)) * .5619)); width: min(112vw, calc((100svh - var(--nav-h)) * .5619)); } /* até 6% de corte em cada lateral (os nomes dos cristais começam a 6,9% da borda) para a arte ocupar a altura toda nos celulares altos, sem faixa escura em cima */
+/* Celular muito alto: se ainda sobrar faixa em cima da arte, ela é preenchida com a borda de cima da própria arte
+   "esticada" para cima (mesmas cores do céu, sem emenda visível). A arte em si não muda nem é cortada a mais. */
+.home::before { content: ""; position: absolute; z-index: -1; top: 0; left: 50%; transform: translateX(-50%); height: 50%;
+  width: min(112vw, calc((100vh - var(--nav-h)) * .5619)); width: min(112vw, calc((100svh - var(--nav-h)) * .5619));
+  background: url(/home-art.webp) center top / 100% 400000% no-repeat; filter: blur(28px) saturate(.9); }
 .home .art img { display: block; width: 100%; height: auto;
-  -webkit-mask-image: linear-gradient(180deg, transparent 0, #000 5%); mask-image: linear-gradient(180deg, transparent 0, #000 5%); }
-.hotspot { position: absolute; left: 50.4%; top: 48.9%; width: 36%; height: max(5.4%, 44px); transform: translate(-50%, -50%);
+  -webkit-mask-image: linear-gradient(180deg, transparent 0, #000 .3%); mask-image: linear-gradient(180deg, transparent 0, #000 .3%); } /* borda suave mínima: a arte nova tem o texto "Projeto desenvolvido…" bem no topo */
+.hotspot { position: absolute; left: 68.8%; top: 66.7%; width: 37.9%; height: max(4.9%, 44px); transform: translate(-50%, -50%);
   background: transparent; border: 0; border-radius: 6px; cursor: pointer; color: transparent; -webkit-tap-highlight-color: transparent; }
 .hotspot span { opacity: 0; }
+
+/* ---- Início no computador: arte em paisagem ocupando a tela toda (cobre; corta só um pouco das bordas) ----
+   Celular, tablet, telas mais quadradas (4:3, 5:4) e celular deitado continuam com a arte em retrato. */
+.home .art-d { display: none; }
+
+/* ---- Efeitos do Início (HomeFx.tsx; posições em lib/homeFx.ts) ----
+   Camada por cima da arte, sem toques. Tamanhos em cqw (% da largura da arte), então acompanham a tela;
+   --s ajusta a escala de cada arte (no computador os cristais e hexágonos são menores em relação à largura).
+   Só opacidade e transformação são animadas (leve para o celular). "Menos movimento" no aparelho: tudo parado
+   (a regra geral desliga as animações) e os brilhos piscantes ficam apagados. */
+.home .art { container-type: inline-size; }
+.hfx { --s: 1; position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
+.art-d .hfx { --s: .5; }
+.hfx i { position: absolute; display: block; transform: translate(-50%, -50%); mix-blend-mode: screen; will-change: opacity, transform; }
+/* Céu: véu de luz que passa devagar, só na parte de cima. */
+.hfx .hfx-aurora { left: -25%; right: -25%; top: -5%; height: 55%; transform: none; opacity: 0;
+  background: radial-gradient(40% 35% at 30% 45%, rgba(18, 207, 224, .55), transparent 70%), radial-gradient(35% 30% at 72% 35%, rgba(240, 91, 200, .45), transparent 70%), radial-gradient(30% 25% at 52% 70%, rgba(118, 44, 235, .5), transparent 70%);
+  -webkit-mask-image: linear-gradient(180deg, #000 55%, transparent); mask-image: linear-gradient(180deg, #000 55%, transparent);
+  animation: hfx-aurora 22s ease-in-out infinite alternate; }
+@keyframes hfx-aurora { 0% { opacity: .1; transform: translateX(-7%); } 50% { opacity: .3; } 100% { opacity: .14; transform: translateX(7%); } }
+/* Estrelas que piscam (brilho de 4 pontas). */
+.hfx .hfx-star { width: calc(3.2cqw * var(--s)); aspect-ratio: 1; opacity: 0;
+  background: radial-gradient(circle, #fff 0 9%, rgba(200, 240, 255, .55) 18%, transparent 42%),
+    linear-gradient(90deg, transparent 47%, rgba(255, 255, 255, .95) 50%, transparent 53%),
+    linear-gradient(0deg, transparent 47%, rgba(255, 255, 255, .95) 50%, transparent 53%);
+  -webkit-mask-image: radial-gradient(circle, #000 18%, transparent 68%); mask-image: radial-gradient(circle, #000 18%, transparent 68%);
+  animation: hfx-twinkle 4.4s ease-in-out infinite; }
+@keyframes hfx-twinkle { 0%, 100% { opacity: 0; transform: translate(-50%, -50%) scale(.35) rotate(0); } 45% { opacity: 1; transform: translate(-50%, -50%) scale(1) rotate(25deg); } 60% { opacity: .2; } }
+/* Runas: brilho que respira na cor de cada jogo. */
+.hfx .hfx-gem { width: calc(30cqw * var(--s)); aspect-ratio: 1; opacity: .25;
+  background: radial-gradient(circle, color-mix(in srgb, var(--c) 75%, transparent) 0, color-mix(in srgb, var(--c) 30%, transparent) 35%, transparent 64%);
+  animation: hfx-breathe 4.6s ease-in-out infinite; }
+@keyframes hfx-breathe { 0%, 100% { opacity: .12; transform: translate(-50%, -50%) scale(.88); } 50% { opacity: .62; transform: translate(-50%, -50%) scale(1.06); } }
+/* Hexágonos com o símbolo da FAETERJ: acendem (luz branco-ciano) e apagam. */
+.hfx .hfx-hex { width: calc(11cqw * var(--s)); aspect-ratio: 1; opacity: 0;
+  background: radial-gradient(circle, rgba(225, 250, 255, .95) 0, rgba(18, 207, 224, .6) 28%, rgba(118, 44, 235, .25) 48%, transparent 66%);
+  animation: hfx-blink 6s ease-in-out infinite; }
+/* Ambiente (o mesmo das jornadas): vaga-lumes sobem em zigue-zague e somem; poeira de luz flutua; névoa passa. */
+.hfx .hfx-fly { width: calc(1.4cqw * var(--sz, 1) * (1 + var(--s)) / 2); aspect-ratio: 1; border-radius: 50%; opacity: 0; transform: none; mix-blend-mode: normal; /* "screen" some no céu claro do pôr do sol */
+  background: radial-gradient(circle, #fff 0 22%, currentColor 42%, transparent 72%); box-shadow: 0 0 10px 3px currentColor, 0 0 3px 1px rgba(60, 20, 110, .35);
+  animation: hfx-fly 10s ease-in-out infinite; }
+@keyframes hfx-fly { 0% { opacity: 0; transform: translate(0, 0); } 15% { opacity: .95; } 35% { transform: translate(1.4cqw, -3cqw); } 50% { opacity: .5; } 60% { opacity: 1; transform: translate(-1cqw, -5.5cqw); } 85% { opacity: .8; transform: translate(1.2cqw, -8cqw); } 100% { opacity: 0; transform: translate(0, -10cqw); } }
+.hfx .hfx-mote { width: calc(.45cqw * (1 + var(--s)) / 2); aspect-ratio: 1; border-radius: 50%; opacity: 0; transform: none; background: #DDF6FF; box-shadow: 0 0 6px #9DF7FF;
+  animation: hfx-mote 9s ease-in-out infinite; }
+@keyframes hfx-mote { 0%, 100% { opacity: 0; transform: translate(0, 0); } 50% { opacity: .85; transform: translate(1.6cqw, -1.8cqw); } }
+.hfx .hfx-mist { left: -30%; width: 160%; height: 16%; transform: none; opacity: .3;
+  background: radial-gradient(30% 50% at 25% 50%, rgba(255, 236, 255, .55), transparent 70%), radial-gradient(28% 45% at 62% 55%, rgba(210, 225, 255, .5), transparent 70%), radial-gradient(22% 40% at 88% 45%, rgba(255, 220, 240, .45), transparent 70%);
+  filter: blur(6px); animation: hfx-mist 26s ease-in-out infinite alternate; }
+.hfx .hfx-mist.b { opacity: .22; animation-duration: 34s; animation-direction: alternate-reverse; }
+@keyframes hfx-mist { from { transform: translateX(-6%); } to { transform: translateX(6%); } }
+@keyframes hfx-blink { 0%, 30% { opacity: 0; } 36% { opacity: .95; } 40% { opacity: .55; } 44%, 56% { opacity: .9; } 66%, 100% { opacity: 0; } }
+.hotspot.desk { left: 75.6%; top: 79.6%; width: 21.2%; height: 9.2%; } /* botão "Jogar agora" da arte do computador */
+@media (min-width: 900px) and (min-height: 541px) and (min-aspect-ratio: 8/5) { /* 16:10 ou mais largo: a arte (bem larga) corta no máximo ~9% de cada lado, sem tocar no nome e no botão */
+  .home { justify-content: center; }
+  .home::before, .home .art-m { display: none; }
+  .home .art.art-d { display: block; width: max(100vw, calc((100vh - var(--nav-h)) * 1.9821)); width: max(100vw, calc((100svh - var(--nav-h)) * 1.9821)); }
+  .home .art-d img { -webkit-mask-image: none; mask-image: none; }
+}
 .hotspot:hover { box-shadow: 0 0 0 3px var(--cyan), 0 0 22px rgba(255,210,63,.7); }
 .hotspot:active { background: rgba(255,255,255,.25); }
 .hotspot:focus-visible { outline: 3px solid var(--cyan); outline-offset: 3px; box-shadow: 0 0 22px rgba(255,210,63,.8); }

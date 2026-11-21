@@ -189,6 +189,16 @@ export function normalizeCode(raw: string): string | null {
   return s.length === 16 ? `${s.slice(0, 4)}-${s.slice(4, 8)}-${s.slice(8, 12)}-${s.slice(12)}` : null;
 }
 
+/**
+ * Formata o código ENQUANTO a pessoa digita: com ou sem tracinho (ou espaço), o campo mostra sempre
+ * "ABCD-EFGH-JKMN-PQRS". Tracinhos digitados são ignorados e recolocados a cada 4 caracteres; minúsculas viram
+ * maiúsculas; o que passar de 16 caracteres é cortado. Ex.: "abcdefgh" → "ABCD-EFGH"; "abcd-" → "ABCD".
+ */
+export function formatCodeInput(raw: string): string {
+  const s = raw.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 16);
+  return s.match(/.{1,4}/g)?.join("-") ?? "";
+}
+
 export async function createPlayer(nick: string, listed: boolean): Promise<Identity> {
   const r = await rpc<{ id: string; token: string; recovery: string }>("create_player", { p_nick: nick, p_listed: listed });
   return { id: r.id, token: r.token, nick, recovery: r.recovery, listed, rev: 0 };

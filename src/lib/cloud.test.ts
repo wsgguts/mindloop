@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { emptySnapshot, hasProgress, mergeSnapshots, normalizeCode, parseIdentityFull, parseSnapshot, readSnapshot, sameSnapshot, syncSnapshot, writeSnapshot, type Identity, type Snapshot } from "./cloud";
+import { emptySnapshot, formatCodeInput, hasProgress, mergeSnapshots, normalizeCode, parseIdentityFull, parseSnapshot, readSnapshot, sameSnapshot, syncSnapshot, writeSnapshot, type Identity, type Snapshot } from "./cloud";
 import { markDone } from "./journey";
 import { addMatch } from "./history";
 import { recordSolve } from "./cases/progress";
@@ -134,5 +134,16 @@ describe("sincronização com o servidor (simulado)", () => {
     const db = fakeServer({ data: null, rev: 0 });
     await expect(syncSnapshot({ ...me, token: "outro" }, sample())).rejects.toMatchObject({ code: "AUTH" });
     expect(db.saves).toBe(0);
+  });
+});
+
+describe("código de recuperação digitado com ou sem tracinho", () => {
+  it("o campo formata sozinho e os dois jeitos dão o mesmo código", () => {
+    expect(formatCodeInput("abcdefghjkmnpqrs")).toBe("ABCD-EFGH-JKMN-PQRS");
+    expect(formatCodeInput("ABCD-EFGH-JKMN-PQRS")).toBe("ABCD-EFGH-JKMN-PQRS");
+    expect(formatCodeInput("abcd efgh")).toBe("ABCD-EFGH");
+    expect(formatCodeInput("ABCD-")).toBe("ABCD"); // tracinho a mais não fica sobrando
+    expect(formatCodeInput("ABCD-EFGH-JKMN-PQRS-XYZ")).toBe("ABCD-EFGH-JKMN-PQRS");
+    expect(normalizeCode(formatCodeInput("abcdefghjkmnpqrs"))).toBe(normalizeCode("ABCD-EFGH-JKMN-PQRS"));
   });
 });

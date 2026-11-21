@@ -37,6 +37,10 @@ import { KEYS, clearStore, onStoreWrite, readStore, writeStore } from "../lib/st
 import { AVATAR_KEY, AVATARS_SEEN_KEY, parseSeen } from "../lib/cast";
 import { AvatarPic, AvatarsPanel, avatarStats, currentAvatar, newAvatars } from "./account/Avatars";
 import { enterAdmin, isAdmin, leaveAdmin } from "../lib/admin";
+import Sobre from "./Sobre";
+import HomeFx from "./HomeFx";
+import { FX_DESKTOP, FX_MOBILE } from "../lib/homeFx";
+import { SOBRE } from "../content/sobre";
 import { PATCHES_PUZZLES } from "../lib/patches";
 import { TANGO_PUZZLES } from "../lib/tango";
 import { ZIP_PUZZLES } from "../lib/zip";
@@ -82,14 +86,23 @@ const perGame = <T,>(f: (g: RulesGame) => T): PerGame<T> => ({ sudoku: f("sudoku
 
 // Áreas clicáveis sobre os cristais da arte do Início (em % da imagem home-art.webp, 944 × 1680; original em home-art.jpg).
 // Cada área cobre o cristal e a etiqueta com o nome do jogo.
-// A runa do Astros (embaixo da logo) é igual às outras: sem cadeado nem selo. Ao tocar, abre a tela do Astros, que
+// A runa do Astros (embaixo do cubo) é igual às outras: sem cadeado nem selo. Ao tocar, abre a tela do Astros, que
 // é quem mostra se ele está bloqueado (prévia jogável) ou liberado (jornada).
 const ART_SPOTS: { id: RulesGame; left: number; top: number; width: number; height: number }[] = [
-  { id: "sudoku", left: 2, top: 21.5, width: 26, height: 12 },
-  { id: "zip", left: 72.5, top: 23.5, width: 26.5, height: 12 },
-  { id: "tango", left: 1.5, top: 39.5, width: 22, height: 12 },
-  { id: "patches", left: 76, top: 40.5, width: 23, height: 12 },
-  { id: "astros", left: 40.5, top: 52.7, width: 25, height: 12.2 },
+  { id: "sudoku", left: 11.4, top: 13.8, width: 21.6, height: 9.3 },
+  { id: "zip", left: 64.1, top: 13, width: 20.7, height: 8.9 },
+  { id: "tango", left: 4.2, top: 29.5, width: 19.9, height: 9.5 },
+  { id: "patches", left: 73.9, top: 30.1, width: 20.7, height: 9.2 },
+  { id: "astros", left: 41.1, top: 41, width: 22.5, height: 9.8 },
+];
+// Arte do computador (paisagem, home-art-desktop.webp, 1776 × 896; original em home-art-desktop.jpg): os mesmos
+// cristais e o botão, em outras posições. Qual arte aparece é decidido no CSS (globals.css, "Início no computador").
+const DESK_SPOTS: typeof ART_SPOTS = [
+  { id: "sudoku", left: 31.5, top: 14.3, width: 11.3, height: 13.4 },
+  { id: "zip", left: 56, top: 12.1, width: 9.9, height: 14.7 },
+  { id: "tango", left: 28, top: 35.9, width: 9.7, height: 14.3 },
+  { id: "patches", left: 60.4, top: 35.9, width: 10.6, height: 14.3 },
+  { id: "astros", left: 45.3, top: 52.5, width: 11, height: 15.6 },
 ];
 
 export default function App() {
@@ -145,7 +158,7 @@ export default function App() {
   const meRef = useRef(me);
   meRef.current = me;
   const [cloudIssue, setCloudIssue] = useState<null | "taken" | "offline">(null);
-  const [profileTab, setProfileTab] = useState<"desempenho" | "avatares" | "ajustes">("desempenho");
+  const [profileTab, setProfileTab] = useState<"desempenho" | "avatares" | "ajustes" | "sobre">("desempenho");
   // Modo Administrador (testes): a conta real fica pausada e o app usa um jogador de teste numa área separada,
   // com tudo liberado e sem servidor (sem sincronização, ranking ou pontuação). Ver lib/admin.ts e lib/storage.ts.
   const [admin, setAdmin] = useState(false);
@@ -362,6 +375,9 @@ export default function App() {
   function goHome(cards = false) { toCards.current = cards; setView("home"); if (cards && view === "home") document.getElementById("jogos")?.scrollIntoView({ behavior: "smooth", block: "start" }); }
 
   /** Card, nome, arte ou "Jogar agora" de um jogo: abre a jornada dele (pedindo o apelido na primeira vez). */
+  // Início: "Jogar agora" leva à lista de jogos (o texto alternativo das artes, homeAlt, fica junto de bonusOpen).
+  const goToGames = () => document.getElementById("jogos")?.scrollIntoView({ behavior: "smooth", block: "start" });
+
   function openGame(id: RulesGame) {
     if (id === BONUS_GAME && !bonusOpen) return openDemo(); // bloqueado: abre a prévia jogável (nunca as fases oficiais)
     // Item 2: o jogo abre direto no mapa da jornada (sem a tela de capítulos no meio).
@@ -575,6 +591,7 @@ export default function App() {
   // Jogo bônus: abre com as 4 jornadas principais completas, ou no Modo Administrador (testes).
   const bonusEarned = bonusUnlocked(progress);
   const bonusOpen = admin || bonusEarned;
+  const homeAlt = `MindLoop — Desafie sua mente. Projeto desenvolvido pelos alunos da FAETERJ Barra Mansa. Um cubo de quebra-cabeça no céu, sobre ilhas flutuantes, com os cristais dos jogos Mini Sudoku, Zip, Tango, Patches e, embaixo, o cristal ${bonusOpen ? "verde" : "azul-noite"} do Astros.`;
   const visible = visibleGames(bonusOpen);
 
   const inGame = !!session && view === "game";
@@ -631,18 +648,33 @@ export default function App() {
         ) : view === "home" ? (
           <>
             <section className="home" aria-label="Início">
-              <FeedbackButton className="home-fb" calm={fbSent} onClick={() => openFeedback()} />
-              <div className="art">
-                {/* Runa do Astros: azul-noite enquanto o jogo está bloqueado; verde (a cor do jogo) depois de liberado.
-                    São duas versões da mesma arte (scripts/recolor_astros_rune.py), sem efeitos por cima. */}
-                <img src={bonusOpen ? "/home-art-open.webp" : "/home-art.webp"} width={944} height={1680} decoding="async" fetchPriority="high"
-                  alt={`MindLoop — Desafie sua mente. Um cubo mágico de quebra-cabeça sobre ilhas flutuantes, com os cristais dos jogos Mini Sudoku, Zip, Tango, Patches e, embaixo, o cristal ${bonusOpen ? "verde" : "azul-noite"} do Astros.`} />
+              <FeedbackButton compact className="home-fb" calm={fbSent} onClick={() => openFeedback()} />
+              {/* Runa do Astros: azul-noite enquanto o jogo está bloqueado; verde (a cor do jogo) depois de liberado.
+                  São duas versões de cada arte (scripts/recolor_astros_rune.py), sem efeitos por cima.
+                  Duas artes: retrato (celular e telas estreitas) e paisagem (computador); o CSS mostra só uma. */}
+              {/* Celular: arte em retrato com tudo desenhado nela (nomes, frase, botão). */}
+              <div className="art art-m">
+                <img src={bonusOpen ? "/home-art-open.webp" : "/home-art.webp"} width={944} height={1680} decoding="async" fetchPriority="high" loading="lazy" alt={homeAlt} />
+                <HomeFx layout={FX_MOBILE} astrosOpen={bonusOpen} />
                 {ART_SPOTS.map((s) => (
                   <button key={s.id} className="gspot" onClick={() => openGame(s.id)}
                     style={{ left: `${s.left}%`, top: `${s.top}%`, width: `${s.width}%`, height: `${s.height}%` }}
                     aria-label={`Jogar ${GAME_META[s.id].name}`} />
                 ))}
-                <button className="hotspot" onClick={() => document.getElementById("jogos")?.scrollIntoView({ behavior: "smooth", block: "start" })} aria-label="Jogar agora: ver os jogos">
+                <button className="hotspot" onClick={goToGames} aria-label="Jogar agora: ver os jogos">
+                  <span aria-hidden="true">Jogar agora</span>
+                </button>
+              </div>
+              {/* Computador: arte em paisagem, também com tudo desenhado nela. */}
+              <div className="art art-d">
+                <img src={bonusOpen ? "/home-art-desktop-open.webp" : "/home-art-desktop.webp"} width={1776} height={896} decoding="async" fetchPriority="high" loading="lazy" alt={homeAlt} />
+                <HomeFx layout={FX_DESKTOP} astrosOpen={bonusOpen} />
+                {DESK_SPOTS.map((s) => (
+                  <button key={s.id} className="gspot" onClick={() => openGame(s.id)}
+                    style={{ left: `${s.left}%`, top: `${s.top}%`, width: `${s.width}%`, height: `${s.height}%` }}
+                    aria-label={`Jogar ${GAME_META[s.id].name}`} />
+                ))}
+                <button className="hotspot desk" onClick={goToGames} aria-label="Jogar agora: ver os jogos">
                   <span aria-hidden="true">Jogar agora</span>
                 </button>
               </div>
@@ -762,7 +794,7 @@ export default function App() {
               {nick && <span className="muted small">{EVERY_GAME.reduce((a, g) => a + doneCount(progress[g]), 0)} fases · {Object.keys(unlocked).length} medalhas</span>}
             </div>
             <div className="tabs" role="tablist" aria-label="Seções do perfil">
-              {([["desempenho", "Desempenho"], ["avatares", "Avatares"], ["ajustes", "Ajustes"]] as const).map(([id, label]) => (
+              {([["desempenho", "Desempenho"], ["avatares", "Avatares"], ["ajustes", "Ajustes"], ["sobre", SOBRE.aba]] as const).map(([id, label]) => (
                 <button key={id} role="tab" id={`tab-${id}`} aria-selected={profileTab === id} aria-controls={`panel-${id}`} className={profileTab === id ? "on" : ""} onClick={() => setProfileTab(id)}>
                   {label}{id === "avatares" && avFresh.size > 0 && <i className="dot" aria-label="(novos avatares)" />}
                 </button>
@@ -776,6 +808,8 @@ export default function App() {
                 </>
               ) : profileTab === "avatares" ? (
                 <AvatarsPanel stats={avStats} current={avatar.id} fresh={avFresh} onPick={pickAvatar} />
+              ) : profileTab === "sobre" ? (
+                <Sobre />
               ) : (
                 <Settings nick={nick} me={me} online={!!rankingConfig()} issue={cloudIssue} localProgress={hasProgress(readSnapshot(readStore))}
                   onRename={() => openNick(() => {})} onRecoverCode={recoverWith}

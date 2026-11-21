@@ -77,3 +77,24 @@ export const BANDS: { id: Band; label: string; from: number; to: number }[] = [
   { id: "mid", label: "Intermediário (31–70)", from: 31, to: 70 },
   { id: "hard", label: "Avançado (71–100)", from: 71, to: 100 },
 ];
+
+/**
+ * Primeiro nível que falta antes de um nível com tempo (ou null se não há buraco).
+ * O servidor do ranking só aceita um nível se o anterior já estiver lá (regra contra "pular" níveis). Fases
+ * concluídas em versões antigas do app ficaram sem tempo salvo; elas criam um buraco e, a partir dele, nada
+ * mais entra no ranking até a pessoa jogar de novo esse nível (o tempo novo é gravado e o resto é aceito).
+ */
+export function firstGap(times: Record<number, number>): number | null {
+  const levels = Object.keys(times).map(Number);
+  if (!levels.length) return null;
+  const top = Math.max(...levels);
+  for (let l = 1; l < top; l++) if (times[l] === undefined) return l;
+  return null;
+}
+
+/** Só os níveis que o ranking aceita: do 1 em diante, sem buraco (a mesma regra do servidor). */
+export function rankedTimes(times: Record<number, number>): Record<number, number> {
+  const out: Record<number, number> = {};
+  for (let l = 1; times[l] !== undefined; l++) out[l] = times[l];
+  return out;
+}

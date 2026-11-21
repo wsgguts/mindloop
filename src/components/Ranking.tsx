@@ -6,7 +6,7 @@ import { ALL_GAMES, GAME_META } from "../lib/games";
 import type { JourneyGame } from "../lib/journey";
 import type { Times } from "../lib/records";
 import { type RankRow, RankError, fetchRanking, rankingConfig, syncGame } from "../lib/ranking";
-import { BANDS, type Band, gameScore, overallScore } from "../lib/scoring";
+import { BANDS, type Band, firstGap, gameScore, overallScore, rankedTimes } from "../lib/scoring";
 
 interface Props {
   times: Record<JourneyGame, Times>;
@@ -37,7 +37,10 @@ export default function Ranking({ times, me, games = ALL_GAMES, onListed, onFixI
   const req = useRef(0);
   const listed = me?.listed === true;
 
-  const local = games.map((g) => ({ g, score: gameScore(g, times[g]), levels: Object.keys(times[g]).length }));
+  // Conta local (sem internet): só os níveis que o servidor aceitaria (do 1 em diante, sem buraco).
+  const local = games.map((g) => { const t = rankedTimes(times[g]); return { g, score: gameScore(g, t), levels: Object.keys(t).length }; });
+  // Fases concluídas numa versão antiga do app, sem tempo salvo: a partir delas nada entra no ranking.
+  const gaps = games.flatMap((g) => { const at = firstGap(times[g]); return at === null ? [] : [{ g, at }]; });
   const localTotal = overallScore(local.map((x) => x.score));
 
   const load = useCallback(async () => {
@@ -70,8 +73,10 @@ export default function Ranking({ times, me, games = ALL_GAMES, onListed, onFixI
   const podium = rows?.filter((r) => r.pos <= 3).slice(0, 3) ?? [];
   const rest = rows?.filter((r) => !podium.includes(r)) ?? [];
   const mine = rows?.find((r) => r.is_me);
-  const myScore = game ? local.find((x) => x.g === game)!.score : localTotal;
-  const myLevels = game ? local.find((x) => x.g === game)!.levels : local.reduce((a, x) => a + x.levels, 0);
+  // O cartão "Você" mostra os MESMOS números da lista (os do servidor); a conta do aparelho é só para quando
+  // o ranking não responde. Antes ele somava tudo o que estava no aparelho e podia não bater com a lista.
+  const myScore = mine ? mine.score : game ? local.find((x) => x.g === game)!.score : localTotal;
+  const myLevels = mine ? mine.levels : game ? local.find((x) => x.g === game)!.levels : local.reduce((a, x) => a + x.levels, 0);
 
   return (
     <div className="wrap rank-page">
@@ -111,6 +116,10 @@ export default function Ranking({ times, me, games = ALL_GAMES, onListed, onFixI
           ) : <button className="btn cta sm" onClick={() => toggle(true)} disabled={busy}>{busy ? "…" : "Participar"}</button>
         )}
       </div>
+      {gaps.filter((x) => !game || x.g === game).map(({ g, at }) => (
+        <div key={g} className="note info" role="note"><b aria-hidden="true">ℹ</b>
+          <span>No <b>{GAME_META[g].name}</b>, o nível {at} foi concluído numa versão antiga do app, sem tempo salvo — por isso ele e os seguintes ainda não contam no ranking. Jogue o nível {at} de novo para liberar.</span></div>
+      ))}
       {confirmLeave && <p className="muted small">Seu apelido some da lista, mas seus pontos e seu progresso continuam guardados. Você pode voltar quando quiser.</p>}
       {online && me && !listed && <p className="muted small">Participar mostra só seu <b>apelido</b> e seus <b>pontos</b> para os outros jogadores.</p>}
 

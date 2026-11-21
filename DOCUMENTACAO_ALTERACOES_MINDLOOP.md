@@ -129,6 +129,90 @@ Arquivos: `src/components/guided/GuidedPlay.tsx` (motor: toques, arrastos, confe
 
 Arquivos: `src/components/ConfirmDialog.tsx` (novo), `Game.tsx`, `TangoGame.tsx`, `ZipGame.tsx`, `PatchesGame.tsx`, `AstrosGame.tsx`, `src/app/journeys.css`.
 
+## Ranking: pontuação do cartão "Você" diferente da lista (21/11/2026)
+
+**Sintoma:** no Ranking geral, o cartão "Você" mostrava 81.038 pts / 193 fases, mas a mesma pessoa aparecia no pódio com 54.033 pts.
+
+**Causa (investigada no banco, só leitura):**
+- A fórmula é a mesma no app e no servidor — não era erro de cálculo.
+- O cartão "Você" somava **todos** os tempos guardados no aparelho, enquanto a lista usa os pontos **aceitos pelo servidor**.
+- No Zip, essa pessoa tinha os níveis 1–75 concluídos, mas os níveis 4–12 foram feitos numa versão antiga do app e **ficaram sem tempo salvo**. O servidor só aceita um nível se o anterior já estiver lá (regra contra pular níveis), então recusou do 13 ao 75: são as 63 fases da diferença (193 − 130).
+- Outros jogadores têm o mesmo buraco por causa de dados antigos. O código atual sempre grava progresso e tempo juntos (`winLevel`), então novos buracos não aparecem.
+
+**Correção (só no app; sem mudança em banco, permissões ou RLS; nenhum dado alterado):**
+- `src/components/Ranking.tsx`: o cartão "Você" mostra os números do servidor (os mesmos da lista e do filtro de dificuldade). Sem internet, usa a conta do aparelho, mas só com os níveis que o servidor aceitaria.
+- Aviso quando há buraco: "No Zip, o nível 4 foi concluído numa versão antiga do app, sem tempo salvo… Jogue o nível 4 de novo para liberar." Ao jogar de novo, o tempo é gravado, o próximo envio inclui todos os tempos e o servidor aceita os níveis seguintes.
+- `src/lib/scoring.ts`: `firstGap` e `rankedTimes` (a mesma regra do servidor), com testes em `scoring.test.ts`.
+
+## Nova arte da tela Início (21/11/2026)
+
+- `public/home-art.jpg`: trocada pela arte nova (944 × 1680, mesmo tamanho da anterior; a antiga continua no histórico do git).
+- `scripts/recolor_astros_rune.py`: a runa do Astros mudou de lugar (agora embaixo do cubo, centro 462 × 768). O script gera de novo as duas versões: `home-art.webp` (Astros bloqueado: runa azul-noite) e `home-art-open.webp` (liberado: verde original). A troca de cor ficou mais suave nos brilhos e não toca no cubo.
+- `src/components/App.tsx` (`ART_SPOTS`): áreas de toque de cada cristal (cristal + etiqueta) refeitas para as novas posições; o texto alternativo da imagem cita a FAETERJ Barra Mansa.
+- `src/app/globals.css`: a área do botão "Jogar agora" foi para a nova posição (direita, abaixo do logo); o esmaecimento do topo da arte caiu de 5% para 0,3%, para não apagar a frase "Projeto desenvolvido pelos alunos da".
+- Nada mais muda: os mesmos toques (abrir o jogo, rolar até "Escolha sua aventura"), a regra da runa azul/verde e o resto do Início.
+- **Ajuste seguinte:** no Início, o botão de opinião virou só o ícone no celular (redondo, 40 px) e "Opinião" em telas maiores, para não cobrir a arte (`ui.css`, `.home-fb`). A arte pode cortar até 6% de cada lateral (`globals.css`, `.home .art`: 112vw em vez de 104vw; até 6% por lateral, os nomes dos cristais começam a 6,9% da borda), para ocupar a altura da tela sem a faixa escura em cima. As áreas de toque são em % da imagem e acompanham. Em celulares muito altos (mais de 6% por lateral seria preciso), a pequena faixa que ainda sobra em cima é preenchida pela borda de cima da própria arte, esticada e bem desfocada (`.home::before`), em vez de cortar o nome dos cristais.
+
+## Código de recuperação: digitar com ou sem tracinho (21/11/2026)
+
+- `src/lib/cloud.ts` → `formatCodeInput`: o campo do código formata sozinho enquanto a pessoa digita. Com ou sem "-" (ou com espaços), em minúsculas ou maiúsculas, o campo mostra sempre `ABCD-EFGH-JKMN-PQRS`, com no máximo 16 caracteres.
+- `src/components/account/Account.tsx`: os dois campos usam essa formatação ("Recuperar conta" e "Jogar em outro dispositivo → Já tenho um código").
+- A conferência do código não mudou: o app (`normalizeCode`) e o servidor (`ml_code_hash`) já ignoravam tracinhos e espaços. Sem mudança no banco.
+- Teste em `cloud.test.ts`.
+
+## Perfil → aba "Sobre" (21/11/2026)
+
+- **Textos:** `src/content/sobre.ts`. É o único arquivo a editar para mudar o conteúdo. Instruções no topo: `**negrito**`, como incluir ou tirar pessoas, siglas dos papéis e jogos de cada grupo.
+- **Tela:** `src/components/Sobre.tsx`, organizada do mais importante para o detalhe: topo (o que é, em uma frase, e os selos de origem) → para quem é e o que se exercita → ligação com a faculdade → orientação → equipes (iniciais coloridas e cristais dos jogos de cada grupo) → propósito e frase final → rodapé.
+- **Estilo:** `src/app/ui.css`, seção "Perfil → Sobre". Usa a paleta do app; no celular as abas do Perfil ficam com letra de 13,5 px para caberem as quatro.
+- **Ajustes no texto original:** o texto passou a falar com o estudante ("você"); repetições foram tiradas ("Projeto de Extensão I" e "Sistemas para Internet da FAETERJ" aparecem nos selos e no rodapé); "Nossa conexão com a faculdade" virou "Da faculdade para você"; os asteriscos soltos do rascunho saíram; "P.O." (Product Owner) e "D.S." (Design System) ganharam explicação na legenda.
+- `src/components/App.tsx`: a nova aba entra no Perfil. Nada mais muda.
+- **Revisão de texto (redundâncias):** cada seção ficou com uma ideia só:
+  - **Topo:** o que é. A instituição já está nos selos.
+  - **Para quem é:** o público e o momento de vida. As habilidades ficam nos cartões.
+  - **Da sala de aula para a tela:** como foi feito, com a única menção ao curso no texto.
+  - **Propósito:** por que existe, incluindo "aproximar a faculdade da comunidade".
+  - **Rodapé:** "MindLoop · 2026", porque antes repetia os selos.
+  - Antes, "Sistemas para Internet" aparecia 5 vezes, "FAETERJ" 4 e "desafio/desafiar" 4.
+- **Revisão:** os títulos "Feito para você" e "Da faculdade para você" soavam repetidos e viraram "Para quem é" e "Feito por estudantes". Em "Nossa equipe" entrou o cartão "Bônus de toda a equipe": Astros e Investigações surgiram de ideias durante o desenvolvimento, com todos os integrantes (`equipe.bonus` em sobre.ts).
+
+## Início: arte própria para o computador (21/11/2026)
+
+- **Arte:** nova arte em paisagem para o computador, em `public/home-art-desktop.jpg` (1920 × 1080). O celular continua com a arte em retrato.
+- **Runa do Astros:** `scripts/recolor_astros_rune.py` agora gera as duas versões das duas artes. Para a do computador: `home-art-desktop.webp` (bloqueado, azul-noite) e `home-art-desktop-open.webp` (liberado, verde).
+- **Qual arte aparece:** quem decide é o CSS (`globals.css`, "Início no computador"). A arte do computador aparece com largura de pelo menos 900 px, altura de pelo menos 541 px e tela mais larga que alta (5:4 ou mais). Celular, tablet em pé e celular deitado continuam com a arte em retrato.
+- **Enquadramento no computador:** a arte cobre a tela toda, centralizada, e corta só um pouco das bordas.
+- **Áreas de toque:** `src/components/App.tsx` → `DESK_SPOTS`, uma para cada cristal da arte do computador.
+- **Arte definitiva do computador:** a nova arte (`home-art-desktop.jpg`, 1680 × 944) já traz desenhados os nomes dos cristais, "Desafie sua mente", o botão "Jogar agora" com os risquinhos e a setinha, o logo da FAETERJ e "Educação, criatividade e tecnologia." — igual à arte do celular. Por isso o app voltou a usar só áreas de toque invisíveis: `DESK_SPOTS`, uma por cristal, e `.hotspot.desk` no botão. Saíram as etiquetas, o botão e o selo que uma versão anterior desenhava por cima, e também o script do logo.
+- **Runa do Astros e nitidez:** a runa foi trocada na nova posição (`recolor_astros_rune.py`), e a arte é exportada com qualidade 92.
+- **Arte "mais digital" (1776 × 896):** substitui a anterior.
+  - O botão "Opinião" veio desenhado no canto da imagem (de um print). Foi apagado e preenchido com o céu em volta, porque o app já mostra o botão de verdade no mesmo lugar.
+  - Nessa arte a runa do Astros já vem azul-noite. O script agora gera a versão VERDE (`to_green`), trocando a cor só dentro do contorno do cristal.
+  - Áreas de toque (`DESK_SPOTS`, `.hotspot.desk`) e proporção (1,9821) atualizadas.
+  - Como a arte é bem larga, ela só aparece em telas 16:10 ou mais largas. Telas mais quadradas (4:3, 5:4) usam a arte do celular, que não corta o nome nem o botão.
+
+## Início: efeitos de ambiente nas artes (21/11/2026)
+
+Efeitos leves por cima das duas artes (celular e computador), sem mudar as imagens nem os toques:
+- **Céu:** um véu de luz (aurora) passa devagar na parte de cima, e brilhos de estrela piscam em pontos do céu longe dos textos.
+- **Runas:** cada cristal "respira" um brilho na cor do jogo. O do Astros acompanha a regra: azul-noite enquanto bloqueado, verde depois de liberado.
+- **Hexágonos com o símbolo da FAETERJ:** acendem e apagam, cada um no seu tempo.
+
+Arquivos:
+- `src/components/HomeFx.tsx`: a camada de efeitos (não recebe toques e fica escondida de leitores de tela).
+- `src/lib/homeFx.ts`: as posições, em % de cada arte. Para ajustar um ponto, mude o número ali.
+- `globals.css` → "Efeitos do Início": as animações. Só brilho e tamanho são animados, o que é leve para o celular.
+
+Quem ativa "reduzir movimento" no aparelho vê tudo parado, com os brilhos que piscam apagados.
+
+**Ambiente igual ao das jornadas:** vaga-lumes coloridos que sobem em zigue-zague da grama e das ilhas, poeira de luz flutuando no céu e duas faixas de névoa que passam devagar sobre as nuvens de baixo. A área dos vaga-lumes e a altura da névoa ficam em `homeFx.ts` (`flies`, `mist`).
+
+**Hexágonos deformados (conserto nas artes):** alguns hexágonos com o símbolo da FAETERJ vieram tortos ou derretidos nas artes originais (3 no celular, 11 no computador). `scripts/fix_hex_icons.py` faz o conserto em dois passos:
+- apaga só cada ícone defeituoso, preenchendo com as cores do céu em volta;
+- desenha no lugar o hexágono certo, tirado do logo grande e nítido do topo, no mesmo tamanho e brilho dos ícones bons. Os que ficam "ao longe" saem mais apagados.
+
+O resto da arte não muda. Os originais sem conserto ficam em `art-src/`. Para refazer: `python scripts/fix_hex_icons.py` e depois `python scripts/recolor_astros_rune.py`.
+
 ## Progresso salvo
 
 Nada foi apagado nem convertido: as chaves antigas continuam valendo. Novas chaves: `mindloop:guided:<jogo>` e `mindloop:fb-ask`. O aviso antigo `mindloop:code-unseen` é apenas limpo.

@@ -2,7 +2,7 @@
 import { useState } from "react";
 import Modal from "../Modal";
 import SoundControls from "../SoundControls";
-import { type Identity, normalizeCode } from "../../lib/cloud";
+import { type Identity, formatCodeInput, normalizeCode } from "../../lib/cloud";
 import { validateNick } from "../../lib/nick";
 import { checkAdminPassword } from "../../lib/admin";
 
@@ -75,8 +75,8 @@ export function NickModal({ initial, renaming, localProgress, online, onSave, on
         <form className="stack" onSubmit={recover} noValidate>
           <div>
             <label htmlFor="rcode">Código de recuperação</label>
-            <input id="rcode" className="code-input" value={code} maxLength={24} autoComplete="off" autoCapitalize="characters" spellCheck={false} autoFocus
-              placeholder="ABCD-EFGH-JKMN-PQRS" aria-invalid={!!error} onChange={(e) => { setCode(e.target.value); setError(null); setConfirmReplace(false); }} />
+            <input id="rcode" className="code-input" value={code} maxLength={40} autoComplete="off" autoCapitalize="characters" spellCheck={false} autoFocus
+              placeholder="ABCD-EFGH-JKMN-PQRS" aria-invalid={!!error} onChange={(e) => { setCode(formatCodeInput(e.target.value)); setError(null); setConfirmReplace(false); }} />
             {error && <p className="err" role="alert"><b aria-hidden="true">! </b>{error}</p>}
           </div>
           {confirmReplace && (
@@ -225,8 +225,8 @@ function OtherDevice({ code, localProgress, onNewCode, onRecoverCode }: { code: 
       </div>
       <form className="stack" onSubmit={recover} noValidate>
         <label htmlFor="other-code"><b>Já tenho um código</b></label>
-        <input id="other-code" className="code-input" value={typed} maxLength={24} autoComplete="off" autoCapitalize="characters" spellCheck={false}
-          placeholder="ABCD-EFGH-JKMN-PQRS" onChange={(e) => { setTyped(e.target.value); setMsg(null); setConfirm(false); }} />
+        <input id="other-code" className="code-input" value={typed} maxLength={40} autoComplete="off" autoCapitalize="characters" spellCheck={false}
+          placeholder="ABCD-EFGH-JKMN-PQRS" onChange={(e) => { setTyped(formatCodeInput(e.target.value)); setMsg(null); setConfirm(false); }} />
         {confirm && (
           <div className="note warn" role="alert"><b aria-hidden="true">!</b>
             <span>O progresso deste aparelho será <b>substituído</b> pelo da conta do código (eles não se misturam).</span></div>

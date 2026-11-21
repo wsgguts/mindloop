@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { ALL_GAMES } from "./games";
 import { BLOCK_PARTS, BLOCK_WORDS } from "./nick";
-import { gameScore, levelScore, minMs, overallScore, refMs } from "./scoring";
+import { firstGap, gameScore, levelScore, minMs, overallScore, rankedTimes, refMs } from "./scoring";
 
 const MIG = join(__dirname, "../../supabase/migrations");
 const sql = readdirSync(MIG).filter((f) => f.endsWith(".sql")).map((f) => readFileSync(join(MIG, f), "utf8")).join("\n");
@@ -51,5 +51,16 @@ describe("pontuação normalizada", () => {
     expect(overallScore([1000, 1000, 0, 0])).toBe(2100);
     expect(overallScore([1000, 1000, 1000, 1000])).toBe(4600);
     expect(overallScore([0, 0, 0, 0])).toBe(0);
+  });
+});
+
+describe("níveis sem tempo (versões antigas) e a regra do servidor contra pular níveis", () => {
+  it("acha o primeiro buraco e conta só o trecho contínuo desde o nível 1", () => {
+    const t = { 1: 4000, 2: 3000, 3: 9000, 13: 8000, 14: 6000 };
+    expect(firstGap(t)).toBe(4);
+    expect(Object.keys(rankedTimes(t)).map(Number)).toEqual([1, 2, 3]);
+    expect(firstGap({ 1: 1, 2: 1 })).toBeNull();
+    expect(firstGap({})).toBeNull();
+    expect(rankedTimes({ 2: 5000 })).toEqual({});
   });
 });
