@@ -12,7 +12,7 @@ import Stats from "./Stats";
 import { ACH_KEY, type Achievement, type Unlocked, evaluate, parseUnlocked } from "../lib/achievements";
 import { HISTORY_KEY, type PlayerLog, addMatch, emptyLog, importLegacy, matchId, parseLog, startMatch } from "../lib/history";
 import { RANK_KEY, RankError, rankingConfig, renamePlayer, syncGame } from "../lib/ranking";
-import { type Identity, STORE_PREFIX, createPlayer, emptySnapshot, hasProgress, issueRecovery, loadRemote, parseIdentityFull, readSnapshot, recoverPlayer, resetPlayer, sameSnapshot, setListed, syncSnapshot, writeSnapshot } from "../lib/cloud";
+import { type Identity, STORE_PREFIX, createPlayer, emptySnapshot, hasProgress, issueRecovery, loadRemote, mergeSnapshots, parseIdentityFull, readSnapshot, recoverPlayer, resetPlayer, sameSnapshot, setListed, syncSnapshot, TUTORIAL_KEY, writeSnapshot } from "../lib/cloud";
 import { NickModal, Settings } from "./account/Account";
 import { RulesContent, type RulesGame } from "./Rules";
 import GuidedPlay, { type GuidedEnd } from "./guided/GuidedPlay";
@@ -77,32 +77,28 @@ const BACK_LABEL: Record<Exclude<View, "feedback">, string> = {
 const TAB_OF: Record<View, Tab> = { home: "home", journey: "home", game: "home", rules: "rules", profile: "profile", feedback: "profile", ranking: "ranking", achievements: "achievements", case: "home", casebook: "home", demo: "home" };
 // Chave de "já viu as regras" de cada jogo (a do Sudoku é a original, mantida por compatibilidade).
 // Tutorial antigo de cada jogo ("done"/"skipped"). Só é lido: quem já viu não é obrigado a ver a partida guiada.
-const TUTORIAL_KEY = (g: RulesGame) => `mindloop:tutorial:${g}`;
 // Progresso salvo no aparelho, por jogo.
 const PROGRESS_KEY = (g: RulesGame) => `mindloop:progress:${g}`;
 const TIMES_KEY = (g: RulesGame) => `mindloop:times:${g}`; // melhor tempo de cada nível
 const LAST_KEY = (g: RulesGame) => `mindloop:last:${g}`; // último nível jogado (referência de retorno)
 const perGame = <T,>(f: (g: RulesGame) => T): PerGame<T> => ({ sudoku: f("sudoku"), zip: f("zip"), tango: f("tango"), patches: f("patches"), astros: f("astros") });
 
-// Áreas clicáveis sobre os cristais da arte do Início (em % da imagem home-art.webp, 944 × 1680; original em home-art.jpg).
-// Cada área cobre o cristal e a etiqueta com o nome do jogo.
-// A runa do Astros (embaixo do cubo) é igual às outras: sem cadeado nem selo. Ao tocar, abre a tela do Astros, que
-// é quem mostra se ele está bloqueado (prévia jogável) ou liberado (jornada).
+// Áreas clicáveis sobre os cristais da arte do Início (em % da imagem home-art.webp, 944 × 1680; original em art/home/home-art.jpg).
+// Cada área cobre o cristal e a etiqueta com o nome do jogo. O Astros não tem cristal na arte: é o jogo extra,
+// que aparece na lista de jogos aberta pelo "Jogar agora".
 const ART_SPOTS: { id: RulesGame; left: number; top: number; width: number; height: number }[] = [
-  { id: "sudoku", left: 11.4, top: 13.8, width: 21.6, height: 9.3 },
-  { id: "zip", left: 64.1, top: 13, width: 20.7, height: 8.9 },
-  { id: "tango", left: 4.2, top: 29.5, width: 19.9, height: 9.5 },
-  { id: "patches", left: 73.9, top: 30.1, width: 20.7, height: 9.2 },
-  { id: "astros", left: 41.1, top: 41, width: 22.5, height: 9.8 },
+  { id: "sudoku", left: 4, top: 14, width: 33, height: 14 },
+  { id: "zip", left: 61, top: 13.5, width: 32, height: 14.5 },
+  { id: "tango", left: 3, top: 38, width: 26, height: 16 },
+  { id: "patches", left: 68, top: 40.5, width: 31, height: 15 },
 ];
-// Arte do computador (paisagem, home-art-desktop.webp, 1776 × 896; original em home-art-desktop.jpg): os mesmos
+// Arte do computador (paisagem, home-art-desktop.webp, 2196 × 1236; original em art/home/home-art-desktop.jpg): os mesmos
 // cristais e o botão, em outras posições. Qual arte aparece é decidido no CSS (globals.css, "Início no computador").
 const DESK_SPOTS: typeof ART_SPOTS = [
-  { id: "sudoku", left: 31.5, top: 14.3, width: 11.3, height: 13.4 },
-  { id: "zip", left: 56, top: 12.1, width: 9.9, height: 14.7 },
-  { id: "tango", left: 28, top: 35.9, width: 9.7, height: 14.3 },
-  { id: "patches", left: 60.4, top: 35.9, width: 10.6, height: 14.3 },
-  { id: "astros", left: 45.3, top: 52.5, width: 11, height: 15.6 },
+  { id: "sudoku", left: 25, top: 3.5, width: 18, height: 25 },
+  { id: "zip", left: 55.5, top: 2, width: 17.5, height: 25.5 },
+  { id: "tango", left: 26, top: 47, width: 13, height: 25 },
+  { id: "patches", left: 60, top: 49.5, width: 17, height: 24.5 },
 ];
 
 export default function App() {
@@ -263,7 +259,12 @@ export default function App() {
       const local = readSnapshot(readStore);
       const r = await syncSnapshot(m, local);
       if (meRef.current?.id !== m.id) return; // a identidade mudou no meio (recuperação ou reinício)
-      if (!sameSnapshot(r.merged, local)) { silently(() => writeSnapshot(r.merged, writeStore)); hydrate(); }
+      // Enquanto o servidor respondia, a pessoa pode ter concluído outro nível. Por isso mescla de novo com o que está
+      // no aparelho AGORA (e não com a leitura de antes): gravar r.merged direto apagaria esse nível recém-concluído.
+      // O que for novo aqui vai para o servidor na próxima sincronização (já agendada por essa gravação).
+      const now = readSnapshot(readStore);
+      const final = mergeSnapshots(now, r.merged);
+      if (!sameSnapshot(final, now)) { silently(() => writeSnapshot(final, writeStore)); hydrate(); }
       if (r.nick && r.nick !== readStore(KEYS.nick)) { silently(() => writeStore(KEYS.nick, r.nick)); setNick(r.nick); }
       saveMe({ ...meRef.current, rev: r.rev, listed: r.listed, nick: r.nick || meRef.current.nick });
       setCloudIssue(null);
@@ -591,7 +592,7 @@ export default function App() {
   // Jogo bônus: abre com as 4 jornadas principais completas, ou no Modo Administrador (testes).
   const bonusEarned = bonusUnlocked(progress);
   const bonusOpen = admin || bonusEarned;
-  const homeAlt = `MindLoop — Desafie sua mente. Projeto desenvolvido pelos alunos da FAETERJ Barra Mansa. Um cubo de quebra-cabeça no céu, sobre ilhas flutuantes, com os cristais dos jogos Mini Sudoku, Zip, Tango, Patches e, embaixo, o cristal ${bonusOpen ? "verde" : "azul-noite"} do Astros.`;
+  const homeAlt = "MindLoop — Desafie sua mente. Uma janela com o botão Jogar agora no céu, sobre ilhas flutuantes, cercada pelos cristais dos jogos Mini Sudoku, Zip, Tango e Patches. Embaixo, o logo da FAETERJ Barra Mansa.";
   const visible = visibleGames(bonusOpen);
 
   const inGame = !!session && view === "game";
@@ -649,13 +650,12 @@ export default function App() {
           <>
             <section className="home" aria-label="Início">
               <FeedbackButton compact className="home-fb" calm={fbSent} onClick={() => openFeedback()} />
-              {/* Runa do Astros: azul-noite enquanto o jogo está bloqueado; verde (a cor do jogo) depois de liberado.
-                  São duas versões de cada arte (scripts/recolor_astros_rune.py), sem efeitos por cima.
-                  Duas artes: retrato (celular e telas estreitas) e paisagem (computador); o CSS mostra só uma. */}
+              {/* Duas artes: retrato (celular e telas estreitas) e paisagem (computador); o CSS mostra só uma.
+                  O "Jogar agora" leva à lista de jogos, onde também fica o Astros (jogo extra). */}
               {/* Celular: arte em retrato com tudo desenhado nela (nomes, frase, botão). */}
               <div className="art art-m">
-                <img src={bonusOpen ? "/home-art-open.webp" : "/home-art.webp"} width={944} height={1680} decoding="async" fetchPriority="high" loading="lazy" alt={homeAlt} />
-                <HomeFx layout={FX_MOBILE} astrosOpen={bonusOpen} />
+                <img src="/home-art.webp" width={944} height={1680} decoding="async" fetchPriority="high" loading="lazy" alt={homeAlt} />
+                <HomeFx layout={FX_MOBILE} />
                 {ART_SPOTS.map((s) => (
                   <button key={s.id} className="gspot" onClick={() => openGame(s.id)}
                     style={{ left: `${s.left}%`, top: `${s.top}%`, width: `${s.width}%`, height: `${s.height}%` }}
@@ -667,8 +667,8 @@ export default function App() {
               </div>
               {/* Computador: arte em paisagem, também com tudo desenhado nela. */}
               <div className="art art-d">
-                <img src={bonusOpen ? "/home-art-desktop-open.webp" : "/home-art-desktop.webp"} width={1776} height={896} decoding="async" fetchPriority="high" loading="lazy" alt={homeAlt} />
-                <HomeFx layout={FX_DESKTOP} astrosOpen={bonusOpen} />
+                <img src="/home-art-desktop.webp" width={2196} height={1236} decoding="async" fetchPriority="high" loading="lazy" alt={homeAlt} />
+                <HomeFx layout={FX_DESKTOP} />
                 {DESK_SPOTS.map((s) => (
                   <button key={s.id} className="gspot" onClick={() => openGame(s.id)}
                     style={{ left: `${s.left}%`, top: `${s.top}%`, width: `${s.width}%`, height: `${s.height}%` }}
@@ -682,7 +682,7 @@ export default function App() {
 
             <section id="jogos" className="screen games-home" aria-labelledby="jogos-title">
               <h1 id="jogos-title">Escolha sua aventura</h1>
-              <p className="lead">{nick ? `Bora, ${nick}! ` : ""}Quatro jornadas de enigmas esperando por você.</p>
+              <p className="lead">{nick ? `Bora, ${nick}! ` : ""}Quatro jornadas de enigmas e um jogo bônus esperando por você.</p>
               <div className="ggrid">
                 {CARDS.map((g) => {
                   const p = progress[g.id];

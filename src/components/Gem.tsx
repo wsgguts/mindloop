@@ -1,6 +1,6 @@
 export type GemKind = "sudoku" | "zip" | "tango" | "patches" | "astros";
 
-// Ícones originais dos jogos, recortados da arte da marca (public/gem-*.webp; originais em gem-*.png).
+// Ícones originais dos jogos, recortados da arte da marca (public/gem-*.webp; originais em art/gems/gem-*.png).
 // O do Astros é o cristal verde com a estrela, recortado da arte do Início (home-art).
 export default function Gem({ kind, size = 64 }: { kind: GemKind; size?: number }) {
   // eslint-disable-next-line @next/next/no-img-element

@@ -47,7 +47,8 @@
 /* Já enviou: continua visível, mas sem animação e mais discreto. */
 .fb-btn.calm { background: linear-gradient(135deg, rgba(240, 91, 200, .85), rgba(118, 44, 235, .85)); border-color: rgba(255, 255, 255, .45); box-shadow: none; }
 /* No Início: no canto da arte. */
-.home .home-fb { position: absolute; z-index: 3; top: calc(10px + env(safe-area-inset-top, 0px)); right: calc(10px + env(safe-area-inset-right, 0px)); }
+/* Canto de baixo à direita, sobre a grama e as pedras das artes (no topo ficam as frases "Pensar, explorar…"). */
+.home .home-fb { position: absolute; z-index: 3; bottom: 14px; right: calc(12px + env(safe-area-inset-right, 0px)); }
 /* No Início do celular: só o ícone, num botão redondo pequeno, para não cobrir a arte. Telas maiores: "Opinião". */
 @media (max-width: 640px) {
   .home .home-fb { width: 40px; min-height: 40px; padding: 0; justify-content: center; }
@@ -85,6 +86,9 @@
 .set-row { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-3); }
 .set-row > div { display: grid; gap: 2px; min-width: 0; }
 .set-row b { color: var(--cosmic); overflow-wrap: anywhere; }
+/* Celular bem estreito: texto e botão não cabem lado a lado (a página rolava 2 px para o lado em 320 px);
+   o botão desce para a linha de baixo. */
+@media (max-width: 360px) { .set-row { flex-wrap: wrap; } .settings > .card { min-width: 0; } }
 .set-row.attention { padding: 10px; border-radius: var(--r-md); background: #FFF7DB; border: 2px solid var(--star); }
 .danger-zone { border-color: #F3C4CD; }
 .code-box { display: grid; place-items: center; padding: 14px 8px; border-radius: var(--r-md); background: var(--cosmic); }
@@ -111,6 +115,21 @@
 /* ---------- Início: cards um pouco mais baixos ---------- */
 .gcard { min-height: 0; padding: 14px 10px 12px; }
 .gcard img { width: 72px; height: 72px; }
+/* Celular em pé: cards bem mais baixos, para o cartão do Astros (jogo bônus) aparecer logo abaixo das 4 jornadas.
+   O selo "Disponível" some (é igual nos quatro; o de "Jornada completa" continua), gema menor e textos mais justos. */
+@media (max-width: 640px) and (orientation: portrait) {
+  .games-home { padding-top: 16px; }
+  .games-home h1 { font-size: 23px; }
+  .games-home .lead { font-size: 15px; margin-bottom: 10px; }
+  .ggrid { gap: 10px; }
+  .gcard { padding: 10px 8px; gap: 3px; }
+  .gcard img { width: 54px; height: 54px; }
+  .gcard:not(.bonus) .badge:not(.full) { display: none; }
+  .gcard .gname { font-size: 18px; }
+  .gcard .gtext { font-size: 13px; line-height: 1.3; }
+  .gcard .gcount { font-size: 12px; margin-bottom: 4px; }
+  .gcard .gplay { min-height: 40px; font-size: 14px; }
+}
 
 /* ---------- Jornada: cabeçalho compacto no celular ---------- */
 @media (max-width: 520px) {
@@ -224,6 +243,9 @@
    Topo escuro com o "céu" do app; seções claras e espaçadas; uma ideia por bloco; títulos curtos. */
 .tabs button { padding: 0 6px; }
 @media (max-width: 430px) { .tabs button { font-size: 13.5px; } } /* 4 abas cabem num celular estreito */
+/* Celular bem estreito (320–360 px): colunas iguais não cabem ("Desempenho" é bem maior que "Sobre") e a página
+   rolava para o lado. Cada aba passa a ocupar a largura do próprio texto, e a sobra é dividida entre elas. */
+@media (max-width: 360px) { .tabs { grid-auto-columns: auto; } .tabs button { font-size: 12.5px; padding: 0 4px; } }
 .about { display: grid; gap: 14px; color: var(--ink); }
 .about h3 { font-size: 18px; color: var(--cosmic); }
 .about p { line-height: 1.6; }

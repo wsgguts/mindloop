@@ -43,8 +43,16 @@ export default function Ranking({ times, me, games = ALL_GAMES, onListed, onFixI
   const gaps = games.flatMap((g) => { const at = firstGap(times[g]); return at === null ? [] : [{ g, at }]; });
   const localTotal = overallScore(local.map((x) => x.score));
 
+  // O ranking só é baixado de novo quando muda o que a consulta pede: filtro, faixa ou a identidade (e se aparece
+  // nela). Antes, qualquer nova renderização do App (aviso de conquista, sincronização…) trazia props novas
+  // (onAuthLost, me, times) e baixava tudo outra vez. Os valores mais recentes ficam neste ref.
+  const latest = useRef({ me, times, games, onAuthLost });
+  latest.current = { me, times, games, onAuthLost };
+  const meKey = me ? `${me.id}:${me.listed === true}` : "";
+
   const load = useCallback(async () => {
     if (!online) return;
+    const { me, times, games, onAuthLost } = latest.current;
     const n = ++req.current; // ignora respostas antigas se a pessoa trocar de filtro rápido
     setLoading(true); setError(null);
     try {
@@ -59,7 +67,7 @@ export default function Ranking({ times, me, games = ALL_GAMES, onListed, onFixI
       if (e instanceof RankError && e.code === "AUTH") onAuthLost();
       setError(e instanceof RankError ? e.message : "Não foi possível carregar o ranking agora.");
     } finally { if (n === req.current) setLoading(false); }
-  }, [online, me, game, band, times, games, onAuthLost]);
+  }, [online, game, band, meKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => { load(); }, [load]);
 

@@ -75,7 +75,7 @@ export default function LevelComplete({ result, medals = [], hasNext, onSwitch, 
   // Com o pedido de opinião na tela, a comemoração NÃO volta sozinha para a jornada (item 5: alunos viam os botões
   // sumirem enquanto liam). Sem o pedido, continua voltando depois de alguns segundos, como antes.
   const [asking, setAsking] = useState(!!askOpinion);
-  const [paused, setPaused] = useState(!!askOpinion || !!guided);
+  const [paused] = useState(!!askOpinion || !!guided); // decidido ao abrir: não muda durante a comemoração
   const sfx = useSfx(r.game);
   const cb = useRef({ onSwitch, onClose });
   cb.current = { onSwitch, onClose };

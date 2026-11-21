@@ -180,7 +180,8 @@ src/lib/            regras e solucionadores de cada jogo, níveis (data/), jorna
                     tutorialData.ts (tabuleiros da partida guiada, conferidos pelos testes contra as regras reais)
                     guided.ts (quando mostrar a partida guiada e o que já foi visto)
 scripts/            geradores de níveis
-public/             artes (.webp servidas pelo app; .jpg/.png originais guardados como matriz)
+public/             artes servidas pelo app (.webp)
+art/                originais das artes (matrizes em .jpg/.png; não vão para o site)
 ```
 Fontes: Space Grotesk (títulos) e Inter (texto), servidas pelo próprio site via `next/font` (sem pedidos ao Google).
 

@@ -67,6 +67,18 @@ describe("mesclagem (mesmo jogador em dois aparelhos)", () => {
     expect(sameSnapshot(once, a)).toBe(true);
     expect(sameSnapshot(mergeSnapshots(once, a), once)).toBe(true);
   });
+
+  it("nível concluído DURANTE a sincronização não se perde (App.syncNow mescla de novo com o aparelho atual)", () => {
+    const before = sample();                               // o que o aparelho tinha quando a sincronização começou
+    const remote = emptySnapshot(); remote.progress.zip = markDone(remote.progress.zip, 1);
+    const fromServer = mergeSnapshots(before, remote);      // resposta do servidor (baseada na leitura antiga)
+    const now = sample(); now.progress.sudoku = markDone(now.progress.sudoku, 3); now.times.sudoku[3] = 70000; // venceu o nível 3 no meio
+    const final = mergeSnapshots(now, fromServer);
+    expect(final.progress.sudoku.slice(0, 3)).toBe("111");  // o nível 3 continua
+    expect(final.times.sudoku[3]).toBe(70000);
+    expect(final.progress.zip[0]).toBe("1");                // e o que veio do outro aparelho também entrou
+    expect(fromServer.progress.sudoku[2]).toBe("0");        // (gravar a resposta direto teria apagado o nível 3)
+  });
 });
 
 describe("identidade e código de recuperação", () => {

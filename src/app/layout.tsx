@@ -26,8 +26,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="pt-BR" className={`${inter.variable} ${grotesk.variable}`}>
       <head>
-        {/* A arte do Início é a primeira coisa que aparece: começa a baixar junto com o resto da página. */}
-        <link rel="preload" as="image" href="/home-art.webp" type="image/webp" fetchPriority="high" />
+        {/* A arte do Início é a primeira coisa que aparece: começa a baixar junto com o resto da página.
+            Só a arte da tela atual (a mesma regra de globals.css, "16:10 ou mais largo"): o computador não baixa a
+            arte do celular, nem o celular a do computador. */}
+        <link rel="preload" as="image" href="/home-art.webp" type="image/webp" fetchPriority="high"
+          media="not all and (min-width: 900px) and (min-height: 541px) and (min-aspect-ratio: 8/5)" />
+        <link rel="preload" as="image" href="/home-art-desktop.webp" type="image/webp" fetchPriority="high"
+          media="(min-width: 900px) and (min-height: 541px) and (min-aspect-ratio: 8/5)" />
       </head>
       <body>{children}</body>
     </html>

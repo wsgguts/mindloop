@@ -25,7 +25,7 @@ export const SOBRE = {
 
   paraQuem: {
     titulo: "Para quem é",
-    texto: "Feito para os estudantes do **3º ano do Ensino Médio**, que estão a um passo da faculdade e das primeiras escolhas profissionais.",
+    texto: "Pensado e desenvolvido para apresentar aos estudantes do **3º ano do Ensino Médio**, que estão a um passo da faculdade e das primeiras escolhas profissionais.",
     subtitulo: "O que você exercita jogando",
     habilidades: [
       { icone: "🧠", nome: "Pensamento crítico" },

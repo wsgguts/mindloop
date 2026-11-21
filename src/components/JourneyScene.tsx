@@ -10,7 +10,7 @@ import { TRAIL_IMAGE } from "../lib/trail";
 // Nada aqui recebe toques (pointer-events: none) — os botões das fases ficam por cima.
 
 const W = TRAIL_IMAGE.width, H = TRAIL_IMAGE.height;
-const G1 = "var(--g1)", G2 = "var(--g2)", G3 = "var(--g3)";
+const G1 = "var(--g1)", G2 = "var(--g2)";
 
 /** Desenha um elemento centrado em (0,0), dentro da caixa definida em DECOR_BOX. */
 function Shape({ d, sc }: { d: Decor; sc: Scene }) {

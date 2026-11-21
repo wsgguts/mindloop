@@ -20,14 +20,6 @@ export function rankingConfig(): { url: string; key: string } | null {
   return url && key ? { url: url.replace(/\/+$/, ""), key } : null;
 }
 
-export function parseIdentity(raw: string | null): RankIdentity | null {
-  if (!raw) return null;
-  try {
-    const o = JSON.parse(raw) as Partial<RankIdentity>;
-    return typeof o.id === "string" && typeof o.token === "string" && typeof o.nick === "string" ? { id: o.id, token: o.token, nick: o.nick } : null;
-  } catch { return null; }
-}
-
 /** Erro com mensagem pronta para mostrar na tela. */
 export class RankError extends Error {
   constructor(message: string, public code: string) { super(message); }
@@ -65,18 +57,9 @@ export async function rpc<T>(fn: string, body: Record<string, unknown>): Promise
   return (text ? JSON.parse(text) : null) as T;
 }
 
-export async function registerPlayer(nick: string): Promise<RankIdentity> {
-  const r = await rpc<{ id: string; token: string }>("register_player", { p_nick: nick });
-  return { id: r.id, token: r.token, nick };
-}
-
 export async function renamePlayer(me: RankIdentity, nick: string): Promise<RankIdentity> {
   await rpc("rename_player", { p_id: me.id, p_token: me.token, p_nick: nick });
   return { ...me, nick };
-}
-
-export async function leaveRanking(me: RankIdentity): Promise<void> {
-  await rpc("delete_player", { p_id: me.id, p_token: me.token });
 }
 
 /**

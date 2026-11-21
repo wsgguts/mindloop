@@ -66,7 +66,6 @@ export type Clue =
 
 export type ClueKind = Clue["k"];
 export const isRule = (c: Clue) => c.k === "rule";
-export const isPos = (c: Clue): c is PosClue => c.k !== "has" && c.k !== "hasNot" && c.k !== "rule";
 /** Pistas que falam de duas pessoas (só valem quando a primeira já foi descoberta). */
 export const isRelational = (c: Clue): c is Extract<PosClue, { a: number }> => c.k === "next" || c.k === "sameSide" || c.k === "oppSide";
 /** Pistas que dizem o que NÃO era. */
@@ -243,14 +242,6 @@ export function allAnswers(m: Model): number[][] {
 }
 
 /** Todas as soluções (até `limit`). */
-export function solveAll(m: Model, clues: Clue[], limit = Infinity): number[][] {
-  const sols: number[][] = [];
-  for (const a of allAnswers(m)) {
-    if (clues.every((c) => evalClue(m, c, a))) { sols.push(a); if (sols.length >= limit) break; }
-  }
-  return sols;
-}
-
 // ---------------------------------------------------------------- texto
 // Todas as frases das pistas saem daqui (o "quem conta" de cada pista vem de witness.ts).
 
@@ -322,8 +313,3 @@ export function ruleNotes(m: Model): string[] {
 }
 
 /** "a Ana estava na casa B2 (Cozinha)" / "a Ana segurava a Lupa". */
-export function assignText(m: Model, st: { cat: "p" | "o"; s: number; v: number }): string {
-  if (st.cat === "o") return `${the(m.people[st.s])} segurava ${the(m.objects[st.v])}`;
-  if (m.rule === "comodos") return `${the(m.people[st.s])} estava ${em(m.scene.rooms[roomOf(m, st.v)])}`;
-  return `${the(m.people[st.s])} estava ${cellText(m, st.v).replace(/^a /, "na ")}`;
-}

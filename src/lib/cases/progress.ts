@@ -117,4 +117,3 @@ export const solvedCount = (log: CaseLog, game?: JourneyGame) => solvedIds(log, 
 export const xpTotal = (log: CaseLog) => Object.values(log.records).reduce((t, r) => t + r.xp, 0);
 /** Mistérios diferentes resolvidos sem nenhuma dica (Lupa de Ouro). */
 export const goldCount = (log: CaseLog, game?: JourneyGame) => solvedIds(log, game).filter((id) => log.records[id].bestHints === 0).length;
-export const fastestMs = (log: CaseLog) => Math.min(Infinity, ...log.history.map((s) => s.ms));

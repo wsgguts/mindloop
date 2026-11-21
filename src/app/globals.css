@@ -38,17 +38,24 @@ p { margin: 0; }
    da tela (corta só um fio das laterais, sem tocar nas etiquetas dos cristais); se ainda sobrar altura, a sobra fica no
    céu, em cima, preenchida pela própria arte ampliada e desfocada. As áreas clicáveis são em % da arte, então
    acompanham qualquer tamanho. */
-.home { position: relative; isolation: isolate; height: calc(100vh - var(--nav-h)); height: calc(100svh - var(--nav-h));
-  display: flex; flex-direction: column; align-items: center; justify-content: flex-end; background: #120E48; overflow: hidden; } /* cor sólida do céu da arte em volta dela (sem imagem borrada) */
-.home .art { position: relative; flex: none; width: min(112vw, calc((100vh - var(--nav-h)) * .5619)); width: min(112vw, calc((100svh - var(--nav-h)) * .5619)); } /* até 6% de corte em cada lateral (os nomes dos cristais começam a 6,9% da borda) para a arte ocupar a altura toda nos celulares altos, sem faixa escura em cima */
-/* Celular muito alto: se ainda sobrar faixa em cima da arte, ela é preenchida com a borda de cima da própria arte
-   "esticada" para cima (mesmas cores do céu, sem emenda visível). A arte em si não muda nem é cortada a mais. */
-.home::before { content: ""; position: absolute; z-index: -1; top: 0; left: 50%; transform: translateX(-50%); height: 50%;
-  width: min(112vw, calc((100vh - var(--nav-h)) * .5619)); width: min(112vw, calc((100svh - var(--nav-h)) * .5619));
-  background: url(/home-art.webp) center top / 100% 400000% no-repeat; filter: blur(28px) saturate(.9); }
-.home .art img { display: block; width: 100%; height: auto;
-  -webkit-mask-image: linear-gradient(180deg, transparent 0, #000 .3%); mask-image: linear-gradient(180deg, transparent 0, #000 .3%); } /* borda suave mínima: a arte nova tem o texto "Projeto desenvolvido…" bem no topo */
-.hotspot { position: absolute; left: 68.8%; top: 66.7%; width: 37.9%; height: max(4.9%, 44px); transform: translate(-50%, -50%);
+/* A arte do Início sempre COBRE a tela toda (sem faixas nem preenchimentos). Como a tela quase nunca tem a mesma
+   proporção da arte, são dois recursos, nesta ordem:
+   1) a arte pode ficar até 6% mais estreita ou mais baixa do que o normal (o .94): imperceptível no desenho e
+      evita cortar as frases e etiquetas que encostam nas bordas;
+   2) o que ainda sobrar é cortado nas bordas.
+   --hh: altura livre da tela (sem o menu). Celular: --wm largura da arte, --am altura, --cm quanto passa da tela.
+   Corte de cima/baixo no celular: até 3% sai de baixo (a logo da FAETERJ fica a ~3,5% da borda) e o resto de cima,
+   mas nunca mais que 11% em cima (os cristais começam a 13%): em tablets o que passar disso sai de baixo. */
+.home { --hh: calc(100vh - var(--nav-h)); --wm: max(100vw, calc(var(--hh) * .5619 * .94));
+  position: relative; isolation: isolate; height: var(--hh);
+  display: flex; flex-direction: column; align-items: center; justify-content: flex-start; background: #120E48; overflow: hidden; }
+@supports (height: 100svh) { .home { --hh: calc(100svh - var(--nav-h)); } }
+.home .art { position: relative; flex: none; width: var(--wm); }
+.home .art-m { --am: max(var(--hh), calc(var(--wm) * 1.7797 * .94)); --cm: calc(var(--am) - var(--hh));
+  margin-top: calc(-1 * min(max(var(--cm) * .4, var(--cm) - var(--am) * .03), var(--am) * .11)); }
+.home .art.art-m img { height: var(--am); }
+.home .art img { display: block; width: 100%; height: auto; } /* a altura de cada arte é definida logo abaixo/acima (--am, --ad) */
+.hotspot { position: absolute; left: 49.2%; top: 44%; width: 35.5%; height: max(4.6%, 44px); /* botão "Jogar agora" da arte do celular */ transform: translate(-50%, -50%);
   background: transparent; border: 0; border-radius: 6px; cursor: pointer; color: transparent; -webkit-tap-highlight-color: transparent; }
 .hotspot span { opacity: 0; }
 
@@ -102,12 +109,16 @@ p { margin: 0; }
 .hfx .hfx-mist.b { opacity: .22; animation-duration: 34s; animation-direction: alternate-reverse; }
 @keyframes hfx-mist { from { transform: translateX(-6%); } to { transform: translateX(6%); } }
 @keyframes hfx-blink { 0%, 30% { opacity: 0; } 36% { opacity: .95; } 40% { opacity: .55; } 44%, 56% { opacity: .9; } 66%, 100% { opacity: 0; } }
-.hotspot.desk { left: 75.6%; top: 79.6%; width: 21.2%; height: 9.2%; } /* botão "Jogar agora" da arte do computador */
-@media (min-width: 900px) and (min-height: 541px) and (min-aspect-ratio: 8/5) { /* 16:10 ou mais largo: a arte (bem larga) corta no máximo ~9% de cada lado, sem tocar no nome e no botão */
-  .home { justify-content: center; }
-  .home::before, .home .art-m { display: none; }
-  .home .art.art-d { display: block; width: max(100vw, calc((100vh - var(--nav-h)) * 1.9821)); width: max(100vw, calc((100svh - var(--nav-h)) * 1.9821)); }
-  .home .art-d img { -webkit-mask-image: none; mask-image: none; }
+.hotspot.desk { left: 49.5%; top: 55.3%; width: 19%; height: 7.6%; } /* botão "Jogar agora" da arte do computador */
+/* 16:10 ou mais largo: arte do computador (16:9) cobrindo a tela, com a mesma folga de 6% na proporção.
+   Se ainda sobrar, telas mais estreitas cortam as laterais (por igual) e telas mais largas cortam em cima e embaixo:
+   até 5% de baixo (o texto "Barra Mansa" fica a ~6% da borda) e o resto de cima, nunca mais que 8% em cima.
+   --wd largura, --ad altura, --cd quanto passa da tela. */
+@media (min-width: 900px) and (min-height: 541px) and (min-aspect-ratio: 8/5) {
+  .home .art-m { display: none; }
+  .home .art.art-d { --wd: max(100vw, calc(var(--hh) * 1.7767 * .94)); --ad: max(var(--hh), calc(var(--wd) / 1.7767 * .94)); --cd: calc(var(--ad) - var(--hh));
+    display: block; width: var(--wd); margin-top: calc(-1 * min(max(var(--cd) * .4, var(--cd) - var(--ad) * .05), var(--ad) * .08)); }
+  .home .art.art-d img { height: var(--ad); }
 }
 .hotspot:hover { box-shadow: 0 0 0 3px var(--cyan), 0 0 22px rgba(255,210,63,.7); }
 .hotspot:active { background: rgba(255,255,255,.25); }
@@ -514,6 +525,8 @@ label { font-weight: 600; display: block; margin-bottom: 4px; }
   .home-main { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: start; padding-bottom: 0; }
   .home { position: sticky; top: 0; height: 100vh; height: 100svh; width: calc(100vh * .5619); width: calc(100svh * .5619); }
   .home .art { width: 100%; }
+  .home .art-m { margin-top: 0; } /* aqui a arte já tem a altura exata da tela: nada a cortar */
+  .home .art.art-m img { height: auto; }
   .games-home { width: 100%; padding: 16px 16px 20px; }
   .games-home h1 { font-size: 22px; }
   .ggrid { grid-template-columns: repeat(auto-fill, minmax(176px, 1fr)); }

@@ -9,8 +9,6 @@
 import { type JourneyGame, LEVELS_PER_CHAPTER } from "./journey";
 
 export const GUIDED_KEY = (g: JourneyGame) => `mindloop:guided:${g}`;
-/** Chave do tutorial antigo (mantida): quem já viu ou pulou o tutorial não é obrigado a ver a partida guiada. */
-export const LEGACY_TUTORIAL_KEY = (g: JourneyGame) => `mindloop:tutorial:${g}`;
 
 export type GuidedPart = "base" | `c${number}`;
 

@@ -213,6 +213,58 @@ Quem ativa "reduzir movimento" no aparelho vê tudo parado, com os brilhos que p
 
 O resto da arte não muda. Os originais sem conserto ficam em `art-src/`. Para refazer: `python scripts/fix_hex_icons.py` e depois `python scripts/recolor_astros_rune.py`.
 
+## Novas artes do Início (sem a runa do Astros)
+
+- **Artes:** novas artes para o celular (`public/home-art.jpg`, 944 × 1680) e para o computador (`public/home-art-desktop.jpg`, 2196 × 1236). As versões `.webp` são as que aparecem na tela.
+- **Astros:** não tem mais cristal na arte. Ele continua como jogo extra, no cartão da lista de jogos que o "Jogar agora" abre. Por isso a arte é uma só, igual com o Astros bloqueado ou liberado.
+- **Arquivos removidos:** `home-art-open.webp`, `home-art-desktop-open.webp`, `scripts/recolor_astros_rune.py`, `scripts/fix_hex_icons.py` e a pasta `art-src/`. Eles serviam só às artes antigas e continuam no histórico do git.
+- **Links:** as áreas dos quatro cristais (cristal + etiqueta) e o "Jogar agora" foram medidos de novo nas duas artes (`ART_SPOTS` e `DESK_SPOTS` em `App.tsx`, `.hotspot` e `.hotspot.desk` em `globals.css`).
+- **Efeitos:** hexágonos da FAETERJ (14 no celular, 8 no computador), brilhos dos cristais, estrelas, vaga-lumes e névoa reposicionados em `src/lib/homeFx.ts`.
+- **Enquadramento:**
+  - No celular, o corte lateral máximo caiu de 6% para 3% (`106vw`), porque as frases e a etiqueta "Patches" ficam mais perto da borda.
+  - No computador, a proporção da arte passou para 1,7767 (16:9).
+- **Botão "Opinião":** no celular e no computador fica no canto de baixo à direita, sobre a grama (`ui.css`). No topo ele cobria a frase "Pensar, explorar…" da arte nova.
+- **Arte cobrindo a tela toda:** sem faixas, céu extra ou laterais desfocadas (`globals.css`, início da seção do Início). Primeiro, a arte pode ficar até 6% mais estreita ou mais baixa que o normal, o que é imperceptível no desenho e evita cortar frases e etiquetas nas bordas. O que ainda sobrar é cortado:
+  - **Celular:** em telas altas, o corte é nas laterais. Em telas largas, até 3% sai de baixo e o resto de cima, mas nunca mais que 11% em cima, para os cristais nunca sumirem (tablet em pé).
+  - **Computador:** em telas mais estreitas que 16:9, o corte é nas laterais. Em telas mais largas, até 5% sai de baixo e o resto de cima, nunca mais que 8%.
+
+## Lista de jogos mais compacta no celular
+
+Antes, cada linha de cards passava de 480 px e o cartão do Astros (jogo bônus) ficava escondido bem abaixo das 4 jornadas. Agora ele aparece já na primeira tela, de 360 px de largura para cima.
+- **Cards (`ui.css`, celular em pé até 640 px):** gema menor (54 px), textos e botão mais justos, e sem o selo "Disponível", que era igual nos quatro. O selo "Jornada completa" continua.
+- **Texto de abertura (`App.tsx`):** agora diz "Quatro jornadas de enigmas e um jogo bônus esperando por você.", avisando que há mais um jogo abaixo.
+
+## Auditoria técnica (21/11/2026)
+
+Varredura completa do código, do banco e das telas. Só foram feitas correções com problema comprovado; as regras dos jogos, a progressão e o banco não foram alterados.
+
+**Bugs corrigidos**
+- **Nível perdido na sincronização (`App.tsx`, `syncNow`):** o app lia o progresso, esperava o servidor e gravava a resposta por cima. Um nível concluído nesse meio-tempo era apagado do aparelho. Agora a resposta é mesclada de novo com o que está no aparelho no momento da gravação. Há um teste novo para isso em `cloud.test.ts`.
+- **Ranking baixado várias vezes (`Ranking.tsx`):** qualquer nova renderização do App baixava o ranking de novo. Agora ele só é baixado quando muda o filtro, a faixa ou a identidade. Em produção, abrir a aba faz 1 consulta.
+- **Som de comemoração fora de hora (`CaseScreen.tsx`):** quem saía logo depois de resolver um caso ouvia a comemoração na tela seguinte. O som agora é cancelado ao sair.
+- **Rolagem lateral no Perfil em celulares de 320 px (`ui.css`):** as 4 abas e as linhas "texto + botão" dos Ajustes não cabiam. Em telas de até 360 px, as abas ficam com a largura do próprio texto e o botão desce para baixo do texto.
+
+**Desempenho**
+- **Pré-carregamento da arte (`layout.tsx`):** só a arte da tela atual é pré-carregada. Antes, o computador baixava também a arte do celular (273 kB) sem exibi-la.
+- **Pasta `public/`:** caiu de 7,4 MB para 4,9 MB. Os originais (`home-art.jpg`, `home-art-desktop.jpg`, `journey-trail.jpg`, `gem-*.png`) foram para `art/home` e `art/gems`, e não vão mais para o site.
+
+**Código e arquivos sem uso removidos (todos conferidos no projeto inteiro, inclusive testes e scripts)**
+- **Imagens:** `avatar-cat`, `avatar-kid` (png e webp), `fantasy.jpg` e `logo.jpg`.
+- **`ranking.ts`:** `registerPlayer`, `leaveRanking` e `parseIdentity`, da primeira versão. Hoje o app usa `createPlayer` e os demais em `cloud.ts`.
+- **`model.ts`:** `isPos`, `solveAll` e `assignText`.
+- **Outros exports:** `fastestMs` (`progress.ts`), `KIND_OF` (`themes.ts`), `isPainted` (`scenes.ts`), `ADMIN_KEY` e `parseAdmin` (`admin.ts`).
+- **Variáveis e imports parados:** `G3` (`JourneyScene.tsx`), `setPaused` (`LevelComplete.tsx`), `isAdjacent` (`ZipGame.tsx`) e `countSolutions` (`sudoku.test.ts`).
+- **Chave do tutorial:** era escrita em 3 lugares (`App.tsx`, `guided.ts` e `cloud.ts`). Ficou só a de `cloud.ts` (`TUTORIAL_KEY`).
+
+**Só identificado (não alterado)**
+- **Funções antigas no Supabase:** `register_player` e `delete_player` continuam publicadas no servidor, mas o app não as usa mais. Retirá-las mexe no banco, então depende de autorização.
+- **Avisos do Supabase:** os demais avisos de segurança ("RLS sem política" e "função executável pelo público") são o desenho intencional. As tabelas ficam fechadas, e o acesso é só pelas funções que conferem o token do jogador.
+- **Tamanho da página:** são 247 kB compactados, e a maior parte são os textos das investigações. Carregá-los só ao abrir um caso exigiria tornar assíncrono o fluxo "nível concluído → caso", uma mudança de risco num fluxo central.
+- **Tablet em pé:** os tabuleiros pequenos (nível 1) deixam espaço vazio embaixo. O tamanho máximo é escolhido por jogo e não foi alterado.
+- **ESLint:** não está configurado no projeto.
+
+**Validação:** TypeScript sem erros, também com a checagem de variáveis e parâmetros sem uso. Build de produção ok, 309 testes passando. Varredura no navegador em 7 tamanhos (320×568 a 1920×1080, incluindo celular deitado e tablet), sem erros de console nem rolagem lateral, com o servidor externo sempre bloqueado ou simulado.
+
 ## Progresso salvo
 
 Nada foi apagado nem convertido: as chaves antigas continuam valendo. Novas chaves: `mindloop:guided:<jogo>` e `mindloop:fb-ask`. O aviso antigo `mindloop:code-unseen` é apenas limpo.

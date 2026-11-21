@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { PUZZLES, puzzleGrid } from "./puzzles";
 import {
-  boxDims, candidates, conflictsAt, countSolutions, findHintCell, isFull, isSolved, parsePuzzle, setCell, usedUpDigits,
+  boxDims, candidates, conflictsAt, findHintCell, isFull, isSolved, parsePuzzle, setCell, usedUpDigits,
 } from "./sudoku";
 
 

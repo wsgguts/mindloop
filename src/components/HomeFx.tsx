@@ -2,7 +2,7 @@
 // (os cristais e o "Jogar agora" continuam clicáveis embaixo), é escondido de leitores de tela e fica parado
 // para quem pediu menos movimento no aparelho. Posições em lib/homeFx.ts; estilos em globals.css ("Efeitos do Início").
 //  • céu: um véu de luz (aurora) que passa devagar e brilhos de estrela que piscam;
-//  • runas: cada cristal "respira" um brilho na cor do jogo (o Astros, azul-noite enquanto bloqueado, verde depois);
+//  • cristais: cada um "respira" um brilho na cor do jogo;
 //  • hexágonos com o símbolo da FAETERJ: acendem e apagam, cada um num tempo diferente;
 //  • ambiente (como nas jornadas): vaga-lumes que sobem da grama e das ilhas, poeira de luz no céu e névoa
 //    que passa devagar sobre as nuvens de baixo.
@@ -19,7 +19,7 @@ const MOTES = 14;
 /** Atraso "embaralhado" e estável para cada item (os brilhos não piscam todos juntos). */
 const delay = (i: number, every: number) => `${-((i * 7919) % 97) / 97 * every}s`;
 
-export default function HomeFx({ layout, astrosOpen }: { layout: FxLayout; astrosOpen: boolean }) {
+export default function HomeFx({ layout }: { layout: FxLayout }) {
   return (
     <div className="hfx" aria-hidden="true">
       <i className="hfx-aurora" />
@@ -29,7 +29,7 @@ export default function HomeFx({ layout, astrosOpen }: { layout: FxLayout; astro
         <i key={`s${i}`} className="hfx-star" style={{ left: `${p.x}%`, top: `${p.y}%`, animationDelay: delay(i, 4.6), animationDuration: `${3.6 + (i % 4) * 0.8}s` } as React.CSSProperties} />
       ))}
       {layout.gems.map((g, i) => (
-        <i key={g.id} className="hfx-gem" style={{ left: `${g.x}%`, top: `${g.y}%`, "--c": g.id === "astros" ? (astrosOpen ? "#3BE070" : "#6F7CFF") : GEM_COLOR[g.id], animationDelay: `${-i * 0.9}s` } as React.CSSProperties} />
+        <i key={g.id} className="hfx-gem" style={{ left: `${g.x}%`, top: `${g.y}%`, "--c": GEM_COLOR[g.id], animationDelay: `${-i * 0.9}s` } as React.CSSProperties} />
       ))}
       {layout.hex.map((p, i) => (
         <i key={`h${i}`} className="hfx-hex" style={{ left: `${p.x}%`, top: `${p.y}%`, animationDelay: delay(i + 3, 6.5), animationDuration: `${5.5 + (i % 3) * 1.2}s` } as React.CSSProperties} />

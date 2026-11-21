@@ -17,8 +17,6 @@ import { TANGO_STORIES } from "./stories/tango";
 import { ZIP_STORIES } from "./stories/zip";
 
 export const RULE_OF: Record<JourneyGame, Rule> = { sudoku: "regioes", tango: "equilibrio", zip: "trilha", patches: "comodos", astros: "ceu" };
-/** Compatível com o código antigo (o "tipo" do caso é a regra do cenário). */
-export const KIND_OF = RULE_OF;
 export const KIND_NAME: Record<Rule, string> = {
   regioes: "Investigação de regiões", equilibrio: "Investigação de equilíbrio", trilha: "Investigação de trilha",
   comodos: "Investigação de cômodos", ceu: "Investigação do céu",

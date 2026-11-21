@@ -231,8 +231,7 @@ export default function CaseScreen({ c, record, active, continueLabel, onContinu
       const ms = Math.round(clock.read());
       const r = onSolve(ms, hints);
       setResult(r);
-      sfx("win");
-      window.setTimeout(() => sfx("celebrate"), 700);
+      sfx("win"); // a comemoração toca logo depois (efeito abaixo, cancelado se a pessoa sair antes)
       return;
     }
     // Errou: não revela a solução — só aponta que algo não fecha (e qual pista conferir).
@@ -243,6 +242,11 @@ export default function CaseScreen({ c, record, active, continueLabel, onContinu
   }
 
   useEffect(() => { if (result) doneRef.current?.focus({ preventScroll: true }); }, [result]);
+  useEffect(() => {
+    if (!result) return;
+    const t = window.setTimeout(() => sfx("celebrate"), 700);
+    return () => window.clearTimeout(t);
+  }, [result]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { window.scrollTo(0, 0); }, [result, stage]);
 
   const placed = a.slice(0, n).filter((v) => v >= 0).length;

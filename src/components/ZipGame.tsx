@@ -8,7 +8,7 @@ import { useSfx } from "./useSound";
 import { useRevealedErrors } from "./useRevealedErrors";
 import { useMemo, useRef, useState } from "react";
 import {
-  type Pos, type ZipPuzzle, canStep, indexInPath, isAdjacent, isZipSolved, nextTarget, parseZip, samePos, visitedNumbers,
+  type Pos, type ZipPuzzle, canStep, indexInPath, isZipSolved, nextTarget, parseZip, samePos, visitedNumbers,
 } from "../lib/zip";
 
 type Tone = "info" | "ok" | "warn" | "hint";

@@ -172,8 +172,6 @@ export const SCENES: Scene[] = [
 
 export const sceneOf = (chapter: number): Scene => SCENES[Math.min(SCENES.length, Math.max(1, chapter)) - 1];
 export const sceneArt = (s: Scene) => s.art ?? TRAIL_IMAGE.src;
-/** Mundo com pintura própria (sem gradação nem cenário vetorial por cima). */
-export const isPainted = (s: Scene) => !!s.art;
 export const scenePoints = (s: Scene) => s.points ?? TRAIL;
 
 /** Caixa (px da pintura) ocupada por um elemento do cenário. */
